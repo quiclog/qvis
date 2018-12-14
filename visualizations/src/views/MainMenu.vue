@@ -1,9 +1,9 @@
 <template>
-  <div id="MainMenu">
-    <p>This is the main menu V2</p>
-      <router-link to="/timeline">Timeline</router-link> | 
-      <router-link to="/sequence">Sequence</router-link>
-  </div>
+    <div id="MainMenu">
+        <p>This is the main menu V2</p>
+        <router-link to="/timeline">Timeline</router-link> | 
+        <router-link to="/sequence">Sequence</router-link>
+    </div>
 </template>
 
 <style scoped>
@@ -11,6 +11,7 @@
         width: 100%;
         background-color: black;
         color: white;
+        text-align: center;
     }
 
     #MainMenu a {

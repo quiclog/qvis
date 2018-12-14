@@ -16,7 +16,7 @@
     "object-literal-sort-keys": false,
     "no-consecutive-blank-lines": false,
     "semicolon": false,
-    "no-import-side-effect": true,
+    "no-import-side-effect": false,
     "no-parameter-reassignment": true,
     "prefer-for-of": true,
     "await-promise": true,
