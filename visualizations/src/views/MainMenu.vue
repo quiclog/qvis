@@ -1,9 +1,13 @@
 <template>
-    <div id="MainMenu">
-        <p>This is the main menu V2</p>
-        <router-link to="/timeline">Timeline</router-link> | 
-        <router-link to="/sequence">Sequence</router-link>
-    </div>
+    <b-container id="MainMenu" fluid>
+        <b-row>
+            <b-col cols="1" md="auto">qvis</b-col>
+            <b-col>
+                <router-link to="/timeline">Timeline</router-link> | 
+                <router-link to="/sequence">Sequence</router-link>
+            </b-col>
+        </b-row>
+    </b-container>
 </template>
 
 <style scoped>

@@ -2,44 +2,30 @@
     <div class="home">
         <HelloWorld msg="This is the timeline view"/>
 
-        <b-alert variant="danger" dismissible show fade>
-            Dismissible Alert!
-        </b-alert>
+        <b-button @click="AddRandomConnection()">Add new random ConnectionGroup</b-button> | 
+        <b-button @click="DeleteFirstConnection()">Delete First</b-button> | 
+        <b-button @click="ChangeEventName()">Change Name</b-button> | 
+        <b-button @click="RemoveEvent()">RemoveEvent</b-button>
 
-        <div class="container">
-            <div class="row">
-                <div class="col-6">
-                    big one
-                </div>
-                <div class="col-2 bg-primary">
-                    small
-                </div>
-                <div class="col-4">
-                    medium
-                </div>
-            </div>
+        <div v-for="connectionGroup in groups" v-bind:key="connectionGroup.description">
+            {{ connectionGroup.description }}
         </div>
-
-        <b-alert variant="success" dismissible show style="width: 500px;">
-            <h4 class="alert-heading">Well done!</h4>
-            <p>Aww yeah, you successfully read this important alert message. This example text is going to run a bit longer so that you can see how spacing within an alert works with this kind of content.</p>
-            <hr>
-            <p class="mb-0">Whenever you need to, be sure to use margin utilities to keep things nice and tidy.</p>
-        </b-alert>
-
-        <div class="alert alert-success alert-dismissible fade show" style="width: 500px;" role="alert">
-            <h4 class="alert-heading">Well done!</h4>
-            <p>Aww yeah, you successfully read this important alert message. This example text is going to run a bit longer so that you can see how spacing within an alert works with this kind of content.</p>
-            <hr>
-            <p class="mb-0">Whenever you need to, be sure to use margin utilities to keep things nice and tidy.</p>
+        <div v-for="(connection, index) in connections" :key="index">
+            <div v-for="(event, index) in connection.GetEvents()" :key="index">
+                - Event: {{ event.name }}
+            </div>
         </div>
 
     </div>
 </template> 
 
 <script lang="ts">
-    import { Component, Vue } from 'vue-property-decorator';
-    import HelloWorld from '@/components/HelloWorld.vue'; // @ is an alias to /src
+    import { getModule } from 'vuex-module-decorators'
+    import { Component, Vue } from "vue-property-decorator";
+    import HelloWorld from "@/components/HelloWorld.vue";
+
+    import ConnectionStore from "@/store/ConnectionStore"
+    import ConnectionGroup from "@/data/ConnectionGroup"
 
     @Component({
         components: {
@@ -48,5 +34,38 @@
     })
 
     export default class Timeline extends Vue {
-    }
+
+        protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
+
+        get groups() {
+            return this.store.groups;
+        }
+
+        get connections(){
+            if( this.store.groups.length > 0 )
+                return this.store.groups[ this.store.groups.length - 1 ].GetConnections();
+            else
+                return undefined;
+        }
+
+        protected AddRandomConnection() {
+            const filename:string = "RandomConnectionGroup " + Math.round(Math.random() * 100);
+            this.store.DEBUG_LoadRandomFile( filename ).then((cgroup:ConnectionGroup) => {
+                console.log("ConnectionGroup added. This is called AFTER the mutation has been committed to the store!", cgroup);
+            });
+        }
+
+        protected DeleteFirstConnection() {
+            this.store.DeleteGroup( this.groups[0] );
+        }
+
+        protected ChangeEventName(){
+            this.connections![0].GetEvents()[0].name = "Event was changed";
+        }
+
+        protected RemoveEvent(){
+            const events = this.connections![0].GetEvents();
+            events.splice( events.length - 1, 1 );
+        }
+    } 
 </script>

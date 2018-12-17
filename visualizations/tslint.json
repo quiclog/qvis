@@ -9,12 +9,17 @@
     ]
   },
   "rules": {
-    "quotemark": [true, "single"],
+    "quotemark": false,
     "indent": [true, "spaces", 4],
+    "array-type": [true, "generic"],
     "interface-name": false,
     "ordered-imports": false,
+    "max-line-length": [true, "200"],
+    "no-console": false,
     "object-literal-sort-keys": false,
     "no-consecutive-blank-lines": false,
+    "typedef-whitespace": false,
+    "no-trailing-whitespace": false,
     "semicolon": false,
     "no-import-side-effect": false,
     "no-parameter-reassignment": true,
@@ -26,6 +31,6 @@
     "eofline": true,
     "arrow-parens": true,
     "newline-before-return": true,
-    "whitespace": [true, "check-decl", "check-branch", "check-operator", "check-type", "check-typecast"]
+    "whitespace": [true, "check-decl", "check-branch", "check-operator", "check-typecast"]
   }
 }
