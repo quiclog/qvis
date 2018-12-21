@@ -32,13 +32,13 @@ export default class ConnectionStore extends VuexModule {
         const testGroup = new QlogConnectionGroup();
         testGroup.description = filename;
 
-        let connectionCount = Math.round(Math.random() * 5);
-        for( let i = 0; i < connectionCount; ++i ){
+        const connectionCount = Math.round(Math.random() * 5);
+        for ( let i = 0; i < connectionCount; ++i ){
             const connectionTest = new QlogConnection(testGroup);
             testGroup.AddConnection( connectionTest );
 
-            let eventCount = Math.ceil(Math.random() * 3);
-            for( let j = 0; j < eventCount; ++j ){
+            const eventCount = Math.ceil(Math.random() * 3);
+            for ( let j = 0; j < eventCount; ++j ){
                 const eventTest = new QlogEvent();
                 eventTest.name = "Connection #" + i + " - Event #" + j;
                 connectionTest.AddEvent( eventTest );
