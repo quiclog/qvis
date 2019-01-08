@@ -6,7 +6,7 @@ import QlogEvent from '@/data/Event';
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
 
-    public grouplist:Array<QlogConnectionGroup> = new Array<QlogConnectionGroup>();
+    protected grouplist:Array<QlogConnectionGroup> = new Array<QlogConnectionGroup>();
 
     get groups(): Array<QlogConnectionGroup> {
         return this.grouplist;
@@ -32,9 +32,10 @@ export default class ConnectionStore extends VuexModule {
         const testGroup = new QlogConnectionGroup();
         testGroup.description = filename;
 
-        const connectionCount = Math.round(Math.random() * 5);
+        const connectionCount = Math.round(Math.random() * 5) + 1;
         for ( let i = 0; i < connectionCount; ++i ){
             const connectionTest = new QlogConnection(testGroup);
+            connectionTest.name = "Connection " + i;
             testGroup.AddConnection( connectionTest );
 
             const eventCount = Math.ceil(Math.random() * 3);

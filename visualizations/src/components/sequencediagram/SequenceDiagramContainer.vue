@@ -1,7 +1,7 @@
 <template>
     <div class="home">
-        <SequenceDiagramConfigurator :config="configGetter"/>
-        <SequenceDiagramRenderer :config="configGetter"/>
+        <SequenceDiagramConfigurator :config="config"/>
+        <SequenceDiagramRenderer :config="config"/>
     </div>
 </template> 
 
@@ -13,7 +13,7 @@
     import SequenceDiagramConfigurator from "./SequenceDiagramConfigurator.vue";
     import SequenceDiagramRenderer from "./SequenceDiagramRenderer.vue"; 
 
-    import ConnectionStore from "@/store/ConnectionStore";
+    import ConfigurationStore from "@/store/ConfigurationStore";
     import ConnectionGroup from "@/data/ConnectionGroup";
 
 
@@ -28,16 +28,16 @@
 
         // We want to share some stuff between our configurator (choosing which files to show, default RTT, scaling, etc.)
         // and our actual renderer. 
-        // The canonical way to do this would be via the global vuex store, but that feels very dirty to me,
-        // as this is supposed to be contained for the SequenceDiagram.
-        // As such, we setup a custom Config object that we share via props.
-        // This is frowned upon by vue (they only want one-way data flow between parent and child)
-        // but I frown upon a single global store for the full application.
-        protected config:SequenceDiagramConfig = new SequenceDiagramConfig();
+        // The canonical way to do this would be to put everything on the vuex store 
+        // and just have the components access the store directly.
+        // However, that's a bit dirty, so instead this top-level component fetches the stored state 
+        // and distributes it over the children, who need not know about the vuex store 
+        protected store:ConfigurationStore = getModule(ConfigurationStore, this.$store);
+        protected config:SequenceDiagramConfig = this.store.sequenceDiagramConfig;
 
         // TODO: get rid of this. Is just to test if we can use $data stuff in computed getters and pass them as props while keeping reactivity
-        get configGetter() {
-            return this.config;
-        }
+        // get configGetter() {
+        //    return this.config;
+        // }
     } 
 </script>

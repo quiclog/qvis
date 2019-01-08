@@ -49,6 +49,15 @@
             }
         }
 
+        protected created(){
+            // TODO: only here for debug reasons obviously
+            if ( this.store.groups.length === 0 ){
+                this.AddRandomConnection();
+                this.AddRandomConnection();
+                this.AddRandomConnection();
+            }
+        }
+
         protected AddRandomConnection() {
             const filename:string = "RandomConnectionGroup " + Math.round(Math.random() * 100);
             this.store.DEBUG_LoadRandomFile( filename ).then((cgroup:ConnectionGroup) => {
