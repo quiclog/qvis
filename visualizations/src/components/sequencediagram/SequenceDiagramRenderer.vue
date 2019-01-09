@@ -2,7 +2,6 @@
     <div>
         <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div>
-        <div>ROBIN</div>
 
         <div v-for="(connection, index) in connections" :key="index">
             - {{index}} : {{connection.name}} : {{connection.parent.description}}

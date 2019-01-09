@@ -12,6 +12,8 @@ export default class QlogConnection {
         this.parent = parent;
         this.name = "NewConnection";
         this.events = new Array<QlogEvent>();
+
+        this.parent.AddConnection( this );
     }
 
     public AddEvent(evt:QlogEvent):void { this.events.push(evt); }

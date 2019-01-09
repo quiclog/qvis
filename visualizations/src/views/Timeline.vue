@@ -51,7 +51,7 @@
 
         protected created(){
             // TODO: only here for debug reasons obviously
-            if ( this.store.groups.length === 0 ){
+            if ( this.store.groups.length <= 1 ){
                 this.AddRandomConnection();
                 this.AddRandomConnection();
                 this.AddRandomConnection();

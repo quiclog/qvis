@@ -1,22 +1,27 @@
 <template>
-    <b-col style="background-color: white; color: black; border: black 1px solid;">
-        <div v-if="tooManyOptions">
-            <!-- separate-select mode -->
-            <!--<div>{{selectedGroup.title}} - {{selectedGroup.description}}</div> -->
-            <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
+    <b-col style="background-color: white; color: black; border: black 1px solid; max-width: 50%;">
+        <b-container fluid>
+            <div v-if="tooManyOptions">
+                <!-- separate-select mode -->
+                <!--<div>{{selectedGroup.title}} - {{selectedGroup.description}}</div> -->
+                <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
 
-            <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
-            <b-form-select v-model="selectedConnection" :options="connectionOptions" @change="onConnectionSelectionChanged" class="mb-3" />
-        </div>
+                <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
+                <b-form-select v-model="selectedConnection" :options="connectionOptions" @change="onConnectionSelectionChanged" class="mb-3" />
+            
+                <b-button v-if="canBeRemoved" @click="removeMyself">&minus;</b-button> 
+            </div>
 
-        <div v-else>
-            <!-- combined-select mode -->
-            <div>{{selectedConnection.parent.description}}</div>
-            <b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged" class="mb-3" />
-        </div>
-
-
-        <b-button @click="removeMyself">&minus;</b-button> 
+            <div v-else>
+                <!-- combined-select mode -->
+                <div>{{selectedConnection.parent.description}}</div>
+                <b-row class="mb-3">
+                    <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
+                    <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
+                </b-row>
+            </div>
+        
+        </b-container>
     </b-col>
 </template> 
 
@@ -35,13 +40,16 @@
     // We provide two modes: all in 1 select (when there aren't too many options) and 2 selects (1 for the group, then the connection)
     // This latter one is for when there are too many options and a single select would be too unwieldy
     @Component
-    export default class ConnectionGroupConfigurator extends Vue {
+    export default class ConnectionConfigurator extends Vue {
         @Prop()
          // passing in connection allows us to set it externally as well (e.g., loading from config string, loading premade testcase)
         protected connection!:Connection;
 
         @Prop()
         protected allGroups!:Array<ConnectionGroup>; 
+
+        @Prop({ default: true })
+        protected canBeRemoved!:boolean;
 
         @Prop()
         protected onConnectionSelected!:(conn: QlogConnection) => void;
@@ -96,6 +104,7 @@
         // used in combined-select mode
         protected get combinedOptions(){ 
             const options:any = [];
+
             for ( const group of this.allGroups ) {
                 options.push( { value: null, text: group.description, disabled: true } );
 
@@ -112,7 +121,9 @@
             // this.selectedGroup is the PREVIOUS selection for some reason 
             console.log("Selected a new group", this.selectedGroup, newlySelected);
 
-            this.selectedConnection = newlySelected.GetConnections()[0]; // auto-select the first connection in the list
+            // auto-select the first connection in the list
+            this.selectedConnection = newlySelected.GetConnections()[0];
+
             this.onConnectionSelectionChanged( this.selectedConnection );
         }
 

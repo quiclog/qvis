@@ -3,9 +3,11 @@
         <div>{{(config ? config.manualRTT + " - " + config.scale : "UNKNOWN" )}}</div>
         <b-button @click="adjustConfigTest()">Adjust config</b-button> 
 
-        <b-row>
-            <ConnectionConfigurator v-for="(connection, index) of this.config.connections" :allGroups="store.groups" :connection="connection" :key="index" :onConnectionSelected="onConnectionSelected.bind(this, index)" :onRemoved="onConnectionRemoved.bind(this,index)" />
-        </b-row>
+        <b-container fluid>
+            <b-row>
+                <ConnectionConfigurator v-for="(connection, index) of this.config.connections" :allGroups="store.groups" :connection="connection" :key="index" :canBeRemoved="index != 0" :onConnectionSelected="onConnectionSelected.bind(this, index)" :onRemoved="onConnectionRemoved.bind(this,index)" />
+            </b-row>
+        </b-container>
     <!--
         <div v-for="(group, index) of store.groups" :key="index">
             {{group.description}}
@@ -61,8 +63,8 @@
             // then we want to set vantagepoint.NETWORK and vantagepoint.SERVER as the next two, if they exist
             // this of course also implies adding new connections to this.config.connections
 
-            // for now, just select all other connections after this one from the same parent
-            if ( connectionIndex === 0 ){
+            // for now, just select all other connections after this one from the same parent if there are more than 1 in a group
+            if ( connectionIndex === 0 && connection.parent.GetConnections().length > 1 ){
                 const connections = connection.parent.GetConnections();
                 const connectionIndexInParent = connections.indexOf(connection);
                 let rendererIndex = 1; 
@@ -78,7 +80,7 @@
 
         public created(){
             // TODO: remove, only for debugging
-            if ( this.store.groups.length > 0 ){
+            if ( this.config.connections.length === 0 ){
                 this.addConnection();
             }
         }
