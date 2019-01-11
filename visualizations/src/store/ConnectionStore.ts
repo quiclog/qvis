@@ -1,10 +1,13 @@
-import {VuexModule, Module, Mutation, Action} from 'vuex-module-decorators'
-import { Module as Modx } from 'vuex'
+import {VuexModule, Module, Mutation, Action} from 'vuex-module-decorators';
+import { Module as Modx } from 'vuex';
 import QlogConnectionGroup from "@/data/ConnectionGroup";
 import QlogConnection from '@/data/Connection';
 import QlogEvent from '@/data/Event';
 
-import { IQLog } from '@quictools/qlog-schema' 
+import * as qlog from '@quictools/qlog-schema'; 
+import { QUtil } from '@quictools/qlog-schema/util'; 
+// import * as qlog from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript' 
+// import { QUtil } from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript/util'; 
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -13,7 +16,7 @@ export default class ConnectionStore extends VuexModule {
     protected dummyConnection!:QlogConnection;
 
     public constructor(moduler: Modx<ThisType<{}>, any>){
-        super(moduler);
+        super(moduler); 
         this.dummyConnection = this.createDummyConnection();
     }
 
@@ -47,7 +50,7 @@ export default class ConnectionStore extends VuexModule {
     // Potentially bigger problem: checking if json adheres to the TypeScript spec... 
     // this could be done with something like https://github.com/typestack/class-transformer
     // but then we would need to add additional annotations to the Schema classes... urgh
-    public async AddGroupFromQlogFile( { fileContents, filename } : { fileContents:IQLog, filename:string } ){
+    public async AddGroupFromQlogFile( { fileContents, filename } : { fileContents:qlog.IQLog, filename:string } ){
         console.log("AddGroupFromQlogFile", fileContents, fileContents.connectionid);
 
         // current QLog files don't yet have the concept of the grouping, 
@@ -58,12 +61,18 @@ export default class ConnectionStore extends VuexModule {
 
         const connection = new QlogConnection(group);
         connection.name = fileContents.vantagepoint;
-        for ( const evt of fileContents.events ){
+        const wrap = QUtil.WrapEvent(null);
+
+        for ( const jsonevt of fileContents.events ){
+            wrap.evt = jsonevt;
+
             const evt2:QlogEvent = new QlogEvent();
-            evt2.time = evt[0];
-            evt2.category = evt[1]; 
-            evt2.name = evt[2];
-            evt2.data = evt[3];
+            evt2.time       = wrap.time;
+            evt2.category   = wrap.category; 
+            evt2.name       = wrap.type;
+            evt2.trigger    = wrap.trigger;
+            evt2.data       = wrap.data;
+
             connection.AddEvent(evt2);
         }
 

@@ -9,7 +9,7 @@ import "bootstrap-vue/dist/bootstrap-vue.css";
 
 import { getModule } from "vuex-module-decorators";
 import ConnectionStore from "@/store/ConnectionStore";
-import { IQLog } from '@quictools/qlog-schema' 
+import { IQLog } from '@quictools/qlog-schema';
 
 const standaloneFiles = [
     "ngtcp2_pcap1.qlog.js",
