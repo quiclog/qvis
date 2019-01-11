@@ -18,7 +18,6 @@
     -->
 
         <b-button @click="addConnection()">&#43;<!-- PLUS + --></b-button> 
-        <b-button @click="DEBUG_hardcodedSetConnection()">Hardcoded set connection</b-button> 
     </div>
 </template> 
 
@@ -88,11 +87,6 @@
         public addConnection(){
             console.log("addCOnnection: adding new connection configurator");
             this.config.connections.push( this.store.groups[0].GetConnections()[0] );
-        }
-
-        public DEBUG_hardcodedSetConnection(){
-            // this.config.connections[0] = this.store.groups[0].GetConnections()[0];
-            Vue.set(this.config.connections, 0, this.store.groups[0].GetConnections()[0]);
         }
 
         protected onConnectionRemoved(connectionIndex:number){

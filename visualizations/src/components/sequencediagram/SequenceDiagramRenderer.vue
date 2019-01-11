@@ -3,9 +3,16 @@
         <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div>
 
-        <div v-for="(connection, index) in connections" :key="index">
-            - {{index}} : {{connection.name}} : {{connection.parent.description}}
-        </div>
+        <b-container fluid>
+            <b-row>
+                <b-col v-for="(connection, index) in connections" :key="index">
+                    - {{index}} : {{connection.name}} : {{connection.parent.description}}
+                    <div v-for="(event,index) in connection.GetEvents()" :key="index">
+                        = {{index}} : {{event.time}} {{event.category}} {{event.name}} {{event.trigger}}
+                    </div>
+                </b-col>
+            </b-row>
+        </b-container>
     </div>
 </template> 
 

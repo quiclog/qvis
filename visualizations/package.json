@@ -17,10 +17,11 @@
     "vuex-module-decorators": "^0.9.2"
   },
   "devDependencies": {
+    "@quictools/qlog-schema": "0.0.2",
     "@vue/cli-plugin-typescript": "^3.2.0",
     "@vue/cli-service": "^3.2.0",
     "typescript": "^3.0.0",
-    "vue-template-compiler": "^2.5.17" 
+    "vue-template-compiler": "^2.5.17"
   },
   "postcss": {
     "plugins": {

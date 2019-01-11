@@ -4,6 +4,8 @@ import QlogConnectionGroup from "@/data/ConnectionGroup";
 import QlogConnection from '@/data/Connection';
 import QlogEvent from '@/data/Event';
 
+import { IQLog } from '@quictools/qlog-schema' 
+
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
 
@@ -32,6 +34,40 @@ export default class ConnectionStore extends VuexModule {
         if ( index !== -1 ) {
             this.grouplist.splice(index, 1);
         }
+    }
+
+    @Action
+    // TODO: move this away from here to its own location
+    // We need to prepare ways to load QLOG files of various qlog versions and then map them to our internal structs
+    // A way to do this is having converters, e.g., Draft17Loader, Draft18Loader etc. that get the fileContents 
+    // and that then transform them to our internal classes
+    // Downside: we need internal classes for everything...
+    // However: if we just always use the latest versions or a single specified version from the @quictools/qlog-schema package,
+    // we can just use that internally and convert the rest to that and update when needed
+    // Potentially bigger problem: checking if json adheres to the TypeScript spec... 
+    // this could be done with something like https://github.com/typestack/class-transformer
+    // but then we would need to add additional annotations to the Schema classes... urgh
+    public async AddGroupFromQlogFile( { fileContents, filename } : { fileContents:IQLog, filename:string } ){
+        console.log("AddGroupFromQlogFile", fileContents, fileContents.connectionid);
+
+        // current QLog files don't yet have the concept of the grouping, 
+        // so what we get in is actually what we would call a QlogConnection instead of a Group
+        const group = new QlogConnectionGroup();
+        group.description = filename;
+        group.title = filename;
+
+        const connection = new QlogConnection(group);
+        connection.name = fileContents.vantagepoint;
+        for ( const evt of fileContents.events ){
+            const evt2:QlogEvent = new QlogEvent();
+            evt2.time = evt[0];
+            evt2.category = evt[1]; 
+            evt2.name = evt[2];
+            evt2.data = evt[3];
+            connection.AddEvent(evt2);
+        }
+
+        this.context.commit( "AddGroup", group );
     }
 
     @Action({commit: 'AddGroup'})
