@@ -14,7 +14,7 @@
 
             <div v-else>
                 <!-- combined-select mode -->
-                <div>{{selectedConnection.parent.description}}</div>
+                <div>{{selectedConnection.parent.title}} ({{selectedConnection.parent.description}})</div>
                 <b-row class="mb-3">
                     <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
                     <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
@@ -85,7 +85,7 @@
         protected get groupOptions(){
             const options:any = [];
             for ( const group of this.allGroups ) {
-                options.push( { value: group, text: group.description } );
+                options.push( { value: group, text: group.title + " (" + group.description + ")" } );
             } 
 
             return options;
@@ -106,10 +106,10 @@
             const options:any = [];
 
             for ( const group of this.allGroups ) {
-                options.push( { value: null, text: group.description, disabled: true } );
+                options.push( { value: null, text: group.title, disabled: true } );
 
                 for ( const connection of group.GetConnections() ) {
-                    options.push( { value: connection, text: "- " + connection.name } );
+                    options.push( { value: connection, text: "↳ " + connection.name } );
                 }
             }
 

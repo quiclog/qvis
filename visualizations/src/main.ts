@@ -14,6 +14,9 @@ import { IQLog } from '@quictools/qlog-schema';
 const standaloneFiles = [
     "ngtcp2_pcap1.qlog.js",
     "quictracker_handshake_v6_quicker_20181219.qlog.js",
+    "ngtcp2_multistreams_server_noloss.qlog.js",
+    "ngtcp2_multistreams_server_10ploss.qlog.js",
+    "ngtcp2_multistreams_server_losscomparison.qlog.js",
 ];
   
 const connectionStore = getModule(ConnectionStore, store);
@@ -22,7 +25,7 @@ for ( const filepath of standaloneFiles ){
 
     const scriptelement = document.createElement('script');
 
-    console.log("Loading ", filepath );
+    console.log("Loading ", filepath ); 
 
     scriptelement.onload = () => {
         // the standalone file has a single variable in it, named after the file, so we can get the contents

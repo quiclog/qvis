@@ -17,7 +17,7 @@ export default class ConnectionStore extends VuexModule {
 
     public constructor(moduler: Modx<ThisType<{}>, any>){
         super(moduler); 
-        this.dummyConnection = this.createDummyConnection();
+        this.dummyConnection = this.createDummyConnection(); 
     }
 
     get groups(): Array<QlogConnectionGroup> {
@@ -51,29 +51,34 @@ export default class ConnectionStore extends VuexModule {
     // this could be done with something like https://github.com/typestack/class-transformer
     // but then we would need to add additional annotations to the Schema classes... urgh
     public async AddGroupFromQlogFile( { fileContents, filename } : { fileContents:qlog.IQLog, filename:string } ){
-        console.log("AddGroupFromQlogFile", fileContents, fileContents.connectionid);
+        console.log("AddGroupFromQlogFile", fileContents, fileContents.connections);
 
-        // current QLog files don't yet have the concept of the grouping, 
-        // so what we get in is actually what we would call a QlogConnection instead of a Group
+        // QLog toplevel structure contains a list of connections
+        // most files currently just contain a single connection, but the idea is to allow bundling connections on a single file
+        // for example 1 log for the server and 1 for the client and 1 for the network, all contained in 1 file
+        // This is why we call it a ConnectionGroup here, instead of QlogFile or something 
         const group = new QlogConnectionGroup();
-        group.description = filename;
+        group.description = fileContents.description || "";
         group.title = filename;
 
-        const connection = new QlogConnection(group);
-        connection.name = fileContents.vantagepoint;
-        const wrap = QUtil.WrapEvent(null);
+        for( const jsonconnection of fileContents.connections ){
 
-        for ( const jsonevt of fileContents.events ){
-            wrap.evt = jsonevt;
+            const connection = new QlogConnection(group);
+            connection.name = jsonconnection.vantagepoint + (jsonconnection.metadata ? " : " + jsonconnection.metadata : "");
+            const wrap = QUtil.WrapEvent(null);
 
-            const evt2:QlogEvent = new QlogEvent();
-            evt2.time       = wrap.time;
-            evt2.category   = wrap.category; 
-            evt2.name       = wrap.type;
-            evt2.trigger    = wrap.trigger;
-            evt2.data       = wrap.data;
+            for ( const jsonevt of jsonconnection.events ){
+                wrap.evt = jsonevt;
 
-            connection.AddEvent(evt2);
+                const evt2:QlogEvent = new QlogEvent();
+                evt2.time       = wrap.time;
+                evt2.category   = wrap.category; 
+                evt2.name       = wrap.type;
+                evt2.trigger    = wrap.trigger;
+                evt2.data       = wrap.data;
+
+                connection.AddEvent(evt2);
+            }
         }
 
         this.context.commit( "AddGroup", group );
