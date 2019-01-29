@@ -35,4 +35,32 @@ const router = new Router({
   ],
 });
 
+function hasQueryParams(route:any) {
+    return !!Object.keys(route.query).length;
+  }
+  
+// Vue does something weird with its processing of query parameters
+// normally, we get an url like : mydomain.com/#/routename
+// if we then do mydomain.com/#/routename?param1=test, everything works
+// HOWEVER
+// mydomain.com?param1=test will NOT work...
+// this will redirect to  mydomain.com?param1=test#/timeline
+// WHICH IS RETARDED, VUE
+// anyway... if we are in this situation, manually copy the parameters over
+// and use them in the redirect so stuff works
+router.beforeEach((to, from, next) => {
+
+    if ( window.location.search && Object.keys(to.query).length === 0 && from.path === "/" ){
+        const params = new URLSearchParams(window.location.search);
+        const query:any = {};
+        for ( const entry of params.entries() ){
+            query[ entry[0] ] = entry[1];
+        }
+        next({ name: to.name, query: query });
+    }
+    else {
+        next();
+    }
+});
+
 export default router;

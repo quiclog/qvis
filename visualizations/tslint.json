@@ -17,6 +17,7 @@
     "ordered-imports": false,
     "max-line-length": [true, 200],
     "no-console": false,
+    "object-literal-shorthand": false,
     "object-literal-sort-keys": false,
     "no-consecutive-blank-lines": false,
     "typedef-whitespace": false,

@@ -40,7 +40,7 @@ for ( const filepath of standaloneFiles ){
 
         connectionStore.AddGroupFromQlogFile(  {fileContents: file as IQLog, filename: varname} ).then( () => {
             console.log("Loaded ", varname, file );
-        });
+        }); 
     };
 
     scriptelement.onerror = (err) => {

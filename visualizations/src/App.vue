@@ -20,3 +20,23 @@
         color: #2c3e50;
     }
 </style>
+
+
+<script lang="ts">
+    import { getModule } from "vuex-module-decorators";
+    import { Component, Vue } from "vue-property-decorator";
+    import HelloWorld from "@/components/HelloWorld.vue";
+
+    import ConnectionStore from "@/store/ConnectionStore";
+    import ConnectionGroup from "@/data/ConnectionGroup";
+
+    @Component
+    export default class App extends Vue {
+
+        protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
+
+        protected created(){ 
+            this.store.LoadFilesFromServer( this.$route.query );
+        }
+    } 
+</script>

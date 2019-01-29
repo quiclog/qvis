@@ -1,10 +1,12 @@
 import {VuexModule, Module, Mutation, Action} from 'vuex-module-decorators';
 import { Module as Modx } from 'vuex';
+import axios from 'axios';
 import QlogConnectionGroup from "@/data/ConnectionGroup";
 import QlogConnection from '@/data/Connection';
 import QlogEvent from '@/data/Event';
 
 import * as qlog from '@quictools/qlog-schema'; 
+// import * as qlog from '@quictools/qlog-schema/dist/draft-16/QLog'; 
 import { QUtil } from '@quictools/qlog-schema/util'; 
 // import * as qlog from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript' 
 // import { QUtil } from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript/util'; 
@@ -61,7 +63,7 @@ export default class ConnectionStore extends VuexModule {
         group.description = fileContents.description || "";
         group.title = filename;
 
-        for( const jsonconnection of fileContents.connections ){
+        for ( const jsonconnection of fileContents.connections ){
 
             const connection = new QlogConnection(group);
             connection.name = jsonconnection.vantagepoint + (jsonconnection.metadata ? " : " + jsonconnection.metadata : "");
@@ -103,6 +105,41 @@ export default class ConnectionStore extends VuexModule {
         }
 
         return testGroup;
+    }
+
+    @Action
+    public async LoadFilesFromServer(parameters:any){
+
+        console.log("ConnectionStore:LoadFilesFromServer ", parameters);
+
+        try{
+            let url = '/loadfiles';
+             // only for local debugging where we run the servers on different ports
+            if ( window.location.toString().indexOf("localhost:8080") >= 0 ){
+                url = "https://localhost/loadfiles";
+            }
+
+            // for documentation on the expected form of these parameters,
+            // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
+            const apireturns:any = await axios.get(url, { params: parameters });
+
+            if ( !apireturns.error && apireturns.data.qlog && apireturns.data.qlog.connections ){
+
+                const fileContents:qlog.IQLog = apireturns.data.qlog; /*= {
+                    qlog_version: "0xff00001",
+                    connections: [],
+                };*/
+                const filename = fileContents.description || "URL parameters";
+
+                this.context.dispatch('AddGroupFromQlogFile', {fileContents, filename});
+            }
+            else{
+                alert("ConnectionStore:LoadFilesFromServer : " + apireturns.error + " // " + apireturns.data.qlog.connections);
+            }
+        }
+        catch (e) {
+            alert("ConnectionStore:LoadFilesFromServer : " + e);
+        }
     }
     
     protected createDummyConnection() : QlogConnection{
