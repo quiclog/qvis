@@ -123,9 +123,9 @@ export default class ConnectionStore extends VuexModule {
             // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
             const apireturns:any = await axios.get(url, { params: parameters });
 
-            if ( !apireturns.error && apireturns.data.qlog && apireturns.data.qlog.connections ){
+            if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
-                const fileContents:qlog.IQLog = apireturns.data.qlog; /*= {
+                const fileContents:qlog.IQLog = JSON.parse(apireturns.data.qlog); /*= {
                     qlog_version: "0xff00001",
                     connections: [],
                 };*/
@@ -134,7 +134,7 @@ export default class ConnectionStore extends VuexModule {
                 this.context.dispatch('AddGroupFromQlogFile', {fileContents, filename});
             }
             else{
-                alert("ConnectionStore:LoadFilesFromServer : " + apireturns.error + " // " + apireturns.data.qlog.connections);
+                alert("ConnectionStore:LoadFilesFromServer : " + apireturns.error + " // " + apireturns.data.error + " // " + apireturns.data.qlog.connections);
             }
         }
         catch (e) {
