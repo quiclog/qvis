@@ -66,7 +66,20 @@ export default class ConnectionStore extends VuexModule {
         for ( const jsonconnection of fileContents.connections ){
 
             const connection = new QlogConnection(group);
-            connection.name = jsonconnection.vantagepoint + (jsonconnection.metadata ? " : " + jsonconnection.metadata : "");
+
+            // metadata can be just a string, so use that
+            // OR it can be a full object, in which case we want just the description here 
+            let description = "";
+            if ( jsonconnection.metadata ){
+                if ( typeof jsonconnection.metadata === "string" ){
+                    description = jsonconnection.metadata;
+                }
+                else if ( jsonconnection.metadata.description ){ // can be empty object {}
+                    description = jsonconnection.metadata.description;
+                }
+            }
+                
+            connection.name = jsonconnection.vantagepoint + " : " + description;
             const wrap = QUtil.WrapEvent(null);
 
             for ( const jsonevt of jsonconnection.events ){
@@ -129,7 +142,7 @@ export default class ConnectionStore extends VuexModule {
                     qlog_version: "0xff00001",
                     connections: [],
                 };*/
-                const filename = fileContents.description || "URL parameters";
+                const filename = "Loaded via URL parameters";
 
                 this.context.dispatch('AddGroupFromQlogFile', {fileContents, filename});
             }
