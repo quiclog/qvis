@@ -8,9 +8,9 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "@quictools/qlog-schema": ">=0.0.8",
+    "@quictools/qlog-schema": "0.0.10",
     "axios": "^0.18.1",
-    "bootstrap-vue": "^2.0.0-rc.26",
+    "bootstrap-vue": "^2.0.0-rc.27",
     "vue": "^2.6.10",
     "vue-class-component": "^6.0.0",
     "vue-property-decorator": "^7.3.0",
@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@vue/cli-plugin-typescript": "^3.9.0",
-    "@vue/cli-service": "^3.9.2",
+    "@vue/cli-service": "^3.9.3",
     "typescript": "^3.5.3",
     "vue-template-compiler": "^2.6.10"
   },
