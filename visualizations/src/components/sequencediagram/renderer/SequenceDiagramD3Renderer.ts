@@ -1,12 +1,15 @@
 import QlogConnection from '@/data/Connection';
+import * as d3 from 'd3';
 
 export default class SequenceDiagramD3Renderer {
 
     public containerID:string;
+    public svgID:string;
     public rendering:boolean = false;
 
-    constructor(containerID:string){
+    constructor(containerID:string, svgID:string){
         this.containerID = containerID;
+        this.svgID = svgID;
     }
    
     public render(traces:Array<QlogConnection>) {
@@ -27,6 +30,9 @@ export default class SequenceDiagramD3Renderer {
             return;
         }
 
+        const svg = d3.select("body").select( "#" + this.svgID );
+        svg.selectAll("*").remove(); // empty svg 
+
         const containerWidth:number = container.clientWidth;
 
         let output = '';
@@ -39,10 +45,16 @@ export default class SequenceDiagramD3Renderer {
 
                 // document.getElementById(this.containerID)!.innerHTML = output;
                 // await new Promise( (resolve) => setTimeout(resolve, 1000));
+
             }
         }
 
-        container.innerHTML = output;
+        // TODO: remove, just for show
+        svg.append('rect').attr('x', 50).attr('y', 50).attr('width', 200).attr('height', 100).attr('fill', 'green');
+    
+
+
+        container.insertAdjacentHTML('beforeend', output);
     }
 
 }

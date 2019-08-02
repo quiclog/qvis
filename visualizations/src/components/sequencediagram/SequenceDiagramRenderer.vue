@@ -4,7 +4,10 @@
         <div>Scale: {{config.scale}}</div>
 
         <div id="sequence-diagram" style="width: 100%; border:5px solid red; min-height: 200px;">
+            <svg id="sequence-diagram-svg">
+                
 
+            </svg>
         </div>
     </div>
 </template> 
@@ -26,7 +29,7 @@
         protected renderer: SequenceDiagramD3Renderer | undefined = undefined;
 
         public created(){
-            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram");
+            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg");
         }
 
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well

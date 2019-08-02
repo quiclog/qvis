@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "@quictools/qlog-schema": ">=0.0.12",
+    "@types/d3": "^5.7.2",
     "axios": "^0.18.1",
     "bootstrap-vue": "^2.0.0-rc.27",
+    "d3": "^5.9.7",
     "vue": "^2.6.10",
     "vue-class-component": "^6.0.0",
     "vue-property-decorator": "^7.3.0",
