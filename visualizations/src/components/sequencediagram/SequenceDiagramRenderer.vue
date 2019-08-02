@@ -3,22 +3,16 @@
         <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div>
 
-        <b-container fluid>
-            <b-row>
-                <b-col v-for="(connection, index) in connections" :key="index">
-                    - {{index}} : {{connection.name}} ( {{connection.parent.description}} )
-                    <div v-for="(event,index) in connection.GetEvents()" :key="index">
-                        = {{index}} : {{connection.parseEvent(event).time}} {{connection.parseEvent(event).category}} {{connection.parseEvent(event).name}} {{connection.parseEvent(event).trigger}} {{(connection.parseEvent(event).data && connection.parseEvent(event).data.header) ? connection.parseEvent(event).data.header.version : ""}}
-                    </div>
-                </b-col>
-            </b-row>
-        </b-container>
+        <div id="sequence-diagram" style="width: 100%; border:5px solid red; min-height: 200px;">
+
+        </div>
     </div>
 </template> 
 
 <script lang="ts">
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig";
+    import SequenceDiagramD3Renderer from "./renderer/SequenceDiagramD3Renderer";
 
     @Component
     export default class SequenceDiagramRenderer extends Vue {
@@ -29,12 +23,23 @@
             return this.config.connections;
         }
 
+        protected renderer: SequenceDiagramD3Renderer | undefined = undefined;
+
+        public created(){
+            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram");
+        }
+
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
         // however, this feels more explicit
         @Watch('config', { immediate: true, deep: true })
         protected onConfigChanged(newConfig: SequenceDiagramConfig, oldConfig: SequenceDiagramConfig) {
-            console.log("Renderer:onConfigChanged : ", newConfig, oldConfig);
+            console.log("SequenceDiagramRenderer:onConfigChanged : ", newConfig, oldConfig);
+
+            if ( this.renderer ) {
+                this.renderer.render( newConfig.connections );
+            }
         }
+
     } 
 
 </script>

@@ -2,6 +2,7 @@
     <div class="home">
         <SequenceDiagramConfigurator :config="config"/>
         <SequenceDiagramRenderer :config="config"/>
+        <!--<SequenceDiagramSimpleRenderer :config="config"/>-->
     </div>
 </template> 
 
@@ -12,6 +13,7 @@
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig"; 
     import SequenceDiagramConfigurator from "./SequenceDiagramConfigurator.vue";
     import SequenceDiagramRenderer from "./SequenceDiagramRenderer.vue"; 
+    import SequenceDiagramSimpleRenderer from "./SequenceDiagramSimpleRenderer.vue"; 
 
     import ConfigurationStore from "@/store/ConfigurationStore";
     import ConnectionGroup from "@/data/ConnectionGroup";
@@ -21,6 +23,7 @@
         components: {
             SequenceDiagramConfigurator,
             SequenceDiagramRenderer,
+            SequenceDiagramSimpleRenderer,
         },
     })
 
