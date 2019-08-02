@@ -11,7 +11,7 @@ import { getModule } from "vuex-module-decorators";
 import ConnectionStore from "@/store/ConnectionStore";
 import { IQLog } from '@quictools/qlog-schema';
 
-const standaloneFiles = [
+const standaloneFiles:Array<string> = [
     "ngtcp2_pcap1.qlog.js",
     "quictracker_handshake_v6_quicker_20181219.qlog.js",
     "ngtcp2_multistreams_server_noloss.qlog.js",
@@ -38,7 +38,7 @@ for ( const filepath of standaloneFiles ){
         // @ts-ignore 
         window[varname] = "loaded"; // make sure it can be gc'ed if necessary
 
-        connectionStore.AddGroupFromQlogFile(  {fileContents: file as IQLog, filename: varname} ).then( () => {
+        connectionStore.AddGroupFromQlogFile(  {fileContentsJSON: file, filename: varname} ).then( () => {
             console.log("Loaded ", varname, file );
         }); 
     };

@@ -4,7 +4,8 @@
 
         <b-button @click="AddRandomConnection()">Add new random ConnectionGroup</b-button> | 
         <b-button @click="DeleteFirstConnection()">Delete First</b-button> | 
-        <b-button @click="ChangeEventName()">Change Name</b-button> | 
+        <b-button @click="ChangeConnectionName()">Change Connection Name</b-button> | 
+        <b-button @click="ChangeEventName()">Change Event Name</b-button> | 
         <b-button @click="RemoveEvent()">RemoveEvent</b-button>
 
         <div v-for="connectionGroup in groups" v-bind:key="connectionGroup.description">
@@ -12,7 +13,7 @@
         </div>
         <div v-for="(connection, index) in connections" :key="index">
             <div v-for="(event, index) in connection.GetEvents()" :key="index">
-                - Event: {{ event.name }}
+                - Event: ROBIN : {{ connection.title }} : {{ connection.parseEvent(event).name }}
             </div>
         </div>
 
@@ -70,7 +71,13 @@
         }
 
         protected ChangeEventName() { 
-            this.connections![0].GetEvents()[0].name = "Event was changed";
+            this.connections![0].GetEvents()[0][2] = "Event was changed";
+            console.log("Event name was changed, but SHOULD NOT reflect in UI since events are no longer reactive!", this.connections![0]);
+        }
+
+        protected ChangeConnectionName() { 
+            this.connections![0].title = "Connection name was changed";
+            console.log("Connection name was changed", this.connections![0]);
         }
 
         protected RemoveEvent() {

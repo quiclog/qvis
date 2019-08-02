@@ -3,13 +3,8 @@ import { Module as Modx } from 'vuex';
 import axios from 'axios';
 import QlogConnectionGroup from "@/data/ConnectionGroup";
 import QlogConnection from '@/data/Connection';
-import QlogEvent from '@/data/Event';
-
-import * as qlog from '@quictools/qlog-schema'; 
-// import * as qlog from '@quictools/qlog-schema/dist/draft-16/QLog'; 
-import { QUtil } from '@quictools/qlog-schema/util'; 
-// import * as qlog from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript' 
-// import { QUtil } from '/home/rmarx/WORK/QUICLOG/qlog-schema/trunk/TypeScript/util'; 
+import { QlogLoader, PreSpecEventParser } from '@/data/QlogLoader';
+import { IQlogRawEvent } from '@/data/QlogEventParser';
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -52,51 +47,17 @@ export default class ConnectionStore extends VuexModule {
     // Potentially bigger problem: checking if json adheres to the TypeScript spec... 
     // this could be done with something like https://github.com/typestack/class-transformer
     // but then we would need to add additional annotations to the Schema classes... urgh
-    public async AddGroupFromQlogFile( { fileContents, filename } : { fileContents:qlog.IQLog, filename:string } ){
-        console.log("AddGroupFromQlogFile", fileContents, fileContents.connections);
+    public async AddGroupFromQlogFile( { fileContentsJSON, filename } : { fileContentsJSON:any, filename:string } ){
+        
+        const group:QlogConnectionGroup | undefined = QlogLoader.fromJSON( fileContentsJSON );
 
-        // QLog toplevel structure contains a list of connections
-        // most files currently just contain a single connection, but the idea is to allow bundling connections on a single file
-        // for example 1 log for the server and 1 for the client and 1 for the network, all contained in 1 file
-        // This is why we call it a ConnectionGroup here, instead of QlogFile or something 
-        const group = new QlogConnectionGroup();
-        group.description = fileContents.description || "";
-        group.title = filename;
-
-        for ( const jsonconnection of fileContents.connections ){
-
-            const connection = new QlogConnection(group);
-
-            // metadata can be just a string, so use that
-            // OR it can be a full object, in which case we want just the description here 
-            let description = "";
-            if ( jsonconnection.metadata ){
-                if ( typeof jsonconnection.metadata === "string" ){
-                    description = jsonconnection.metadata;
-                }
-                else if ( jsonconnection.metadata.description ){ // can be empty object {}
-                    description = jsonconnection.metadata.description;
-                }
-            }
-                
-            connection.name = jsonconnection.vantagepoint + " : " + description;
-            const wrap = QUtil.WrapEvent(null);
-
-            for ( const jsonevt of jsonconnection.events ){
-                wrap.evt = jsonevt;
-
-                const evt2:QlogEvent = new QlogEvent();
-                evt2.time       = wrap.time;
-                evt2.category   = wrap.category; 
-                evt2.name       = wrap.type;
-                evt2.trigger    = wrap.trigger;
-                evt2.data       = wrap.data;
-
-                connection.AddEvent(evt2);
-            }
+        if ( group !== undefined ){
+            group.filename = filename;
+            this.context.commit( "AddGroup", group );
         }
-
-        this.context.commit( "AddGroup", group );
+        else{
+            alert("Qlog file could not be loaded! " + filename);
+        }
     }
 
     @Action({commit: 'AddGroup'})
@@ -107,14 +68,17 @@ export default class ConnectionStore extends VuexModule {
         const connectionCount = Math.round(Math.random() * 5) + 1;
         for ( let i = 0; i < connectionCount; ++i ){
             const connectionTest = new QlogConnection(testGroup);
-            connectionTest.name = "Connection " + i;
+            connectionTest.title = "Connection " + i;
+
+            const events:Array<Array<any>> = new Array<Array<any>>();
 
             const eventCount = Math.ceil(Math.random() * 3);
             for ( let j = 0; j < eventCount; ++j ){
-                const eventTest = new QlogEvent();
-                eventTest.name = "Connection #" + i + " - Event #" + j;
-                connectionTest.AddEvent( eventTest );
+                events.push( [j, "testcat", "Connection #" + i + " - Event #" + j, "dummytrigger" , { dummy: true }] );
             }
+
+            connectionTest.SetEventParser( new PreSpecEventParser() );
+            connectionTest.SetEvents( events );
         }
 
         return testGroup;
@@ -124,6 +88,13 @@ export default class ConnectionStore extends VuexModule {
     public async LoadFilesFromServer(parameters:any){
 
         console.log("ConnectionStore:LoadFilesFromServer ", parameters);
+
+        if ( Object.keys(parameters).length === 0 ){
+            // empty parameter, nothing to be fetched
+            console.error("ConnectionSTore:LoadFilesFromSErver : no parameters passed, doing nothing. ", parameters);
+            
+            return;
+        }
 
         try{
             let url = '/loadfiles';
@@ -138,7 +109,7 @@ export default class ConnectionStore extends VuexModule {
 
             if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
-                const fileContents:qlog.IQLog = JSON.parse(apireturns.data.qlog); /*= {
+                const fileContents:any = JSON.parse(apireturns.data.qlog); /*= {
                     qlog_version: "0xff00001",
                     connections: [],
                 };*/
@@ -166,7 +137,7 @@ export default class ConnectionStore extends VuexModule {
         dummyGroup.title = "None";
 
         const output:QlogConnection = new QlogConnection(dummyGroup);
-        output.name = "None";
+        output.title = "None";
 
         this.grouplist.push( dummyGroup ); 
 

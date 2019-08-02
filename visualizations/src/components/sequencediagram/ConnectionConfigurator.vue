@@ -3,7 +3,7 @@
         <b-container fluid>
             <div v-if="tooManyOptions">
                 <!-- separate-select mode -->
-                <!--<div>{{selectedGroup.title}} - {{selectedGroup.description}}</div> -->
+                <!--<div>{{selectedGroup.filename}} - {{selectedGroup.description}}</div> -->
                 <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
 
                 <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
@@ -14,7 +14,7 @@
 
             <div v-else>
                 <!-- combined-select mode -->
-                <div>{{selectedConnection.parent.title}} ({{selectedConnection.parent.description}})</div>
+                <div>{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
                 <b-row class="mb-3">
                     <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
                     <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
@@ -40,7 +40,7 @@
     // We provide two modes: all in 1 select (when there aren't too many options) and 2 selects (1 for the group, then the connection)
     // This latter one is for when there are too many options and a single select would be too unwieldy
     @Component
-    export default class ConnectionConfigurator extends Vue {
+    export default class ConnectionConfigurator extends Vue { 
         @Prop()
          // passing in connection allows us to set it externally as well (e.g., loading from config string, loading premade testcase)
         protected connection!:Connection;
@@ -67,7 +67,7 @@
         // TODO: this feels dirty... figure out a better way to do two-way binding of these vars between outside and inside 
         @Watch('connection', { immediate: false, deep: false })
         protected onConnectionChanged(newConnection: Connection, oldConnection: Connection) {
-            console.log("ConnectionConfigurator:onConnectionChanged : setting selectedGroup : ", newConnection.name, oldConnection.name, newConnection, oldConnection);
+            console.log("ConnectionConfigurator:onConnectionChanged : setting selectedGroup : ", newConnection.title, oldConnection.title, newConnection, oldConnection);
             this.selectedGroup = newConnection.parent;
             if ( this.selectedConnection !== newConnection ) {
                 this.selectedConnection = newConnection;
@@ -85,7 +85,7 @@
         protected get groupOptions(){
             const options:any = [];
             for ( const group of this.allGroups ) {
-                options.push( { value: group, text: group.title + " (" + group.description + ")" } );
+                options.push( { value: group, text: group.filename + " (" + group.description + ")" } );
             } 
 
             return options;
@@ -95,7 +95,7 @@
         protected get connectionOptions(){ 
             const options:any = [];
             for ( const connection of this.selectedGroup.GetConnections() ) {
-                options.push( { value: connection, text: connection.name } );
+                options.push( { value: connection, text: connection.title } );
             }
 
             return options;
@@ -106,10 +106,10 @@
             const options:any = [];
 
             for ( const group of this.allGroups ) {
-                options.push( { value: null, text: group.title, disabled: true } );
+                options.push( { value: null, text: group.filename, disabled: true } );
 
                 for ( const connection of group.GetConnections() ) {
-                    options.push( { value: connection, text: "↳ " + connection.name } );
+                    options.push( { value: connection, text: "↳ " + connection.title } );
                 }
             }
 

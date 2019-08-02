@@ -8,7 +8,7 @@
                 <b-col v-for="(connection, index) in connections" :key="index">
                     - {{index}} : {{connection.name}} ( {{connection.parent.description}} )
                     <div v-for="(event,index) in connection.GetEvents()" :key="index">
-                        = {{index}} : {{event.time}} {{event.category}} {{event.name}} {{event.trigger}} {{(event.data && event.data.header) ? event.data.header.version : ""}}
+                        = {{index}} : {{connection.parseEvent(event).time}} {{connection.parseEvent(event).category}} {{connection.parseEvent(event).name}} {{connection.parseEvent(event).trigger}} {{(connection.parseEvent(event).data && connection.parseEvent(event).data.header) ? connection.parseEvent(event).data.header.version : ""}}
                     </div>
                 </b-col>
             </b-row>
