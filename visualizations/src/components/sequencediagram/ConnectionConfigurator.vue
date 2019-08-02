@@ -109,7 +109,7 @@
                 options.push( { value: null, text: group.filename, disabled: true } );
 
                 for ( const connection of group.GetConnections() ) {
-                    options.push( { value: connection, text: "↳ " + connection.title } );
+                    options.push( { value: connection, text: "↳ " + (connection.vantagePoint ? connection.vantagePoint.type : "UNKNOWN") + " : " + connection.title } );
                 }
             }
 

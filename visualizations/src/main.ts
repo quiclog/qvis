@@ -12,11 +12,16 @@ import ConnectionStore from "@/store/ConnectionStore";
 import { IQLog } from '@quictools/qlog-schema';
 
 const standaloneFiles:Array<string> = [
-    "ngtcp2_pcap1.qlog.js",
-    "quictracker_handshake_v6_quicker_20181219.qlog.js",
-    "ngtcp2_multistreams_server_noloss.qlog.js",
-    "ngtcp2_multistreams_server_10ploss.qlog.js",
-    "ngtcp2_multistreams_server_losscomparison.qlog.js",
+    "draft-00/example_github.qlog.js",
+    "draft-01/new_cid.qlog.js",
+    "draft-01/spin_bit.qlog.js",
+    "prespec/ngtcp2_pcap1.qlog.js",
+    /*
+    "prespec/quictracker_handshake_v6_quicker_20181219.qlog.js",
+    "prespec/ngtcp2_multistreams_server_noloss.qlog.js",
+    "prespec/ngtcp2_multistreams_server_10ploss.qlog.js",
+    "prespec/ngtcp2_multistreams_server_losscomparison.qlog.js",
+    */
 ];
   
 const connectionStore = getModule(ConnectionStore, store);
@@ -31,7 +36,9 @@ for ( const filepath of standaloneFiles ){
         // the standalone file has a single variable in it, named after the file, so we can get the contents
         // e.g., var dupli_pkts_cl_ngtcp2 = {...}
         // since it's a 'var' and not 'let', we can access it via the window[]
-        const varname = filepath.substr(0, filepath.indexOf(".")); // ngtcp2_pcap1.qlog.js -> ngtcp2_pcap1
+        // prespec/ngtcp2_pcap1.qlog.js -> ngtcp2_pcap1
+        let varname = filepath.substr(filepath.indexOf("/") + 1);
+        varname = varname.substr(0, varname.indexOf("."));
 
         // @ts-ignore 
         const file = window[varname];

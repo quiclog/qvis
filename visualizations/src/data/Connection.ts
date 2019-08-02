@@ -11,6 +11,10 @@ export default class QlogConnection {
     public title:string;
     public description:string;
 
+    public eventFieldNames:Array<string> = new Array<string>();
+    public commonFields:qlog.ICommonFields = {};
+    public configuration:qlog.IConfiguration = { time_offset: "0", time_units: "ms", original_uris: [] };
+
     public vantagePoint!:qlog.IVantagePoint;
 
     private events:Array<IQlogRawEvent>;
