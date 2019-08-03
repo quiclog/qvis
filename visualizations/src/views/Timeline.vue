@@ -12,7 +12,7 @@
             {{ connectionGroup.description }}
         </div>
         <div v-for="(connection, index) in connections" :key="index">
-            <div v-for="(event, index) in connection.GetEvents()" :key="index">
+            <div v-for="(event, index) in connection.getEvents()" :key="index">
                 - Event: ROBIN : {{ connection.title }} : {{ connection.parseEvent(event).name }}
             </div>
         </div>
@@ -43,7 +43,7 @@
 
         get connections() {
             if ( this.store.groups.length > 0 ) {
-                return this.store.groups[ this.store.groups.length - 1 ].GetConnections();
+                return this.store.groups[ this.store.groups.length - 1 ].getConnections();
             }
             else {
                 return undefined;
@@ -67,11 +67,11 @@
         }
 
         protected DeleteFirstConnection() {
-            this.store.DeleteGroup( this.groups[0] );
+            this.store.deleteGroup( this.groups[0] );
         }
 
         protected ChangeEventName() { 
-            this.connections![0].GetEvents()[0][2] = "Event was changed";
+            this.connections![0].getEvents()[0][2] = "Event was changed";
             console.log("Event name was changed, but SHOULD NOT reflect in UI since events are no longer reactive!", this.connections![0]);
         }
 
@@ -81,7 +81,7 @@
         }
 
         protected RemoveEvent() {
-            const events = this.connections![0].GetEvents();
+            const events = this.connections![0].getEvents();
             events.splice( events.length - 1, 1 );
         }
     } 

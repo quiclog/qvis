@@ -94,7 +94,7 @@
         // used in separate-select mode
         protected get connectionOptions(){ 
             const options:any = [];
-            for ( const connection of this.selectedGroup.GetConnections() ) {
+            for ( const connection of this.selectedGroup.getConnections() ) {
                 options.push( { value: connection, text: connection.title } );
             }
 
@@ -108,8 +108,13 @@
             for ( const group of this.allGroups ) {
                 options.push( { value: null, text: group.filename, disabled: true } );
 
-                for ( const connection of group.GetConnections() ) {
-                    options.push( { value: connection, text: "↳ " + (connection.vantagePoint ? connection.vantagePoint.type : "UNKNOWN") + " : " + connection.title } );
+                for ( const connection of group.getConnections() ) {
+                    let connectionName = connection.vantagePoint ? connection.vantagePoint.type : "UNKNOWN";
+                    connectionName += " : ";
+                    connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " flow " + connection.vantagePoint.flow + " : " : "";
+                    connectionName += connection.title;
+                    
+                    options.push( { value: connection, text: "↳ " + connectionName } );
                 }
             }
 
@@ -122,7 +127,7 @@
             console.log("Selected a new group", this.selectedGroup, newlySelected);
 
             // auto-select the first connection in the list
-            this.selectedConnection = newlySelected.GetConnections()[0];
+            this.selectedConnection = newlySelected.getConnections()[0];
 
             this.onConnectionSelectionChanged( this.selectedConnection );
         }

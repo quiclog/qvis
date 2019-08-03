@@ -36,7 +36,7 @@
         protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
         protected created(){ 
-            this.store.LoadFilesFromServer( this.$route.query );
+            this.store.loadFilesFromServer( this.$route.query );
         }
     } 
 </script>

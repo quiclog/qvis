@@ -19,6 +19,6 @@ export default class QlogConnectionGroup {
         this.summary = {};
     }
 
-    public AddConnection( connection:QlogConnection ):void { this.connections.push( connection ); }
-    public GetConnections() { return this.connections; }
+    public addConnection( connection:QlogConnection ):void { this.connections.push( connection ); }
+    public getConnections() { return this.connections; }
 }

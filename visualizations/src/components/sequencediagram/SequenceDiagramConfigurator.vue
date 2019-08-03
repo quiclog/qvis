@@ -63,8 +63,8 @@
             // this of course also implies adding new connections to this.config.connections
 
             // for now, just select all other connections after this one from the same parent if there are more than 1 in a group
-            if ( connectionIndex === 0 && connection.parent.GetConnections().length > 1 ){
-                const connections = connection.parent.GetConnections();
+            if ( connectionIndex === 0 && connection.parent.getConnections().length > 1 ){
+                const connections = connection.parent.getConnections();
                 const connectionIndexInParent = connections.indexOf(connection);
                 let rendererIndex = 1; 
                 for ( let i = connectionIndexInParent + 1; i < connections.length; ++i ){
@@ -86,7 +86,7 @@
 
         public addConnection(){
             console.log("addCOnnection: adding new connection configurator");
-            this.config.connections.push( this.store.groups[0].GetConnections()[0] );
+            this.config.connections.push( this.store.groups[0].getConnections()[0] );
         }
 
         protected onConnectionRemoved(connectionIndex:number){

@@ -22,13 +22,13 @@ export default class ConnectionStore extends VuexModule {
     }
 
     @Mutation
-    public AddGroup(group:QlogConnectionGroup) {
+    public addGroup(group:QlogConnectionGroup) {
         console.log("ConnectionStore Mutation for adding group", group);
         this.grouplist.push(group);
     }
 
     @Mutation
-    public DeleteGroup(group:QlogConnectionGroup) {
+    public deleteGroup(group:QlogConnectionGroup) {
         const index = this.grouplist.indexOf(group);
 
         if ( index !== -1 ) {
@@ -47,20 +47,20 @@ export default class ConnectionStore extends VuexModule {
     // Potentially bigger problem: checking if json adheres to the TypeScript spec... 
     // this could be done with something like https://github.com/typestack/class-transformer
     // but then we would need to add additional annotations to the Schema classes... urgh
-    public async AddGroupFromQlogFile( { fileContentsJSON, filename } : { fileContentsJSON:any, filename:string } ){
+    public async addGroupFromQlogFile( { fileContentsJSON, filename } : { fileContentsJSON:any, filename:string } ){
         
         const group:QlogConnectionGroup | undefined = QlogLoader.fromJSON( fileContentsJSON );
 
         if ( group !== undefined ){
             group.filename = filename;
-            this.context.commit( "AddGroup", group );
+            this.context.commit( "addGroup", group );
         }
         else{
             alert("Qlog file could not be loaded! " + filename);
         }
     }
 
-    @Action({commit: 'AddGroup'})
+    @Action({commit: 'addGroup'})
     public async DEBUG_LoadRandomFile(filename:string) {
         const testGroup = new QlogConnectionGroup();
         testGroup.description = filename;
@@ -77,15 +77,15 @@ export default class ConnectionStore extends VuexModule {
                 events.push( [j, "testcat", "Connection #" + i + " - Event #" + j, "dummytrigger" , { dummy: true }] );
             }
 
-            connectionTest.SetEventParser( new PreSpecEventParser() );
-            connectionTest.SetEvents( events );
+            connectionTest.setEventParser( new PreSpecEventParser() );
+            connectionTest.setEvents( events );
         }
 
         return testGroup;
     }
 
     @Action
-    public async LoadFilesFromServer(parameters:any){
+    public async loadFilesFromServer(parameters:any){
 
         console.log("ConnectionStore:LoadFilesFromServer ", parameters);
 

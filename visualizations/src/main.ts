@@ -45,7 +45,7 @@ for ( const filepath of standaloneFiles ){
         // @ts-ignore 
         window[varname] = "loaded"; // make sure it can be gc'ed if necessary
 
-        connectionStore.AddGroupFromQlogFile(  {fileContentsJSON: file, filename: varname} ).then( () => {
+        connectionStore.addGroupFromQlogFile(  {fileContentsJSON: file, filename: varname} ).then( () => {
             console.log("Loaded ", varname, file );
         }); 
     };

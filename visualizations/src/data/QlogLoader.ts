@@ -68,9 +68,9 @@ export class QlogLoader {
                 connection.commonFields = jsonconnection.common_fields!;
                 connection.configuration = jsonconnection.configuration!;
 
-                connection.SetEvents( jsonconnection.events );
+                connection.setEvents( jsonconnection.events );
 
-                connection.SetEventParser( new EventFieldsParser() );
+                connection.setEventParser( new EventFieldsParser() );
             }
         }
 
@@ -111,9 +111,9 @@ export class QlogLoader {
             connection.eventFieldNames = jsonconnection.event_fields;
             connection.commonFields = jsonconnection.common_fields;
             connection.configuration = jsonconnection.configuration;
-            connection.SetEvents( jsonconnection.events as any );
+            connection.setEvents( jsonconnection.events as any );
 
-            connection.SetEventParser( new EventFieldsParser() );
+            connection.setEventParser( new EventFieldsParser() );
         }
 
         return group;
@@ -166,9 +166,9 @@ export class QlogLoader {
             connection.description = description;
 
             connection.eventFieldNames = jsonconnection.fields;
-            connection.SetEvents( jsonconnection.events as any );
+            connection.setEvents( jsonconnection.events as any );
 
-            connection.SetEventParser( new PreSpecEventParser() );
+            connection.setEventParser( new PreSpecEventParser() );
         }
 
         return group;
@@ -187,6 +187,7 @@ export class EventFieldsParser implements IQlogEventParser {
 
     private timeTrackingMethod = TimeTrackingMethod.RAW;
     private startTime:number = 0;
+    private subtractTime:number = 0;
     private timeMultiplier:number = 1;
     private timeOffset:number = 0;
 
@@ -205,8 +206,8 @@ export class EventFieldsParser implements IQlogEventParser {
 
         // TODO: now we do this calculation whenever we access the .time property
         // probably faster to do this in a loop for each event in init(), but this doesn't fit well with the streaming use case...
-        // can probably do the parseInt up-front though?
-        return parseInt((this.currentEvent as IQlogRawEvent)[this.timeIndex], undefined) * this.timeMultiplier - this.startTime + this.timeOffset;
+        // can probably do the parseFloat up-front though?
+        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + this.timeOffset;
     }
     public get category():string {
         if ( this.categoryIndex === -1 ) {
@@ -221,6 +222,13 @@ export class EventFieldsParser implements IQlogEventParser {
         }
 
         return (this.currentEvent as IQlogRawEvent)[this.nameIndex];
+    }
+    public set name(val:string) {
+        if ( this.nameIndex === -1 ) {
+            return;
+        }
+            
+        (this.currentEvent as IQlogRawEvent)[this.nameIndex] = val;
     }
     public get trigger():string {
         if ( this.triggerIndex === -1 ) {
@@ -270,7 +278,7 @@ export class EventFieldsParser implements IQlogEventParser {
                 this.timeTrackingMethod = TimeTrackingMethod.REFERENCE_TIME;
 
                 if ( trace.commonFields && trace.commonFields.reference_time !== undefined ){
-                    this.startTime = parseInt(trace.commonFields.reference_time, undefined);
+                    this.startTime = parseFloat(trace.commonFields.reference_time);
                 }
                 else {
                     alert("QlogLoader: Using relative_time but no reference_time found in common_fields");
@@ -281,15 +289,16 @@ export class EventFieldsParser implements IQlogEventParser {
         }
         else{
             this.timeTrackingMethod = TimeTrackingMethod.RAW;
-            this.startTime = trace.GetEvents()[0][this.timeIndex];
+            this.startTime = parseFloat( trace.getEvents()[0][this.timeIndex] );
+            this.subtractTime = this.startTime;
         }
 
         if ( trace.configuration && trace.configuration.time_units && trace.configuration.time_units === "us" ){
-            this.timeMultiplier = 0.001; // timestamps are in microseconds
+            this.timeMultiplier = 0.001; // timestamps are in microseconds, we want to view everything in milliseconds
         }
 
         if ( trace.configuration && trace.configuration.time_offset ){
-            this.timeOffset = parseInt( trace.configuration.time_offset, undefined ) * this.timeMultiplier;
+            this.timeOffset = parseFloat( trace.configuration.time_offset ) * this.timeMultiplier;
         }
 
         this.startTime *= this.timeMultiplier;
@@ -308,13 +317,16 @@ export class PreSpecEventParser implements IQlogEventParser {
     private currentEvent:IQlogRawEvent|undefined;
 
     public get time():number {
-        return (this.currentEvent as IQlogRawEvent)[0];
+        return parseFloat( (this.currentEvent as IQlogRawEvent)[0] );
     }
     public get category():string {
         return (this.currentEvent as IQlogRawEvent)[1];
     }
     public get name():string {
         return (this.currentEvent as IQlogRawEvent)[2];
+    }
+    public set name(val:string) {
+        (this.currentEvent as IQlogRawEvent)[2] = val;
     }
     public get trigger():string {
         return (this.currentEvent as IQlogRawEvent)[3];

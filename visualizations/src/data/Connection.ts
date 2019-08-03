@@ -33,10 +33,32 @@ export default class QlogConnection {
 
         (this.events as any)._isVue = true;
 
-        this.parent.AddConnection( this );
+        this.parent.addConnection( this );
     }
 
-    public SetEventParser( parser:IQlogEventParser ){
+    // performs a DEEP clone of this connection
+    // NOTE: this is SLOW and should only be used sparingly (mainly added for the sequence diagram)
+    public clone():QlogConnection {
+        // TODO: maybe find a better way to do this than just JSON.stringify? 
+        // online they recommend lodash's deepClone
+        const output:QlogConnection = new QlogConnection( this.parent );
+
+        output.title = this.title;
+        output.description = this.description;
+        output.eventFieldNames = this.eventFieldNames.slice();
+        output.commonFields = JSON.parse( JSON.stringify(this.commonFields) );
+        output.configuration = JSON.parse( JSON.stringify(this.configuration) );
+        output.vantagePoint = JSON.parse( JSON.stringify(this.vantagePoint) );
+        const events = JSON.parse( JSON.stringify(this.events) );
+        (events as any)._isVue = true;
+        output.events = events;
+
+        output.eventParser = this.eventParser; // TODO: properly clone this one as well! should work for now, since it's supposed to be static
+
+        return output;
+    }
+
+    public setEventParser( parser:IQlogEventParser ){
         // we need to bypass Vue's reactivity here
         // this Connection class is made reactive in ConnectionStore, including the this.eventParser property and its internals
         // however, if we use parseEvent(), this will update the internal .currentEvent property of this.eventParser
@@ -64,9 +86,9 @@ export default class QlogConnection {
         return this.eventParser.load( evt );
     }
 
-    public SetEvents(events:Array<Array<any>>):void { 
+    public setEvents(events:Array<Array<any>>):void { 
         (events as any)._isVue = true; // prevent the individual events from being Vue Reactive, see above
         this.events = events; 
     }
-    public GetEvents():Array<Array<any>> { return (this as any).events; }
+    public getEvents():Array<Array<any>> { return this.events; }
 }
