@@ -2,6 +2,7 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 
+
 export default class SequenceDiagramCanvasRenderer {
 
     public containerID:string;
@@ -155,6 +156,10 @@ export default class SequenceDiagramCanvasRenderer {
         const maxY = this.calculateCoordinates( traces );
         console.log("SequenceDiagramD3Renderer:renderTimeSliced : rendering traces", traces, maxY);
 
+        const interactionLayer:HTMLElement = document.createElement("div");
+        interactionLayer.setAttribute("id", "sequencediagram-interaction");
+
+
         const containerWidth:number = container.clientWidth;
         const containerHeight:number = maxY;
 
@@ -162,18 +167,31 @@ export default class SequenceDiagramCanvasRenderer {
         // TODO: explore options: rendering to double-buffered canvas first, use multipe on-screen canvases, rendering only parts and updating when scrolling, 
         //       rendering in a web worker thread (potential problems with getting data there), ...
 
-        let canvas = document.getElementById("sequencediagram-canvas");
+        // To make canvas interactive, there really are no easy shortcuts... 
+        // - Tried with Fabric.js : this just crashes the tab with even a moderately sized trace
+        // - Tried with overlaying DOM elements : event with visibility off, still invokes a long layout/styling/painting step, taking several seconds
+        // - Only option really: keep a custom pixels-to-element dictionary, similar to how chrome's devtools does it:
+        //      https://github.com/ChromeDevTools/devtools-frontend/blob/8fb3ac5a4f56332900ddec43aeebb845759531ed/front_end/perf_ui/FlameChart.js#L740
+
+        let canvas:HTMLCanvasElement = document.getElementById("sequencediagram-canvas") as HTMLCanvasElement;
         if ( !canvas ) {
             canvas = document.createElement("canvas");
             canvas.setAttribute("id", "sequencediagram-canvas");
+            container.appendChild( canvas );
         }
 
-        const ctx = (canvas as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D;
+        const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 
         // changing width/height of a canvas empties it... so we calculate the maxY first (see above) so we can set it correctly from the start
         // FIXME: TODO: canvases have a maximum size/surface area, need to make sure we don't exceed this
         canvas.setAttribute("width", "" + containerWidth);
         canvas.setAttribute("height", "" + containerHeight);
+
+        container.appendChild( interactionLayer );
+        container.setAttribute("style", "position: relative;");
+        interactionLayer.setAttribute("style", `position: absolute; left: 0px; top: 0px; width: ${containerWidth}px; height:${containerHeight}px; z-index: 1; border: 2px solid blue;`);
+        // interactionLayer.setAttribute("width", "" + containerWidth);
+        // interactionLayer.setAttribute("height", "" + containerHeight);
 
         const bandWidth = (containerWidth / traces.length);
     
@@ -190,26 +208,33 @@ export default class SequenceDiagramCanvasRenderer {
         //       we would need to e.g., draw 1000 events from trace 1, then 1000 from 2, then back to 1, etc.
         for ( let i = 0; i < traces.length; ++i ){
             const trace = traces[i];
-            const currentX =  bandWidth * i + (bandWidth * 0.5);
+            const currentXline =  bandWidth * i + (bandWidth * 0.5);
 
             const events = trace.getEvents();
             let currentY = 0;
             for ( const evt of events ){
-
                 currentY = (evt as any).qvis.sequencediagram.y;
 
                 ctx.fillStyle = 'green';
-                ctx.fillRect(currentX, currentY, 10, 2);
+                let currentX = currentXline + (Math.random() * 50);
+                ctx.fillRect(currentX, currentY, 10, 10);
                 
                 ctx.fillStyle = 'black';
                 ctx.font = "20px Arial";
                 ctx.fillText("" + currentY, currentX + 10, currentY);
+
+                let clicker = document.createElement("div");
+                clicker.setAttribute("style", `visibility: hidden; width: 10px; height: 10px; position: absolute; left: ${currentX}px; top: ${currentY}px;`);
+                clicker.onclick = (ev) => { alert("Clicked on event!" + (evt as any).qvis.sequencediagram.y); };
+                interactionLayer.appendChild(clicker);
             }
         }
 
         if ( canvas.parentElement === null ) {
             container.appendChild( canvas );
         }
+
+        // fcanvas.renderAll();
     }
 
 }

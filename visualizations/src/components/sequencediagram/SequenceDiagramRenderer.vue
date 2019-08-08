@@ -6,7 +6,6 @@
         <div id="sequence-diagram" style="width: 100%; border:5px solid red; min-height: 200px;">
             <svg id="sequence-diagram-svg">
                 
-
             </svg>
         </div>
     </div>
@@ -30,8 +29,8 @@
         protected renderer: SequenceDiagramD3Renderer | SequenceDiagramCanvasRenderer | undefined = undefined;
 
         public created(){
-            //this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg");
-            this.renderer = new SequenceDiagramCanvasRenderer("sequence-diagram");
+            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg");
+            // this.renderer = new SequenceDiagramCanvasRenderer("sequence-diagram");
         }
 
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
