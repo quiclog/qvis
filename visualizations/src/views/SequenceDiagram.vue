@@ -1,8 +1,6 @@
 <template>
     <div>
-        <h1>This is the Sequence Diagram </h1>
         <SequenceDiagramContainer />
-
     </div>
 </template> 
 

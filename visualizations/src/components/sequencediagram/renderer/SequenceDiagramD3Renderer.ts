@@ -42,18 +42,7 @@ export default class SequenceDiagramD3Renderer {
             return;
         }
 
-        if ( document.getElementById(this.containerID) === undefined ){
-            console.error("SequenceDiagramD3Renderer:render : container element not found, cannot render!", this.containerID);
-
-            return;
-        }
-
-        if ( document.getElementById(this.svgID) === undefined ){
-            console.error("SequenceDiagramD3Renderer:render : svg element not found, cannot render!", this.svgID);
-
-            return;
-        }
-
+        console.log("SequenceDiagramRenderer:render", traces);
 
         this.rendering = true;
 
@@ -61,7 +50,13 @@ export default class SequenceDiagramD3Renderer {
         // We always render just parts of it at the same time
         // this.setup prepares everything, calculates coordinates and relations between events etc.
         // this.renderPartialExtents can then be called on scroll updates. It figures out which part of the SVG is visible and makes sure that part of the diagram is drawn.
-        this.setup(traces);
+        const canContinue:boolean = this.setup(traces);
+
+        if ( !canContinue ) {
+            this.rendering = false;
+
+            return;
+        }
 
         this.renderPartialExtents().then( () => {
             this.rendering = false;
@@ -69,16 +64,43 @@ export default class SequenceDiagramD3Renderer {
     }
 
     // runs once before each render. Used to bootstrap everything.
-    protected setup(tracesInput:Array<QlogConnection>) {
+    protected setup(tracesInput:Array<QlogConnection>):boolean {
 
+        // 0. make sure the containers exist
         // 1. make sure we have at least 2 traces to draw (sequence diagram doesn't make much sense with just one)
         // 2. calculate the y coordinates for each event on the timelines. This can be done once and stored for future use
         // 3. setup the SVG container and draw things like timelines
         // 4. prepare data structures to keep scrolling state (what we've drawn already and what not yet)
         // 5. setup event listeners so we can update the rendering when needed
 
+        // 0.
+        if ( document.getElementById(this.containerID) === undefined ){
+            console.error("SequenceDiagramD3Renderer:setup : container element not found, cannot render!", this.containerID);
+
+            return false;
+        }
+
+        if ( document.getElementById(this.svgID) === undefined ){
+            console.error("SequenceDiagramD3Renderer:setup : svg element not found, cannot render!", this.svgID);
+
+            return false;
+        }
+
         // 1.
-        this.traces = tracesInput.slice(); // shallow copy since we might want to add a trace 
+        this.traces = new Array<QlogConnection>();
+        // new array, because a) we might want to add a trace if there's only 1 and b) we might have invalid traces in there
+        for (const trace of tracesInput) {
+            if ( trace.getEvents().length > 0 ){
+                this.traces.push( trace );
+            }
+        }
+
+        if ( this.traces.length === 0 ){
+            console.error("SequenceDiagramD3Renderer:setup : None of the selected traces have events in them, cannot render");
+
+            return false;
+        }
+
         this.ensureMoreThanOneTrace( this.traces );
 
         // 2. 
@@ -160,6 +182,8 @@ export default class SequenceDiagramD3Renderer {
         window.addEventListener('scroll', this.scrollHandler);
 
         // TODO: also couple to window resize events? That should possibly trigger a full re-render, since the SVG can have changed width
+
+        return true;
     }
 
     protected ensureMoreThanOneTrace(traces:Array<QlogConnection>) {
@@ -169,6 +193,9 @@ export default class SequenceDiagramD3Renderer {
         }
 
         if ( traces[0].parent.getConnections().length > 1 ){
+            // traces.length is currently just 1, so we need to add its next sibling automatically as trace here 
+            traces.push( traces[0].parent.getConnections()[1] );
+            
             return;
         }
 
@@ -222,26 +249,25 @@ export default class SequenceDiagramD3Renderer {
         const heads:Array<number> = new Array<number>( traces.length ).fill(0); // points to the current index of each trace we're looking at
         let doneCount = 0;
 
-        for ( let t = 0; t < traces.length; ++t ){
-            const trace:any = traces[t];
-            if ( trace.qvis && trace.qvis.sequencediagram && trace.qvis.sequencediagram.coordinatesCalculated ){
-                heads[t] = -1;
-                ++doneCount;
-            }
-            else {
-                this.createPrivateNamespace(trace);
-                (trace as any).qvis.sequencediagram.coordinatesCalculated = true;
-            }
-        }
+        // for ( let t = 0; t < traces.length; ++t ){
+        //     const trace:any = traces[t];
+        //     if ( trace.qvis && trace.qvis.sequencediagram && trace.qvis.sequencediagram.coordinatesCalculated ){
+        //         heads[t] = -1;
+        //         ++doneCount;
+        //     }
+        //     else {
+        //         this.createPrivateNamespace(trace);
+        //         (trace as any).qvis.sequencediagram.coordinatesCalculated = true;
+        //     }
+        // }
 
         let done = false;
-        done = doneCount === traces.length;
+        // done = doneCount === traces.length;
 
-        if ( done ) {
-            return (traces[0] as any).qvis.sequencediagram.maxY;
-        }
+        // if ( done ) {
+        //     return (traces[0] as any).qvis.sequencediagram.maxY;
+        // }
 
-        console.log( "CalculateCoordinates start" );
         let maxY = 0;
 
         while ( !done ) {
@@ -291,7 +317,6 @@ export default class SequenceDiagramD3Renderer {
 
 
         maxY += 100; // give a bit of breathing room at the bottom of the diagram
-        (traces[0] as any).qvis.sequencediagram.maxY = maxY;
 
         return maxY;
     }

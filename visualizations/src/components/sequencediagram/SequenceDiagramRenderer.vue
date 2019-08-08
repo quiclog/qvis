@@ -33,6 +33,13 @@
             // this.renderer = new SequenceDiagramCanvasRenderer("sequence-diagram");
         }
 
+        public mounted(){
+            // mainly for when we switch away, and then back to the sequenceDiagram
+            if ( this.config && this.renderer ) {
+                this.renderer.render( this.config.connections );
+            }
+        }
+
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
         // however, this feels more explicit
         @Watch('config', { immediate: true, deep: true })

@@ -1,8 +1,9 @@
 <template>
-    <div style="background-color: red; color: white;">
-        <div>{{(config ? config.manualRTT + " - " + config.scale : "UNKNOWN" )}}</div>
-        <b-button @click="adjustConfigTest()">Adjust config</b-button> 
+    <div style="background-color: red; color: white; padding: 0px 10px;" >
+        <!--<div>{{(config ? config.manualRTT + " - " + config.scale : "UNKNOWN" )}}</div>-->
+        <!--<b-button @click="adjustConfigTest()">Adjust config</b-button> -->
 
+        <p>Select one or more traces via the dropdown(s) below to visualize them in the sequence diagram</p>
         <b-container fluid>
             <b-row>
                 <ConnectionConfigurator v-for="(connection, index) of this.config.connections" :allGroups="store.groups" :connection="connection" :key="index" :canBeRemoved="index != 0" :onConnectionSelected="onConnectionSelected.bind(this, index)" :onRemoved="onConnectionRemoved.bind(this,index)" />

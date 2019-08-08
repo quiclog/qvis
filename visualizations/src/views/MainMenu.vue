@@ -3,7 +3,7 @@
         <b-row>
             <b-col cols="1" md="auto">qvis</b-col>
             <b-col>
-                <router-link to="/timeline">Timeline</router-link> | 
+                <router-link to="/debug">VUEDebug</router-link> | 
                 <router-link to="/sequence">Sequence</router-link>
             </b-col>
         </b-row>

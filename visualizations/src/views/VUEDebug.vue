@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <HelloWorld msg="This is the timeline view"/>
+        <HelloWorld msg="This is the VUE debugger to test reactive data coupling"/>
 
         <b-button @click="AddRandomConnection()">Add new random ConnectionGroup</b-button> | 
         <b-button @click="DeleteFirstConnection()">Delete First</b-button> | 
@@ -33,7 +33,7 @@
             HelloWorld,
         },
     })
-    export default class Timeline extends Vue {
+    export default class VUEDebug extends Vue {
 
         protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
 

@@ -1,7 +1,7 @@
 import Vue from "vue";
 import Router from "vue-router";
 import MainMenu from "./views/MainMenu.vue";
-import Timeline from "./views/Timeline.vue";
+import VUEDebug from "./views/VUEDebug.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
 
 Vue.use(Router);
@@ -13,10 +13,10 @@ const router = new Router({
       redirect: "/sequence",
     },
     {
-      path: "/timeline",
-      name: "timeline",
+      path: "/debug",
+      name: "VUEDebug",
       components: {
-        default: Timeline,
+        default: VUEDebug,
         menu: MainMenu,
       },
     },
