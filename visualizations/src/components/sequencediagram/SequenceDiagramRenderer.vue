@@ -26,7 +26,7 @@
             return this.config.connections;
         }
 
-        protected renderer: SequenceDiagramD3Renderer | SequenceDiagramCanvasRenderer | undefined = undefined;
+        protected renderer: SequenceDiagramD3Renderer | undefined = undefined;
 
         public created(){
             this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg");
