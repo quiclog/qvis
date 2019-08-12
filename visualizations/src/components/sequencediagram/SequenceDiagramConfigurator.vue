@@ -86,7 +86,7 @@
         }
 
         public addConnection(){
-            console.log("addCOnnection: adding new connection configurator");
+            console.log("addConnection: adding new connection configurator");
             this.config.connections.push( this.store.groups[0].getConnections()[0] );
         }
 

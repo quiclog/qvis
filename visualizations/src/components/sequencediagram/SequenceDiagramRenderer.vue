@@ -11,6 +11,12 @@
     </div>
 </template> 
 
+<style>
+    #sequence-diagram-svg text.timestamp {
+        font-size: 11px;
+    }
+</style> 
+
 <script lang="ts">
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig";

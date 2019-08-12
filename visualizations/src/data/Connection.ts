@@ -19,6 +19,8 @@ export default class QlogConnection {
 
     private events:Array<IQlogRawEvent>;
 
+    private lookupTable:Map<string, Map<string, Array<IQlogRawEvent>>>;
+
     // The EventParser is needed because qlog events aren't always of the same shape
     // They are also defined as flat arrays, with their member names defined separately (in event_fields)
     // As such, it is not immediately clear which of the indices in the flat array leads to which property (e.g., the timestamp is -usually- at 0, but could be anywhere)
@@ -34,6 +36,9 @@ export default class QlogConnection {
         (this.events as any)._isVue = true;
 
         this.parent.addConnection( this );
+
+        this.lookupTable = new Map<string, Map<string, any>>();
+        (this.lookupTable as any)._isVue = true;
     }
 
     // performs a DEEP clone of this connection
@@ -82,6 +87,12 @@ export default class QlogConnection {
         this.eventParser.init( this );
     }
 
+    // NOTE: only use this directly when connection.parseEvent() is too slow due to Vue's ReactiveGetter on it
+    // see SequenceDiagramD3Renderer.calculateConnections for an example of that
+    public getEventParser(){
+        return this.eventParser;
+    }
+
     public parseEvent( evt:IQlogRawEvent ){
         return this.eventParser.load( evt );
     }
@@ -91,4 +102,35 @@ export default class QlogConnection {
         this.events = events; 
     }
     public getEvents():Array<Array<any>> { return this.events; }
+
+    public setupLookupTable() {
+        if ( this.lookupTable.size !== 0 ){
+            return;
+        }
+
+        for ( const evt of this.events ){
+            const category  = this.parseEvent(evt).category;
+            const eventType = this.parseEvent(evt).name;
+
+            if ( !this.lookupTable.has(category) ) {
+                this.lookupTable.set( category, new Map<string, Array<IQlogRawEvent>>() );
+            }
+            
+            const categoryDictionary = this.lookupTable.get(category);
+            if ( !categoryDictionary!.has(eventType) ) {
+                categoryDictionary!.set( eventType, new Array<IQlogRawEvent>() );
+            }
+
+            categoryDictionary!.get(eventType)!.push( evt );
+        }
+    }
+
+    public lookup(category:string, eventType:string):Array<IQlogRawEvent> {
+        if ( this.lookupTable.has(category) && this.lookupTable.get(category)!.has(eventType) ){
+            return this.lookupTable.get(category)!.get(eventType)!;
+        }
+        else {
+            return [];
+        }
+    }
 }

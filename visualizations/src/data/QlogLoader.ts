@@ -214,14 +214,14 @@ export class EventFieldsParser implements IQlogEventParser {
             return "unknown";
         }
 
-        return (this.currentEvent as IQlogRawEvent)[this.categoryIndex];
+        return (this.currentEvent as IQlogRawEvent)[this.categoryIndex].toLowerCase();
     }
     public get name():string {
         if ( this.nameIndex === -1 ) {
             return "unknown";
         }
 
-        return (this.currentEvent as IQlogRawEvent)[this.nameIndex];
+        return (this.currentEvent as IQlogRawEvent)[this.nameIndex].toLowerCase();
     }
     public set name(val:string) {
         if ( this.nameIndex === -1 ) {
@@ -235,7 +235,7 @@ export class EventFieldsParser implements IQlogEventParser {
             return "unknown";
         }
 
-        return (this.currentEvent as IQlogRawEvent)[this.triggerIndex];
+        return (this.currentEvent as IQlogRawEvent)[this.triggerIndex].toLowerCase();
     }
     public get data():any|undefined {
         if ( this.dataIndex === -1 ) {

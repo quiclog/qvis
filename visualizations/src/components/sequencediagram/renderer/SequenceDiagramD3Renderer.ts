@@ -2,6 +2,8 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import SequenceDiagramConfig from '../data/SequenceDiagramConfig';
+import { VantagePointType } from '@quictools/qlog-schema';
+import { IQlogRawEvent } from '@/data/QlogEventParser';
 
 interface VerticalRange {
     svgGroup:HTMLOrSVGElement | undefined,
@@ -21,6 +23,17 @@ interface CoordinateTracker {
     y: number
 }
 
+interface Interval {
+    yMin: number,
+    yMax: number,
+    timeSkipped: number
+}
+
+enum arrowTargetProperty {
+    left = "leftTarget",
+    right = "rightTarget",
+};
+
 export default class SequenceDiagramD3Renderer {
 
     public containerID:string;
@@ -37,6 +50,7 @@ export default class SequenceDiagramD3Renderer {
     
     private renderedRanges!:Array<VerticalRange>;
     private rangeHeight!:number;
+    private shortenedIntervals:Array<Interval> = new Array<Interval>();
 
     private dimensions:any = {};
     
@@ -57,21 +71,24 @@ export default class SequenceDiagramD3Renderer {
         this.selectedTraces = traces;
         this.rendering = true;
 
-        // To make things performant enough, we don't render the full diagram at once
-        // We always render just parts of it at the same time
-        // this.setup prepares everything, calculates coordinates and relations between events etc.
-        // this.renderPartialExtents can then be called on scroll updates. It figures out which part of the SVG is visible and makes sure that part of the diagram is drawn.
-        const canContinue:boolean = this.setup(traces);
+        setTimeout( () => {
+            // To make things performant enough, we don't render the full diagram at once
+            // We always render just parts of it at the same time
+            // this.setup prepares everything, calculates coordinates and relations between events etc.
+            // this.renderPartialExtents can then be called on scroll updates. It figures out which part of the SVG is visible and makes sure that part of the diagram is drawn.
+            const canContinue:boolean = this.setup(traces);
 
-        if ( !canContinue ) {
-            this.rendering = false;
+            if ( !canContinue ) {
+                this.rendering = false;
 
-            return;
-        }
+                return;
+            }
 
-        this.renderPartialExtents().then( () => {
-            this.rendering = false;
-        });
+            this.renderPartialExtents().then( () => {
+                this.rendering = false;
+            });
+
+        }, 1);
     }
 
     // runs once before each render. Used to bootstrap everything.
@@ -115,19 +132,27 @@ export default class SequenceDiagramD3Renderer {
         // TODO: potentially do this outside? In SequenceDiagramRenderer? or maybe ConnectionConfigurator itself?
         this.ensureMoreThanOneTrace();
 
+        for ( const trace of this.traces ){
+            trace.setupLookupTable();
+        }
+
         // 2. 
         this.dimensions = {
             margin: {
-                top: 40,
+                top: 60,
                 bottom: 100,
                 left: 0,
                 right: 0,
             },
             width: 0, // total width, including margins
             height: 0, // total height, including margin.top and margin.bottom
+
+            pixelsPerMillisecond: 10,
+            shortenIntervalsLongerThan: 120,
         };
 
         this.dimensions.height = this.calculateCoordinates( this.traces );
+        this.calculateConnections();
 
         // TODO: verify traces are left-to-right : i.e., arrows do not go UP!
 
@@ -149,16 +174,46 @@ export default class SequenceDiagramD3Renderer {
         for ( let i = 0; i < this.traces.length; ++i ){
             const currentX =  this.bandWidth * i + (this.bandWidth * 0.5); // get center of the band
 
-            this.svg.append('rect').attr("x", currentX).attr("y", this.dimensions.margin.top).attr("width", 2).attr("height", this.dimensions.height).attr("fill", "black");
+            this.svg.append('rect').attr("x", currentX - 1).attr("y", this.dimensions.margin.top).attr("width", 2).attr("height", this.dimensions.height).attr("fill", "black");
 
-
-            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            
+            let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
             text.setAttribute('x', "" + currentX);
             text.setAttribute('y', "" + 20);
             text.setAttribute('dominant-baseline', "middle");
             text.setAttribute('text-anchor', "middle");
-            text.textContent = "" + this.traces[i].title;
+            text.textContent = "" + this.traces[i].parent.filename;
             (this.svg.node()! as HTMLElement).appendChild( text );
+            
+
+
+            let vantagePoint:VantagePointType | string = this.traces[i].vantagePoint.type;
+            if ( vantagePoint === qlog.VantagePointType.network ){
+                vantagePoint = "" + vantagePoint + " : from " + this.traces[i].vantagePoint.flow + "'s viewpoint";
+            }
+
+            text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute('x', "" + currentX);
+            text.setAttribute('y', "" + 40);
+            text.setAttribute('dominant-baseline', "middle");
+            text.setAttribute('text-anchor', "middle");
+            text.textContent = "" + vantagePoint;
+            (this.svg.node()! as HTMLElement).appendChild( text );
+        }
+
+        for ( const interval of this.shortenedIntervals ){
+            for ( let i = 0; i < this.traces.length; ++i ){
+                const currentX =  this.bandWidth * i + (this.bandWidth * 0.5); // get center of the band
+    
+                // dashed array doesn't have a background color, so make sure we draw it ourselves
+                this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
+                                        .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
+                                        .attr("stroke", "white").attr("stroke-width", 4);
+
+                this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
+                                        .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
+                                        .attr("stroke", "black").attr("stroke-width", 4).attr("stroke-dasharray", 4);
+            }
         }
 
         // 4.
@@ -229,7 +284,18 @@ export default class SequenceDiagramD3Renderer {
             this.traces = this.traces.filter((v,i) => this.traces.indexOf(v) === i); // keeps the first occurence, since indexOf always returns first index
 
             if ( this.traces.length !== originalCount ) {
-                this.selectedTraces = this.traces.slice(); // update selection UI
+
+                // Vue reactivity is a weird beast
+                // setting this.selectedTraces = this.traces will NOT work, so we have to manually pop and push everything
+                // TODO: simpler to just pass the config around... let's just do that, shall we? 
+                while ( this.selectedTraces.length > 0 ) {
+                    this.selectedTraces.pop();
+                }
+
+                for ( const trace of this.traces ){
+                    this.selectedTraces.push( trace );
+                }
+                // this.selectedTraces = this.traces.slice(); // update selection UI
             }
 
             if ( this.traces.length  > 1 ) {
@@ -255,11 +321,13 @@ export default class SequenceDiagramD3Renderer {
         if ( this.traces[0].vantagePoint.type === qlog.VantagePointType.server || 
              this.traces[0].vantagePoint.flow === qlog.VantagePointType.server ){
             newTrace.vantagePoint.type = qlog.VantagePointType.client;
+            newTrace.vantagePoint.flow = qlog.VantagePointType.unknown;
             this.traces.unshift( newTrace );
         }
         else if ( this.traces[0].vantagePoint.type === qlog.VantagePointType.client || 
                   this.traces[0].vantagePoint.flow === qlog.VantagePointType.client ){
             newTrace.vantagePoint.type = qlog.VantagePointType.server;
+            newTrace.vantagePoint.flow = qlog.VantagePointType.unknown;
             this.traces.push( newTrace );
         }
 
@@ -275,7 +343,13 @@ export default class SequenceDiagramD3Renderer {
             // TODO: are there other events that should be changed? probably some that should be filtered out? e.g., all non transport/H3-related things? 
         }
 
-        this.selectedTraces.push( newTrace );
+        // deal with weird Vue Reactivity, see above
+        while ( this.selectedTraces.length > 0 ) {
+            this.selectedTraces.pop();
+        }
+        for ( const trace of this.traces ){
+            this.selectedTraces.push( trace );
+        }
     }
 
     protected createPrivateNamespace(obj:any):void {
@@ -290,7 +364,7 @@ export default class SequenceDiagramD3Renderer {
 
     protected calculateCoordinates(traces:Array<QlogConnection>):number {
 
-        const pixelsPerMillisecond = 10;
+        const pixelsPerMillisecond = this.dimensions.pixelsPerMillisecond;
 
         // we have n traces, each with their own timestamped events
         // we want to map these on a single conceptual sequence diagram, so that the same timestamps line up correctly on the y-axis, but still have a single vertical timeline per-trace
@@ -316,8 +390,13 @@ export default class SequenceDiagramD3Renderer {
 
         let maxY = 0;
 
-        let currentTimestampUnderConsideration:number = 0;
+        let currentTimestampUnderConsideration:number = -1;
         let currentY:number = this.dimensions.margin.top;
+        let inOverlapPreventionMode:boolean = false;
+        let previousMinimumTrace:number = 0; // only needed for overlap prevention
+
+
+        this.shortenedIntervals = new Array<Interval>();
 
         while ( !done ) {
             let currentMinimumTrace:number = -1;
@@ -332,7 +411,9 @@ export default class SequenceDiagramD3Renderer {
                 const evt = traces[t].getEvents()[ heads[t] ];
                 const time = traces[t].parseEvent(evt).time;
                 
-                if ( time < currentMinimumTime ){
+                // < instead of <= so we always favor rendering a single trace as long as possible before switching to the next. 
+                // Important for overlap prevention.
+                if ( time < currentMinimumTime ){ 
                     currentMinimumTrace = t;
                     currentMinimumTime = time;
                     currentMinimumEvent = evt;
@@ -340,51 +421,117 @@ export default class SequenceDiagramD3Renderer {
             }
 
             // goals:
-            // 1. prevent overlapping of events on the same timeline (can overlap horizontally in different timelines)
+            // 1. prevent long stretches of empty vertical space : replace those with shorter parts
+            //  -> need to detect when these happen and adjust accordingly
+            //  -> because we look for the minimum across traces each time, this is easy: if there is too large a margin between the new and old, everything is shifted down
+            // 2. prevent overlapping of events on the same timeline (can overlap horizontally in different timelines)
             //  -> need to both keep track of overlaps on the same timeline, and make sure all timelines shift down when one of them does 
-            // 2. prevent long stretches of empty vertical space : replace those with shorter parts
-            //  -> need to detect when these happen across all timelines and adjust accordingly
+            //  -> this is more involved and requires separate tracking structs per-timeline ("trackers")
 
             // need to keep a running total per-timeline: (lastTimestamp + lastActualY)
             //  -> currentTimestamp - lastTimestamp is then what we use for our logic
             //  -> lastActualY + (timestampDiff * pixelsPerMilliSecond) is then what we need
             //  -> if we then skip a range, we need to not just do timeStampDiff * pixelsPerMillisecond, but apply a scaling factor to that
-            //  -> if we then have overlap prevention, we keep timestamp the same, update only lastActualY. The moment we have a new timestamp, we make all lastActualY's the same (and also timestamps?)
+            //  -> if we then have overlap prevention, we keep timestamp the same, update only lastActualY. 
+            //          The moment we have a new timestamp, we make all lastActualY's the same (and also timestamps?)
 
-            // 1. we've been having overlaps before, but now we're going to the next timestamp, so reset stuff
-            const currentRoundedTime = Math.floor( currentMinimumTime );
-            if ( currentRoundedTime !== currentTimestampUnderConsideration ){
+            // we render in milliseconds, so the overlap is on millisecond resolution
+            // however, the times are floats, so we need to round them
+            const currentTimeBucket = Math.floor( currentMinimumTime );
 
-                // 2. prevent long stretches
-                if( (currentRoundedTime - currentTimestampUnderConsideration) * pixelsPerMillisecond > 200 ) { // max space of 200 pixels allowed
-                    // TODO: add this stretch to separate array so we can render dashed line here
-                    currentY = currentY + 200;
-                    for (const tracker of trackers) {
-                        tracker.y = currentY;
+            // 2. prevent overlaps
+            // Example of what can happen:
+            // | 105            | 105           |           | 105   
+            // | 105            |               |           | 105   
+            // | 105            |               |           | 105   
+            // | 105            |               |           |       
+            // | 105            |               |           |       
+            // 4 timelines, of which 3 have events all at timeBucket 105
+            // we cannot just render all the 105 events from trace 1, then those of 2, etc.
+            // so in this case, we need to keep track when we started the overlaps (tracker.y)
+            // then render all events of the 1st trace. When that's done, we render those of trace 2, etc.
+            // setting currentY to the currentMinimumTrace's tracked Y ensures that we "reset" to the y where the overlaps began for each trace in turn
+            // then, when timestamp > 105 starts, we exit this mode and just use the maximum of the tracked Y's as new currentY 
+            // (in this case the one for the 1st trace)
+            if ( currentTimeBucket === currentTimestampUnderConsideration ){
+
+                // 2 options:
+                //  1) either this is the first and we need to initiate the trackers
+                //  2) or we're in a stretch of overlaps and need to continue;
+                
+                // 1)
+                if ( !inOverlapPreventionMode ) {
+                    inOverlapPreventionMode = true;
+
+
+                    // problem: when we get here, it's basically the 2nd event in the same timebucket
+                    // we've already drawn the 1st event at currentY
+                    // so if we now set all tracks to currentY and then do + pixelsPerMillisecond on all (see below), the 1st track will be "one ahead" of the rest
+                    // so, make sure the other lines "undo" that first increment here 
+                    // NOTE: I'm sure there's a cleaner way of doing this, but it's not coming to monday-morning-me
+                    for ( let t = 0; t < trackers.length; ++t ){
+                        if ( t !== previousMinimumTrace ){
+                            trackers[t].y = currentY - pixelsPerMillisecond;
+                        }
+                        else {
+                            trackers[t].y = currentY;
+                        }
+                    }
+
+                    // for (const tracker of trackers) {
+                    //     tracker.y = currentY;
+                    // }
+
+                }
+
+                // 2)
+                // time remains the same, but we can have switched traces, so need to select the correct starting Y
+                trackers[currentMinimumTrace].y += pixelsPerMillisecond;
+                currentY = trackers[currentMinimumTrace].y;
+            }
+            else if ( inOverlapPreventionMode ){ 
+
+                // we previously had overlaps, but now we're onto the next Timestamp bucket: need to update everyone + exit mode
+                inOverlapPreventionMode = false;
+
+                let maxTrackerY = 0;
+                for (const tracker of trackers) {
+                    if ( tracker.y > maxTrackerY ){
+                        maxTrackerY = tracker.y;
                     }
                 }
 
-                // TODO
-                // hmz, doesn't seem right yet, now we're doing this every time we switch timestamps, not after overlaps
-                // kunen misschien werken met 1 globale logica: currentTimestampUnderConsider + currentY geven eigenlijk voor ALLES aan waar we zitten
-                // dus die kan elke timeline gewoon gebruiken tot er een overlap is, pas dan hebben we special logic nodig per-timeline en de trackers
-                // voor de long stretches zijn de trackers dus ook niet nodig
-                for (const tracker of trackers) {
-                    tracker.timestamp = currentRoundedTime;
-                    tracker.y = currentY;
-                }
+                currentY = maxTrackerY;
+            }
 
-                currentTimestampUnderConsideration = currentRoundedTime;
+            const timeDifference = (currentTimeBucket - currentTimestampUnderConsideration);
+
+            // 1. check for longer stretches on inactivity and compress them
+            // do this after 2., since otherwhise this offset can be overridden by exiting overlapPreventionMode
+            if ( timeDifference * pixelsPerMillisecond > this.dimensions.shortenIntervalsLongerThan ) { // max space of 120 pixels allowed
+                this.shortenedIntervals.push({
+                    yMin: currentY,
+                    yMax: currentY + this.dimensions.shortenIntervalsLongerThan,
+                    timeSkipped: currentTimeBucket - currentTimestampUnderConsideration,
+                });
+                
+                currentY += this.dimensions.shortenIntervalsLongerThan;
+            }
+            else {
+                // this is the default behaviour, just render the next event directly relative to the previous one
+                currentY += timeDifference * pixelsPerMillisecond;
             }
 
             
 
-            // TODO: calculate coordinate for the current minimum
-            // TODO: what happens with identical timestamps? should favor single trace, right?
             this.createPrivateNamespace(currentMinimumEvent);
-            (currentMinimumEvent as any).qvis.sequencediagram.y = traces[currentMinimumTrace].parseEvent(currentMinimumEvent).time * pixelsPerMillisecond;
+            (currentMinimumEvent as any).qvis.sequencediagram.y = currentY; // traces[currentMinimumTrace].parseEvent(currentMinimumEvent).time * pixelsPerMillisecond;
 
             // console.log("Next event was : ", (currentMinimumEvent as any).qvis.sequencediagram.y, currentMinimumTrace, currentMinimumValue);
+
+            // prepare for next loop
+            currentTimestampUnderConsideration = currentTimeBucket;
+            previousMinimumTrace = currentMinimumTrace;
 
             heads[ currentMinimumTrace ] += 1;
             if ( heads[currentMinimumTrace] >= traces[currentMinimumTrace].getEvents().length ) {
@@ -394,8 +541,7 @@ export default class SequenceDiagramD3Renderer {
 
             done = doneCount === traces.length;
 
-            currentY = (currentMinimumEvent as any).qvis.sequencediagram.y;
-            maxY = (currentMinimumEvent as any).qvis.sequencediagram.y;
+            maxY = currentY;
         }
 
         // let DEBUG_penultimateEvent = traces[0].getEvents()[ traces[0].getEvents().length - 1 ];
@@ -409,6 +555,119 @@ export default class SequenceDiagramD3Renderer {
         maxY += this.dimensions.margin.bottom; // give a bit of breathing room at the bottom of the diagram
 
         return maxY;
+    }
+
+    protected calculateConnections() {
+        // we want to draw arrows between PACKET_* events 
+        // arrow starts from PACKET_SENT and goes to PACKET_RECEIVED
+        // we do 2 passes: 1 from left to right (client to server), 1 from right to left (server to client)
+        // because we can have intermediate network-traces, we need to take into account their individual perspectives
+        // as such, we process in the two directions to be able to do that correctly
+
+        const connectEventLists = (metadataTargetProperty:arrowTargetProperty, start:QlogConnection, startEvents:Array<IQlogRawEvent>, end:QlogConnection, endEvents:Array<IQlogRawEvent>) => {
+
+            // start.parseEvent() looks up the eventparser using this.eventParser, which is a Vue ReactiveGetter, which is -slow-...
+            // so, create our own references to the parsers here, which is faster
+            const startParser = start.getEventParser();
+            const endParser   = end.getEventParser();
+
+            let DEBUG_packetLostCount = 0;
+
+            // for each of the events in our starting trace, we need to see if we can find an accompanying event in the ending trace
+            // however, the naive way of doing this is O(n * n), which turns out to be too slow for large traces
+            // so, we're going to use some domain knowledge and heuristics to speed this up
+            // We know all events are ordered by timestamp and that QUIC packet numbers are monotonically increasing
+            // So when looking for the counterpart for packet 5000, we -probably- don't need to start all the way from the bottom, or go to packet 15000
+            // We keep track of the previously found packet and look in 10% before and 10% after increments 
+            // (if it's outside that, there is massive jitter anyway, and the use of this visualization is debatable)
+            // this approach allowed us to go from 7s to < 600ms for a 3.5MB trace
+            // TODO: speed up even more by skipping packet numbers that have a PACKET_LOST event
+
+            let lastFoundTargetIndex:number = 0;
+            const endEventsFraction:number = Math.min(1000, Math.max(200, Math.round(endEvents.length / 10))); // 10% each way, minimum of 200 events, max of 1000
+
+            for ( const rawevt of startEvents ){
+                const evt = startParser.load(rawevt).data as qlog.IEventPacketSent;
+                const metadata = (rawevt as any).qvis.sequencediagram; 
+
+                if ( !evt.header!.packet_number ){
+                    console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
+                    continue;
+                }
+
+                metadata[arrowTargetProperty.right] = undefined; // could be set from a previous processing, which might no longer be correct now (e.g., new trace in the middle)
+                metadata[arrowTargetProperty.left]  = undefined;
+                // evt.header!.packet_number = "DEBUG_FORCELOSS";
+
+                const startCandidateIndex:number = Math.max( 0,                    lastFoundTargetIndex - endEventsFraction ); // go back 10% events, but not lower than 0
+                const endCandidateIndex:number   = Math.min( endEvents.length - 1, lastFoundTargetIndex + endEventsFraction ); // go forward 10% events, but not beyond the array length
+
+
+                for ( let c = startCandidateIndex; c <= endCandidateIndex; ++c ) {
+                    // note : event can be either sent or received, but interfaces are the same, so doesn't matter atm
+                    // TODO: define separate interface for this in the qlog schema!
+                    const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacketReceived; 
+                    
+                    // need to check for .type as well to deal with different packet number spaces
+                    if (candidate.type === evt.type && candidate.header!.packet_number === evt.header!.packet_number ){
+                        metadata[metadataTargetProperty] = endEvents[c];
+                        lastFoundTargetIndex = c;
+                        break;
+                    }
+                }
+
+                if ( metadata[metadataTargetProperty] === undefined ){
+                    DEBUG_packetLostCount++;
+                }
+            }
+
+            console.error("ConnectEventLists : lost events ", DEBUG_packetLostCount);
+        };
+
+        const connectTraces = (metadataTargetProperty:arrowTargetProperty, start:QlogConnection, end:QlogConnection) => {
+
+            let startPerspective = start.vantagePoint.type;
+            let endPerspective = end.vantagePoint.type;
+
+            if ( startPerspective === qlog.VantagePointType.network ){
+                startPerspective = start.vantagePoint.flow as qlog.VantagePointType;
+            }
+            if ( endPerspective === qlog.VantagePointType.network ){
+                endPerspective = end.vantagePoint.flow as qlog.VantagePointType;
+            }
+
+            const startEventType = qlog.TransportEventType.packet_sent;
+            const endEventType = (startPerspective === endPerspective ) ? qlog.TransportEventType.packet_sent : qlog.TransportEventType.packet_received;
+
+            const startEvents = start.lookup( qlog.EventCategory.transport, startEventType );
+            const endEvents = end.lookup( qlog.EventCategory.transport, endEventType );
+
+            if ( startEvents.length === 0 ) { 
+                console.error("SequenceDiagram:calculateConnections : trace " + start.parent.filename + ":" + startPerspective + " did not have " + startEventType + " events, which are needed");
+            }
+            if ( endEvents.length === 0 ) { 
+                console.error("SequenceDiagram:calculateConnections : trace " + end.parent.filename + ":" + endPerspective + " did not have " + endEventType + " events, which are needed");
+            }
+
+            connectEventLists( metadataTargetProperty, start, startEvents, end, endEvents );
+        };
+
+        // packets flowing from client to server (left to right)
+        for ( let t = 0; t < this.traces.length - 1; ++t ){ // to -1, because rightmost is handled separately below
+            const start = this.traces[t];
+            const end   = this.traces[t + 1];
+
+            connectTraces(arrowTargetProperty.right, start, end);
+        }
+
+        // packets flowing from server to client (right to left)
+        for ( let t = this.traces.length - 1; t > 0; --t ) { // > 0 because leftmost was handled above
+            const start = this.traces[t];
+            const end   = this.traces[t - 1];
+
+            connectTraces(arrowTargetProperty.left, start, end);
+
+        }
     }
 
     protected async renderPartialExtents(){
@@ -526,7 +785,7 @@ export default class SequenceDiagramD3Renderer {
             .attr("font-family", "Trebuchet MS");
         */
 
-
+        const pixelsPerMillisecond = this.dimensions.pixelsPerMillisecond;
 
         const output = '';
 
@@ -543,8 +802,10 @@ export default class SequenceDiagramD3Renderer {
                 const events = trace.getEvents();
                 
                 let currentY = 0;
+                let currentMetadata = undefined;
                 for ( const evt of events ){
-                    currentY = (evt as any).qvis.sequencediagram.y;
+                    currentMetadata = (evt as any).qvis.sequencediagram;
+                    currentY = currentMetadata.y;
 
                     if ( currentY < extent.start ) {
                         continue;
@@ -555,22 +816,48 @@ export default class SequenceDiagramD3Renderer {
                     }
 
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute('x', "" + currentX);
-                    rect.setAttribute('y', "" + currentY);
-                    rect.setAttribute('width', "10");
-                    rect.setAttribute('height', "10");
+                    rect.setAttribute('x', "" + (currentX - pixelsPerMillisecond / 2));
+                    rect.setAttribute('y', "" + (currentY - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
+                    rect.setAttribute('width', ""  + pixelsPerMillisecond);
+                    rect.setAttribute('height', "" + pixelsPerMillisecond);
                     rect.setAttribute('fill', 'green');
-                    rect.onclick = (evt_in) => { alert("Clicked on " + ((evt as any).qvis.sequencediagram.y)); };
+                    rect.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(evt)); };
                     extentContainer.appendChild( rect );
 
 
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute('x', "" + (currentX + 20));
+                    text.setAttribute('class', "timestamp");
+                    text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -pixelsPerMillisecond * 2 : pixelsPerMillisecond * 2)));
                     text.setAttribute('y', "" + (currentY));
                     text.setAttribute('dominant-baseline', "middle");
-                    text.setAttribute('text-anchor', "left");
-                    text.textContent = "" + currentY;
+                    text.setAttribute('text-anchor', (i === 0) ? "end" : "start");
+                    text.textContent = "" + (trace.parseEvent(evt).time);
                     extentContainer.appendChild( text );
+
+                    // TODO: now we're using left and right and client is always left, server always right
+                    // could make this more flexible if each event would also store their x-coordinate, rather than only y
+
+                    let xOffset:number|undefined = undefined;
+                    let target:any|undefined = undefined;
+                    if  (currentMetadata[ arrowTargetProperty.right ] ){
+                        xOffset = this.bandWidth;
+                        target = (currentMetadata[ arrowTargetProperty.right ] as any).qvis.sequencediagram;
+                    }
+                    else if ( currentMetadata[ arrowTargetProperty.left ] ){
+                        xOffset = -this.bandWidth;
+                        target = (currentMetadata[ arrowTargetProperty.left ] as any).qvis.sequencediagram;
+                    }
+
+                    if ( xOffset ){
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        line.setAttribute('x1', "" + (currentX));
+                        line.setAttribute('x2', "" + (currentX + xOffset!));
+                        line.setAttribute('y1', "" + (currentY - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
+                        line.setAttribute('y2', "" + (target.y - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
+                        line.setAttribute('stroke-width', '4');
+                        line.setAttribute('stroke', 'blue');
+                        extentContainer.appendChild( line );
+                    }
 
                     // svg.append('rect').attr('x', currentX).attr('y', currentY).attr('width', 10).attr('height', 2).attr('fill', 'green');
                     // svg.append('text').attr('x', currentX + 10).attr('y', currentY).text( currentY );
@@ -579,6 +866,8 @@ export default class SequenceDiagramD3Renderer {
                     //     await new Promise( (resolve) => setTimeout(resolve, 100));
                     // }
                     // document.getElementById(this.containerID)!.innerHTML = output;
+
+
                 }
             }
 
