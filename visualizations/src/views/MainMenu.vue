@@ -3,8 +3,9 @@
         <b-row>
             <b-col cols="1" md="auto">qvis</b-col>
             <b-col>
-                <router-link to="/debug">VUEDebug</router-link> | 
-                <router-link to="/sequence">Sequence</router-link>
+                <router-link to="/debug">VUEDebug</router-link> |
+                <router-link to="/sequence">Sequence</router-link> |
+                <router-link to="/congestion">Congestion</router-link>
             </b-col>
         </b-row>
     </b-container>
@@ -26,4 +27,4 @@
     #MainMenu a.router-link-exact-active {
         color: #42b983;
     }
-</style> 
+</style>

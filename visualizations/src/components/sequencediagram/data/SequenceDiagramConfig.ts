@@ -1,6 +1,6 @@
 import Connection from "@/data/Connection";
 
-export default class SequenceDiagramConfig { 
+export default class SequenceDiagramConfig {
 
     public manualRTT:number = -1;
     public scale:number = 0.1; // amount of pixels per ms // by default 1 pixel = 10 ms // can be in [0,1[ to squish things

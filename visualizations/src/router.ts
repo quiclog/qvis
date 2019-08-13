@@ -3,6 +3,7 @@ import Router from "vue-router";
 import MainMenu from "./views/MainMenu.vue";
 import VUEDebug from "./views/VUEDebug.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
+import CongestionGraph from "./views/CongestionGraph.vue";
 
 Vue.use(Router);
 
@@ -32,13 +33,25 @@ const router = new Router({
         menu: MainMenu,
       },
     },
+    {
+      path: "/congestion",
+      name: "congestion",
+      // route level code-splitting
+      // this generates a separate chunk (about.[hash].js) for this route
+      // which is lazy-loaded when the route is visited.
+      // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
+      components: {
+        default: CongestionGraph,
+        menu: MainMenu,
+      },
+    },
   ],
 });
 
 function hasQueryParams(route:any) {
     return !!Object.keys(route.query).length;
   }
-  
+
 // Vue does something weird with its processing of query parameters
 // normally, we get an url like : mydomain.com/#/routename
 // if we then do mydomain.com/#/routename?param1=test, everything works
