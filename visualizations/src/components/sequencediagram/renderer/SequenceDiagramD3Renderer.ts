@@ -71,24 +71,21 @@ export default class SequenceDiagramD3Renderer {
         this.selectedTraces = traces;
         this.rendering = true;
 
-        setTimeout( () => {
-            // To make things performant enough, we don't render the full diagram at once
-            // We always render just parts of it at the same time
-            // this.setup prepares everything, calculates coordinates and relations between events etc.
-            // this.renderPartialExtents can then be called on scroll updates. It figures out which part of the SVG is visible and makes sure that part of the diagram is drawn.
-            const canContinue:boolean = this.setup(traces);
+        // To make things performant enough, we don't render the full diagram at once
+        // We always render just parts of it at the same time
+        // this.setup prepares everything, calculates coordinates and relations between events etc.
+        // this.renderPartialExtents can then be called on scroll updates. It figures out which part of the SVG is visible and makes sure that part of the diagram is drawn.
+        const canContinue:boolean = this.setup(traces);
 
-            if ( !canContinue ) {
-                this.rendering = false;
+        if ( !canContinue ) {
+            this.rendering = false;
 
-                return;
-            }
+            return;
+        }
 
-            this.renderPartialExtents().then( () => {
-                this.rendering = false;
-            });
-
-        }, 1);
+        this.renderPartialExtents().then( () => {
+            this.rendering = false;
+        });
     }
 
     // runs once before each render. Used to bootstrap everything.
@@ -803,8 +800,9 @@ export default class SequenceDiagramD3Renderer {
                 
                 let currentY = 0;
                 let currentMetadata = undefined;
-                for ( const evt of events ){
-                    currentMetadata = (evt as any).qvis.sequencediagram;
+                for ( const rawEvt of events ){
+                    const evt = trace.parseEvent(rawEvt);
+                    currentMetadata = (rawEvt as any).qvis.sequencediagram;
                     currentY = currentMetadata.y;
 
                     if ( currentY < extent.start ) {
@@ -815,57 +813,172 @@ export default class SequenceDiagramD3Renderer {
                         break;
                     }
 
+                    // rect for each event on the vertical timelines
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                     rect.setAttribute('x', "" + (currentX - pixelsPerMillisecond / 2));
                     rect.setAttribute('y', "" + (currentY - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
                     rect.setAttribute('width', ""  + pixelsPerMillisecond);
                     rect.setAttribute('height', "" + pixelsPerMillisecond);
                     rect.setAttribute('fill', 'green');
-                    rect.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(evt)); };
+                    rect.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
                     extentContainer.appendChild( rect );
 
-
+                    // timestamp for each event next to the rects
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('class', "timestamp");
                     text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -pixelsPerMillisecond * 2 : pixelsPerMillisecond * 2)));
                     text.setAttribute('y', "" + (currentY));
                     text.setAttribute('dominant-baseline', "middle");
                     text.setAttribute('text-anchor', (i === 0) ? "end" : "start");
-                    text.textContent = "" + (trace.parseEvent(evt).time);
+                    text.textContent = "" + evt.time.toFixed(2);
                     extentContainer.appendChild( text );
 
                     // TODO: now we're using left and right and client is always left, server always right
                     // could make this more flexible if each event would also store their x-coordinate, rather than only y
 
-                    let xOffset:number|undefined = undefined;
+                    // full connecting arrows between events
                     let target:any|undefined = undefined;
+                    let offsetMultiplier:number|undefined = undefined;
                     if  (currentMetadata[ arrowTargetProperty.right ] ){
-                        xOffset = this.bandWidth;
+                        offsetMultiplier = 1;
                         target = (currentMetadata[ arrowTargetProperty.right ] as any).qvis.sequencediagram;
                     }
                     else if ( currentMetadata[ arrowTargetProperty.left ] ){
-                        xOffset = -this.bandWidth;
+                        offsetMultiplier = -1;
                         target = (currentMetadata[ arrowTargetProperty.left ] as any).qvis.sequencediagram;
                     }
 
-                    if ( xOffset ){
+                    if ( offsetMultiplier ) { // if not, the current event does not have a connecting arrow
+                        let targetX = currentX + ( offsetMultiplier * this.bandWidth ); // either move 1 band to the right or left, depending on arrow direction
+                        targetX = targetX - (offsetMultiplier! * (pixelsPerMillisecond / 2)); // don't overlap with the event rect
+
+                        //target.y += Math.random() * 5000;
+                        
                         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                         line.setAttribute('x1', "" + (currentX));
-                        line.setAttribute('x2', "" + (currentX + xOffset!));
-                        line.setAttribute('y1', "" + (currentY - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
-                        line.setAttribute('y2', "" + (target.y - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
+                        line.setAttribute('x2', "" + (targetX));
+                        line.setAttribute('y1', "" + (currentY)); 
+                        line.setAttribute('y2', "" + (target.y));
                         line.setAttribute('stroke-width', '4');
                         line.setAttribute('stroke', 'blue');
                         extentContainer.appendChild( line );
+
+                        // polyline expects a list of x,y coordinates
+                        // we draw the arrow as normal (across the "x-axis" to the right: >), then rotate it along the connecting line
+
+                        const arrowX = targetX; 
+                        let points = "";
+                        points +=  `${arrowX - 10},${target.y - 10}`; // top point
+                        points += ` ${arrowX     },${target.y     }`; // center point
+                        points += ` ${arrowX - 10},${target.y + 10}`; // bottom point
+
+                        // https://stackoverflow.com/questions/2676719/calculating-the-angle-between-the-line-defined-by-two-points
+                        const deltaY = currentY - target.y;
+                        const deltaX = targetX  - currentX;
+                        let angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI; 
+                        angle = -angle; // svg's rotate has the convention that clockwise rotations are positive angles, counterclockwise are negative. 
+
+                        const arrow = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+                        arrow.setAttribute('points', points);
+                        arrow.setAttribute('stroke-width', '4');
+                        arrow.setAttribute('stroke', 'red');
+                        arrow.setAttribute('fill', 'transparent');
+                        arrow.setAttribute('transform', `rotate(${angle},${arrowX},${target.y})`);
+                        extentContainer.appendChild( arrow );
+
+                        // make the text 90% of the width of the arrow
+                        const textWidth = Math.sqrt( Math.pow( targetX - currentX, 2) + Math.pow( target.y - currentY, 2) ) * 0.9;
+                        const textHeight = pixelsPerMillisecond * 2; // foreignObject clips, so make it a bit higher and offset with translate
+                        let textAngle = angle;
+                        let originalAngle = angle;
+                        // angle for the arrow can go to any value, for text we still want it to be readable (i.e., not upside down)
+                        // value of 90 is basically further than -90 on the goniometric circle, aka upside down
+                        // so if we go over that, compensate by swivveling to the other side
+                        // dito for -90
+                        if ( textAngle >= 90 ){
+                            textAngle -= 180;
+                        }
+                        else if ( textAngle <= -90 ){
+                            textAngle += 180;
+                        }
+
+                        const midwayX = (currentX + targetX ) / 2;
+                        const midwayY = (currentY + target.y) / 2;
+
+                        // getting different colored text spans next to each other in SVG requires -manual- positioning (yes, even though it's 2019)
+                        // as such, we take the dirty route and use foreignObject so we can use the HTML layouting engine
+                        const textForeign = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+                        textForeign.setAttribute('x', "" + (midwayX));
+                        textForeign.setAttribute('y', "" + (midwayY)); 
+                        textForeign.setAttribute('width',  "" + textWidth);
+                        textForeign.setAttribute('height', "" + textHeight); 
+                        // order of the transformation is important here!
+                        // we first rotate the top left corner of the text area around the midway point (which is also where it's positioned) so we get the correct rotation
+                        // then we translate the entire rect within this rotated coordinate space (doing it the other way around would translate in worldspace, not what we want)
+                        textForeign.setAttribute('transform', `rotate(${textAngle},${midwayX},${midwayY}) translate(${-textWidth / 2},${-textHeight - 2})`);  // 
+
+
+                        const debugRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        debugRect.setAttribute('x', "" + (midwayX));
+                        debugRect.setAttribute('y', "" + (midwayY)); // x and y are top left, we want it to be middle
+                        debugRect.setAttribute('width', ""  + pixelsPerMillisecond);
+                        debugRect.setAttribute('height', "" + pixelsPerMillisecond);
+                        debugRect.setAttribute('fill', 'red');
+                        extentContainer.appendChild( debugRect );
+
+                        const textContainer = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+                        // textContainer.innerHTML = "Hello worlds";
+                        //textContainer.style.backgroundColor = "#FF0000";
+                        textContainer.style.width = "" + textWidth + "px";
+                        textContainer.style.textAlign = "center";
+
+                        const textSpan = document.createElement("span");
+                        textSpan.textContent = "" + evt.data.type + " : " + evt.data.header.packet_number;
+                        textSpan.style.color = "#383d41"; // dark grey
+                        textSpan.style.backgroundColor = "#d6d8db"; // light grey
+                        textSpan.style.paddingLeft = "5px";
+                        textSpan.style.paddingRight = "5px";
+                        textSpan.style.border = "1px solid white";
+                        textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                        textContainer.appendChild(textSpan);
+
+                        for ( const frameRaw of evt.data.frames ) {
+                            const frame = frameRaw as qlog.QuicFrame;
+
+                            const textSpan = document.createElement("span");
+                            textSpan.textContent = "" + frame.frame_type;
+                            textSpan.style.color = "#004085"; // dark blue
+                            textSpan.style.backgroundColor = "#b8daff"; // light blue
+                            textSpan.style.paddingLeft = "5px";
+                            textSpan.style.paddingRight = "5px";
+                            textSpan.style.border = "1px solid white";
+                            textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                            textContainer.appendChild(textSpan);
+                        }
+
+
+                        textForeign.appendChild( textContainer );
+                        extentContainer.appendChild( textForeign );
+
+                        // <g class="clickable" v-bind:transform="'translate(200,' + (y_coord - 5) + ') rotate(' + angle + ')'" v-if="clientsend">
+
+                        // </g>
+
+
+                        // centerpoint_text(){
+                        //     // see ArrowInfo for how the text is translated. These values are based on x-translates of 200 and 450
+                        //     // this is basically a LERP of the y-value across the line at the correct percentage 
+                        //     if (this.clientsend)
+                        //         return this.y_receive * 0.0714285; // starts at 200, which is 50 more than the start of 150. total x-range is 850 - 150 = 700. 50/700 = 0.0714285
+                        //     else
+                        //         return this.y_receive * 0.5714286;// starts at 450, 300 more than the start of 150:  400/700 = 0.5714286
+                        // },
+
+
+
                     }
 
-                    // svg.append('rect').attr('x', currentX).attr('y', currentY).attr('width', 10).attr('height', 2).attr('fill', 'green');
-                    // svg.append('text').attr('x', currentX + 10).attr('y', currentY).text( currentY );
-
-                    // if ( eventCount % 2000 === 0 ){
-                    //     await new Promise( (resolve) => setTimeout(resolve, 100));
-                    // }
-                    // document.getElementById(this.containerID)!.innerHTML = output;
+                    
 
 
                 }
