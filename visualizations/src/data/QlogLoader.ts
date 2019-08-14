@@ -1,9 +1,9 @@
 import QlogConnectionGroup from '@/data/ConnectionGroup';
 
 
-import * as qlog01 from '@quictools/qlog-schema'; 
-import * as qlogPreSpec from '@quictools/qlog-schema/draft-16/QLog'; 
-import { QUtil } from '@quictools/qlog-schema/util'; 
+import * as qlog01 from '@quictools/qlog-schema';
+import * as qlogPreSpec from '@quictools/qlog-schema/draft-16/QLog';
+import { QUtil } from '@quictools/qlog-schema/util';
 import QlogConnection from '@/data/Connection';
 import { IQlogEventParser, IQlogRawEvent } from '@/data/QlogEventParser';
 
@@ -114,13 +114,24 @@ export class QlogLoader {
             connection.setEvents( jsonconnection.events as any );
 
             connection.setEventParser( new EventFieldsParser() );
+
+            for ( const evt of connection.getEvents() ){
+                const data = connection.parseEvent(evt).data;
+                if ( data.frames ) {
+                    for ( const frame of data.frames ){
+                        if ( frame.frame_type ){
+                            frame.frame_type = frame.frame_type.toLowerCase();
+                        }
+                    }
+                }
+            }
         }
 
         return group;
     }
 
     protected static fromPreSpec(json:any) : QlogConnectionGroup {
-        
+
         const fileContents:qlogPreSpec.IQLog = json as qlogPreSpec.IQLog;
 
         console.log("QlogLoader:fromPreSpec : ", fileContents, fileContents.connections);
@@ -128,7 +139,7 @@ export class QlogLoader {
         // QLog00 toplevel structure contains a list of connections
         // most files currently just contain a single connection, but the idea is to allow bundling connections on a single file
         // for example 1 log for the server and 1 for the client and 1 for the network, all contained in 1 file
-        // This is why we call it a ConnectionGroup here, instead of QlogFile or something 
+        // This is why we call it a ConnectionGroup here, instead of QlogFile or something
         const group = new QlogConnectionGroup();
         group.description = fileContents.description || "";
 
@@ -137,7 +148,7 @@ export class QlogLoader {
             const connection = new QlogConnection(group);
 
             // metadata can be just a string, so use that
-            // OR it can be a full object, in which case we want just the description here 
+            // OR it can be a full object, in which case we want just the description here
             let description = "no description";
             if ( jsonconnection.metadata ){
                 if ( typeof jsonconnection.metadata === "string" ){
@@ -161,7 +172,7 @@ export class QlogLoader {
                     connection.vantagePoint.flow = qlog01.VantagePointType.client;
                 }
             }
-            
+
             connection.title = description;
             connection.description = description;
 
@@ -227,7 +238,7 @@ export class EventFieldsParser implements IQlogEventParser {
         if ( this.nameIndex === -1 ) {
             return;
         }
-            
+
         (this.currentEvent as IQlogRawEvent)[this.nameIndex] = val;
     }
     public get trigger():string {
@@ -245,6 +256,10 @@ export class EventFieldsParser implements IQlogEventParser {
         return (this.currentEvent as IQlogRawEvent)[this.dataIndex];
     }
 
+    public timeToMilliseconds(time: number | string): number {
+        return parseFloat(time as any) * this.timeMultiplier;
+    }
+
     public init( trace:QlogConnection ) {
         this.currentEvent = undefined;
 
@@ -258,15 +273,15 @@ export class EventFieldsParser implements IQlogEventParser {
         this.nameIndex      = eventFieldNames.indexOf( "event_type" );
         if ( this.nameIndex === -1 ) {
             this.nameIndex      = eventFieldNames.indexOf( "event" ); // 00 is event_type, 01 is event
-        } 
+        }
         this.triggerIndex   = eventFieldNames.indexOf( "trigger" );
         this.dataIndex      = eventFieldNames.indexOf( "data" );
 
 
 
-        this.timeIndex = eventFieldNames.indexOf("time"); // typically 0 
+        this.timeIndex = eventFieldNames.indexOf("time"); // typically 0
         if ( this.timeIndex === -1 ){
-            this.timeIndex = eventFieldNames.indexOf("relative_time"); // typically 0 
+            this.timeIndex = eventFieldNames.indexOf("relative_time"); // typically 0
 
             if ( this.timeIndex === -1 ){
                 this.timeTrackingMethod = TimeTrackingMethod.DELTA_TIME;
@@ -308,7 +323,7 @@ export class EventFieldsParser implements IQlogEventParser {
         this.currentEvent = evt;
 
         return this;
-    } 
+    }
 }
 
 // tslint:disable max-classes-per-file
@@ -339,9 +354,13 @@ export class PreSpecEventParser implements IQlogEventParser {
         this.currentEvent = undefined;
     }
 
+    public timeToMilliseconds(time: number | string): number {
+        return parseFloat(time as any);
+    }
+
     public load( evt:IQlogRawEvent ) : IQlogEventParser {
         this.currentEvent = evt;
 
         return this;
-    } 
+    }
 }

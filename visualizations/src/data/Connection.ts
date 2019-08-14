@@ -44,7 +44,7 @@ export default class QlogConnection {
     // performs a DEEP clone of this connection
     // NOTE: this is SLOW and should only be used sparingly (mainly added for the sequence diagram)
     public clone():QlogConnection {
-        // TODO: maybe find a better way to do this than just JSON.stringify? 
+        // TODO: maybe find a better way to do this than just JSON.stringify?
         // online they recommend lodash's deepClone
         const output:QlogConnection = new QlogConnection( this.parent );
 
@@ -97,9 +97,9 @@ export default class QlogConnection {
         return this.eventParser.load( evt );
     }
 
-    public setEvents(events:Array<Array<any>>):void { 
+    public setEvents(events:Array<Array<any>>):void {
         (events as any)._isVue = true; // prevent the individual events from being Vue Reactive, see above
-        this.events = events; 
+        this.events = events;
     }
     public getEvents():Array<Array<any>> { return this.events; }
 
@@ -115,7 +115,7 @@ export default class QlogConnection {
             if ( !this.lookupTable.has(category) ) {
                 this.lookupTable.set( category, new Map<string, Array<IQlogRawEvent>>() );
             }
-            
+
             const categoryDictionary = this.lookupTable.get(category);
             if ( !categoryDictionary!.has(eventType) ) {
                 categoryDictionary!.set( eventType, new Array<IQlogRawEvent>() );
@@ -123,9 +123,10 @@ export default class QlogConnection {
 
             categoryDictionary!.get(eventType)!.push( evt );
         }
+
     }
 
-    public lookup(category:string, eventType:string):Array<IQlogRawEvent> {
+    public lookup(category: qlog.EventCategory | string, eventType: qlog.EventType | string):Array<IQlogRawEvent> {
         if ( this.lookupTable.has(category) && this.lookupTable.get(category)!.has(eventType) ){
             return this.lookupTable.get(category)!.get(eventType)!;
         }

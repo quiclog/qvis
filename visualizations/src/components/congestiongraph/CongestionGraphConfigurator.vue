@@ -3,6 +3,11 @@
 
         <p>Select one or more traces via the dropdown(s) below to visualize them in the sequence diagram</p>
 
+        <b-button @click="loadTrace()">Load trace</b-button>
+        <b-button @click="resetZoom()">Reset zoom</b-button>
+        <b-button @click="useBrushX()">Zoom timerange</b-button>
+        <b-button @click="useBrush2d()">Zoom area</b-button>
+        <b-button @click="toggleCongestionGraph()">Toggle congestion info</b-button>
         <b-button @click="togglePerspective()">Toggle perspective</b-button>
     </div>
 </template>
@@ -16,14 +21,13 @@
     import ConnectionGroup from "@/data/ConnectionGroup";
     import Connection from "@/data/Connection";
 
-    @Component({
-        components: {},
-    })
+    @Component({})
+
     export default class CongestionGraphConfigurator extends Vue {
         @Prop()
-        protected config!: CongestionGraphConfig;
+        public config!: CongestionGraphConfig;
 
-        protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
+        public store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
         public created(){
             // TODO: remove, only for debugging
@@ -37,9 +41,29 @@
             this.config.connection = ( this.store.groups[0].getConnections()[0] );
         }
 
+        public loadTrace(){
+            console.log("Loading trace...", this.config);
+            this.config.connection = ( this.store.groups[4].getConnections()[0] );
+        }
+
+        public resetZoom(){
+            // TODO
+        }
+
+        public useBrushX(){
+            // TODO
+        }
+
+        public useBrush2d(){
+            // TODO
+        }
+
+        public toggleCongestionGraph(){
+            // TODO
+        }
+
         public togglePerspective(){
-            alert("Toggling perspective");
-            this.config.connection = ( this.store.groups[1].getConnections()[0] );
+            // TODO
         }
     }
 

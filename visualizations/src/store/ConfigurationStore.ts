@@ -5,6 +5,6 @@ import CongestionGraphConfig from '@/components/congestiongraph/data/CongestionG
 @Module({name: 'configurations'})
 export default class ConfigurationStore extends VuexModule {
 
-    public sequenceDiagramConfig: SequenceDiagramConfig = new SequenceDiagramConfig();
     public congestionGraphConfig: CongestionGraphConfig = new CongestionGraphConfig();
+    public sequenceDiagramConfig: SequenceDiagramConfig = new SequenceDiagramConfig();
 }

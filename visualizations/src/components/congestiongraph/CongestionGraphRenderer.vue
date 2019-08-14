@@ -6,6 +6,13 @@
 </template>
 
 <style>
+    .grid line {
+        stroke: #ddd;
+    }
+
+    .nogrid line {
+        stroke: #ffffff;
+    }
 </style>
 
 <script lang="ts">
@@ -30,7 +37,7 @@
 
         public mounted(){
             // mainly for when we switch away, and then back to the congestionGraph
-            if ( this.config && this.renderer ) {
+            if ( this.config && this.renderer && this.config.connection !== undefined ) {
                 this.renderer.render( this.config );
             }
         }
@@ -41,7 +48,7 @@
         protected onConfigChanged(newConfig: CongestionGraphConfig, oldConfig: CongestionGraphConfig) {
             console.log("CongestionGraphRenderer:onConfigChanged : ", newConfig, oldConfig);
 
-            if ( this.renderer ) {
+            if ( this.renderer && newConfig.connection !== undefined ) {
                 this.renderer.render( newConfig );
             }
         }

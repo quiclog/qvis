@@ -13,14 +13,14 @@
         <div v-for="(group, index) of store.groups" :key="index">
             {{group.description}}
             <div v-for="(connection,index) of group.GetConnections()" :key="index">
-                - <b-button @click="addConnection(connection)">Add Connection</b-button> 
+                - <b-button @click="addConnection(connection)">Add Connection</b-button>
             </div>
         </div>
     -->
 
-        <b-button @click="addConnection()">&#43;<!-- PLUS + --></b-button> 
+        <b-button @click="addConnection()">&#43;<!-- PLUS + --></b-button>
     </div>
-</template> 
+</template>
 
 <script lang="ts">
     import { getModule } from "vuex-module-decorators";
@@ -51,7 +51,7 @@
         }
 
         public onConnectionSelected(connectionIndex:number, connection:Connection){
-            console.log("Configurator:onConnectionSelected : ", connectionIndex, connection);
+            console.log("Configurator:onConnectionSelected : ", this.config, connectionIndex, connection);
 
             // Vue reactivity cannot detect direct index-based changes to an array, i.e.,
             // this.config.connections[connectionIndex] = connection;
@@ -67,7 +67,7 @@
             if ( connectionIndex === 0 && connection.parent.getConnections().length > 1 ){
                 const connections = connection.parent.getConnections();
                 const connectionIndexInParent = connections.indexOf(connection);
-                let rendererIndex = 1; 
+                let rendererIndex = 1;
                 for ( let i = connectionIndexInParent + 1; i < connections.length; ++i ){
                     // Vue.set works like .push when the index isn't yet in the array
                     Vue.set( this.config.connections, rendererIndex, connections[i] );
@@ -93,6 +93,6 @@
         protected onConnectionRemoved(connectionIndex:number){
             this.config.connections.splice(connectionIndex, 1);
         }
-    } 
+    }
 
 </script>
