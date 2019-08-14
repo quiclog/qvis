@@ -56,6 +56,8 @@ export default class SequenceDiagramD3Renderer {
     
     private bandWidth:number = 0; // width of an individual vertical trace timeline on screen
 
+    private frameTypeToColorLUT:Map<string, Array<string>> = new Map<string, Array<string>>();
+
     constructor(containerID:string, svgID:string){
         this.containerID = containerID;
         this.svgID = svgID;
@@ -144,7 +146,7 @@ export default class SequenceDiagramD3Renderer {
             width: 0, // total width, including margins
             height: 0, // total height, including margin.top and margin.bottom
 
-            pixelsPerMillisecond: 10,
+            pixelsPerMillisecond: 20,
             shortenIntervalsLongerThan: 120,
         };
 
@@ -200,16 +202,37 @@ export default class SequenceDiagramD3Renderer {
 
         for ( const interval of this.shortenedIntervals ){
             for ( let i = 0; i < this.traces.length; ++i ){
-                const currentX =  this.bandWidth * i + (this.bandWidth * 0.5); // get center of the band
+                let currentX =  this.bandWidth * i + (this.bandWidth * 0.5); // get center of the band
     
+                // the outside of the trace
                 // dashed array doesn't have a background color, so make sure we draw it ourselves
                 this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
                                         .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
                                         .attr("stroke", "white").attr("stroke-width", 4);
-
                 this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
                                         .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
                                         .attr("stroke", "black").attr("stroke-width", 4).attr("stroke-dasharray", 4);
+
+                // in between the two traces
+                if ( i !== this.traces.length - 1) {
+                    currentX = this.bandWidth * (i + 1);
+                    this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
+                                            .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
+                                            .attr("stroke", "white").attr("stroke-width", 4);
+                    this.svg.append('line') .attr("x1", currentX).attr("x2", currentX)
+                                            .attr("y1", interval.yMin + this.dimensions.pixelsPerMillisecond).attr("y2", interval.yMax - this.dimensions.pixelsPerMillisecond)
+                                            .attr("stroke", "black").attr("stroke-width", 4).attr("stroke-dasharray", 4);
+
+                    
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute('class', "timestamp");
+                    text.setAttribute('x', "" + (currentX + (this.dimensions.pixelsPerMillisecond) ));
+                    text.setAttribute('y', "" + (interval.yMin + (interval.yMax - interval.yMin) / 2));
+                    text.setAttribute('dominant-baseline', "middle");
+                    text.textContent = `${interval.timeSkipped}ms of inactivity`;
+                    (this.svg.node()! as HTMLElement).appendChild( text );   
+                }                                     
+
             }
         }
 
@@ -617,8 +640,6 @@ export default class SequenceDiagramD3Renderer {
                     DEBUG_packetLostCount++;
                 }
             }
-
-            console.error("ConnectEventLists : lost events ", DEBUG_packetLostCount);
         };
 
         const connectTraces = (metadataTargetProperty:arrowTargetProperty, start:QlogConnection, end:QlogConnection) => {
@@ -815,10 +836,11 @@ export default class SequenceDiagramD3Renderer {
 
                     // rect for each event on the vertical timelines
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute('x', "" + (currentX - pixelsPerMillisecond / 2));
-                    rect.setAttribute('y', "" + (currentY - pixelsPerMillisecond / 2)); // x and y are top left, we want it to be middle
-                    rect.setAttribute('width', ""  + pixelsPerMillisecond);
-                    rect.setAttribute('height', "" + pixelsPerMillisecond);
+                    const rectSize = pixelsPerMillisecond * 0.6;
+                    rect.setAttribute('x', "" + (currentX - rectSize / 2));
+                    rect.setAttribute('y', "" + (currentY - rectSize / 2)); // x and y are top left, we want it to be middle
+                    rect.setAttribute('width', ""  + (rectSize));
+                    rect.setAttribute('height', "" + (rectSize));
                     rect.setAttribute('fill', 'green');
                     rect.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
                     extentContainer.appendChild( rect );
@@ -839,28 +861,32 @@ export default class SequenceDiagramD3Renderer {
                     // full connecting arrows between events
                     let target:any|undefined = undefined;
                     let offsetMultiplier:number|undefined = undefined;
+                    let directionText:string|undefined = undefined;
+                    let directionColor:string|undefined = undefined;
                     if  (currentMetadata[ arrowTargetProperty.right ] ){
                         offsetMultiplier = 1;
                         target = (currentMetadata[ arrowTargetProperty.right ] as any).qvis.sequencediagram;
+                        directionText = ">";
+                        directionColor = "#0468cc"; // blue
                     }
                     else if ( currentMetadata[ arrowTargetProperty.left ] ){
                         offsetMultiplier = -1;
                         target = (currentMetadata[ arrowTargetProperty.left ] as any).qvis.sequencediagram;
+                        directionText = "<";
+                        directionColor = "#a80f3a"; // red
                     }
 
                     if ( offsetMultiplier ) { // if not, the current event does not have a connecting arrow
                         let targetX = currentX + ( offsetMultiplier * this.bandWidth ); // either move 1 band to the right or left, depending on arrow direction
                         targetX = targetX - (offsetMultiplier! * (pixelsPerMillisecond / 2)); // don't overlap with the event rect
-
-                        //target.y += Math.random() * 5000;
                         
                         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                         line.setAttribute('x1', "" + (currentX));
                         line.setAttribute('x2', "" + (targetX));
                         line.setAttribute('y1', "" + (currentY)); 
                         line.setAttribute('y2', "" + (target.y));
-                        line.setAttribute('stroke-width', '4');
-                        line.setAttribute('stroke', 'blue');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('stroke', directionColor!);
                         extentContainer.appendChild( line );
 
                         // polyline expects a list of x,y coordinates
@@ -881,16 +907,15 @@ export default class SequenceDiagramD3Renderer {
                         const arrow = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
                         arrow.setAttribute('points', points);
                         arrow.setAttribute('stroke-width', '4');
-                        arrow.setAttribute('stroke', 'red');
+                        arrow.setAttribute('stroke', directionColor!);
                         arrow.setAttribute('fill', 'transparent');
                         arrow.setAttribute('transform', `rotate(${angle},${arrowX},${target.y})`);
                         extentContainer.appendChild( arrow );
 
                         // make the text 90% of the width of the arrow
                         const textWidth = Math.sqrt( Math.pow( targetX - currentX, 2) + Math.pow( target.y - currentY, 2) ) * 0.9;
-                        const textHeight = pixelsPerMillisecond * 2; // foreignObject clips, so make it a bit higher and offset with translate
+                        const textHeight = pixelsPerMillisecond * 0.9; // bit smaller so we have some padding at least
                         let textAngle = angle;
-                        let originalAngle = angle;
                         // angle for the arrow can go to any value, for text we still want it to be readable (i.e., not upside down)
                         // value of 90 is basically further than -90 on the goniometric circle, aka upside down
                         // so if we go over that, compensate by swivveling to the other side
@@ -912,48 +937,70 @@ export default class SequenceDiagramD3Renderer {
                         textForeign.setAttribute('y', "" + (midwayY)); 
                         textForeign.setAttribute('width',  "" + textWidth);
                         textForeign.setAttribute('height', "" + textHeight); 
+                        textForeign.style.overflow = "visible";
                         // order of the transformation is important here!
                         // we first rotate the top left corner of the text area around the midway point (which is also where it's positioned) so we get the correct rotation
                         // then we translate the entire rect within this rotated coordinate space (doing it the other way around would translate in worldspace, not what we want)
-                        textForeign.setAttribute('transform', `rotate(${textAngle},${midwayX},${midwayY}) translate(${-textWidth / 2},${-textHeight - 2})`);  // 
-
-
-                        const debugRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        debugRect.setAttribute('x', "" + (midwayX));
-                        debugRect.setAttribute('y', "" + (midwayY)); // x and y are top left, we want it to be middle
-                        debugRect.setAttribute('width', ""  + pixelsPerMillisecond);
-                        debugRect.setAttribute('height', "" + pixelsPerMillisecond);
-                        debugRect.setAttribute('fill', 'red');
-                        extentContainer.appendChild( debugRect );
+                        textForeign.setAttribute('transform', `rotate(${textAngle},${midwayX},${midwayY}) translate(${-textWidth / 2},${-textHeight - 3})`);  // 
 
                         const textContainer = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-                        // textContainer.innerHTML = "Hello worlds";
-                        //textContainer.style.backgroundColor = "#FF0000";
                         textContainer.style.width = "" + textWidth + "px";
                         textContainer.style.textAlign = "center";
 
-                        const textSpan = document.createElement("span");
-                        textSpan.textContent = "" + evt.data.type + " : " + evt.data.header.packet_number;
-                        textSpan.style.color = "#383d41"; // dark grey
-                        textSpan.style.backgroundColor = "#d6d8db"; // light grey
-                        textSpan.style.paddingLeft = "5px";
-                        textSpan.style.paddingRight = "5px";
-                        textSpan.style.border = "1px solid white";
-                        textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
-                        textContainer.appendChild(textSpan);
+                        if ( directionText === "<" ){
+                            const smallArrowSize = Math.floor(textHeight * 0.30);
+                            const directionSpan = document.createElement("span");
+                            directionSpan.style.display = "inline-block";
+                            directionSpan.style.borderTop = `${smallArrowSize}px solid transparent`;
+                            directionSpan.style.borderBottom = `${smallArrowSize}px solid transparent`;
+                            directionSpan.style.borderRight = `${smallArrowSize}px solid ${directionColor}`;
+                            directionSpan.style.marginRight = "1px";
+                            textContainer.appendChild(directionSpan);
+                        }
+
+                        const textSpanFront = document.createElement("span");
+                        textSpanFront.textContent = "" + evt.data.type + " : " + evt.data.header.packet_number;
+                        textSpanFront.style.color = "#383d41"; // dark grey
+                        textSpanFront.style.backgroundColor = "#d6d8db"; // light grey
+                        textSpanFront.style.paddingLeft = "5px";
+                        textSpanFront.style.paddingRight = "5px";
+                        textSpanFront.style.border = "1px white";
+                        textSpanFront.style.borderStyle = "none solid";
+                        textSpanFront.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
+                        textSpanFront.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                        textContainer.appendChild(textSpanFront);
 
                         for ( const frameRaw of evt.data.frames ) {
                             const frame = frameRaw as qlog.QuicFrame;
 
                             const textSpan = document.createElement("span");
-                            textSpan.textContent = "" + frame.frame_type;
-                            textSpan.style.color = "#004085"; // dark blue
-                            textSpan.style.backgroundColor = "#b8daff"; // light blue
+                            const [bgColor, textColor] = this.frameTypeToColor( frame.frame_type );
+                            textSpan.textContent = this.frameToShortString( frame );
+                            textSpan.style.color = textColor;
+                            textSpan.style.backgroundColor = bgColor;
                             textSpan.style.paddingLeft = "5px";
                             textSpan.style.paddingRight = "5px";
-                            textSpan.style.border = "1px solid white";
+                            textSpan.style.border = "1px white";
+                            textSpan.style.borderStyle = "none solid";
+                            textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
                             textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
-                            textContainer.appendChild(textSpan);
+                            if ( directionText === ">" ) {
+                                textContainer.prepend(textSpan);
+                            }
+                            else {
+                                textContainer.appendChild(textSpan);
+                            }
+                        }
+
+                        if ( directionText === ">" ){
+                            const smallArrowSize = Math.floor(textHeight * 0.30);
+                            const directionSpan = document.createElement("span");
+                            directionSpan.style.display = "inline-block";
+                            directionSpan.style.borderTop = `${smallArrowSize}px solid transparent`;
+                            directionSpan.style.borderBottom = `${smallArrowSize}px solid transparent`;
+                            directionSpan.style.borderLeft = `${smallArrowSize}px solid ${directionColor}`;
+                            directionSpan.style.marginLeft = "1px";
+                            textContainer.appendChild(directionSpan);
                         }
 
 
@@ -989,6 +1036,89 @@ export default class SequenceDiagramD3Renderer {
     
         // const DEBUG_renderedRanges = this.renderedRanges.filter( (range) => range.rendered );
         // console.log("Actually rendered ranges at this point: ", DEBUG_renderedRanges.length, DEBUG_renderedRanges);
+    }
+
+    protected frameTypeToColor( frameType:qlog.QUICFrameTypeName ) : Array<string>{
+
+        if ( this.frameTypeToColorLUT.size === 0 ){
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.ack,       ["#03ad25", "#FFFFFF"] ); // green
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.stream,    ["#0468cc", "#FFFFFF"] ); // blue
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.crypto,    ["#0468cc", "#FFFFFF"] ); // blue
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.padding,   ["#ff69b4", "#FFFFFF"] ); // pink
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.connection_close,  ["#a80f3a", "#FFFFFF"] ); // dark red
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.reset_stream,      ["#a80f3a", "#FFFFFF"] ); // dark red
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.application_close, ["#a80f3a", "#FFFFFF"] ); // dark red
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.stop_sending,      ["#a80f3a", "#FFFFFF"] ); // dark red
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.new_connection_id,      ["#068484", "#FFFFFF"] ); // dark green
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.retire_connection_id,   ["#068484", "#FFFFFF"] ); // dark green
+
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.ping,              ["#d6dd02", "#FFFFFF"] ); // ugly yellow
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_challenge,    ["#d6dd02", "#FFFFFF"] ); // ugly yellow
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_response,     ["#d6dd02", "#FFFFFF"] ); // ugly yellow
+
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.max_data,              ["#5f0984", "#FFFFFF"] ); // dark purple
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.max_stream_data,       ["#5f0984", "#FFFFFF"] ); // dark purple
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.max_streams,           ["#5f0984", "#FFFFFF"] ); // dark purple
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.data_blocked,          ["#5f0984", "#FFFFFF"] ); // dark purple
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.streams_blocked,       ["#5f0984", "#FFFFFF"] ); // dark purple
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.stream_data_blocked,   ["#5f0984", "#FFFFFF"] ); // dark purple
+        }
+
+        if ( this.frameTypeToColorLUT.has( frameType ) ){
+            return this.frameTypeToColorLUT.get( frameType )!;
+        }
+        else {
+            return ["#FF0000", "#FFFFFF"];
+        }
+    }
+
+    protected frameToShortString( frame:qlog.QuicFrame ){
+        let output = "";
+        switch ( frame.frame_type ){
+            case qlog.QUICFrameTypeName.ack:
+                output = frame.frame_type + " ";
+                const ranges = frame.acked_ranges;
+                for ( let r = 0; r < ranges.length; ++r  ){
+                    if ( ranges[r][0] !== ranges[r][1] ){
+                        output += ranges[r][0] + "-" + ranges[r][1];
+                    }
+                    else{
+                        output += ranges[r][0];
+                    }
+                    if ( r < ranges.length - 1 ){
+                        output += ","
+                    }
+                }
+
+                return "" + output;
+                break;
+
+            case qlog.QUICFrameTypeName.stream:
+                return frame.frame_type + " " + frame.id + ((frame.fin) ? " FIN" : "");
+                break;
+
+
+            case qlog.QUICFrameTypeName.connection_close:
+                output = frame.frame_type + " ";
+                if (frame.error_code === qlog.TransportError.no_error || frame.error_code === qlog.ApplicationError.http_no_error || frame.error_code === 0) {
+                    output += ": clean";
+                }
+                else{
+                    output += frame.error_code + " : " + frame.reason;
+                }
+                
+                return output;
+                break;
+
+            default:
+                return frame.frame_type;
+                break;
+        }
     }
 
 }
