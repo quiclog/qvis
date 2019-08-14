@@ -33,6 +33,7 @@
 
         public created(){
             this.renderer = new CongestionGraphD3Renderer("congestion-graph");
+            this.config.renderer = this.renderer;
         }
 
         public mounted(){

@@ -47,23 +47,28 @@
         }
 
         public resetZoom(){
-            // TODO
+            // TODO hook up properly
+            this.config.renderer.resetZoom();
         }
 
         public useBrushX(){
-            // TODO
+            // TODO hook up properly
+            this.config.renderer.useBrushX();
         }
 
         public useBrush2d(){
-            // TODO
+            // TODO hook up properly
+            this.config.renderer.useBrush2d();
         }
 
         public toggleCongestionGraph(){
-            // TODO
+            // TODO hook up properly
+            this.config.renderer.toggleCongestionGraph();
         }
 
         public togglePerspective(){
-            // TODO
+            // TODO hook up properly
+            this.config.renderer.togglePerspective();
         }
     }
 

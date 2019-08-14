@@ -1,5 +1,5 @@
 <template>
-    <div id="app"> 
+    <div id="app">
         <router-view name="menu"/>
         <router-view />
     </div>
@@ -35,8 +35,8 @@
 
         protected store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
-        protected created(){ 
+        protected created(){
             this.store.loadFilesFromServer( this.$route.query );
         }
-    } 
+    }
 </script>

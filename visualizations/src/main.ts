@@ -23,14 +23,14 @@ const standaloneFiles:Array<string> = [
     "prespec/ngtcp2_multistreams_server_losscomparison.qlog.js",
     */
 ];
-  
+
 const connectionStore = getModule(ConnectionStore, store);
 
 for ( const filepath of standaloneFiles ){
 
     const scriptelement = document.createElement('script');
 
-    console.log("Loading ", filepath ); 
+    console.log("Loading ", filepath );
 
     scriptelement.onload = () => {
         // the standalone file has a single variable in it, named after the file, so we can get the contents
@@ -40,14 +40,14 @@ for ( const filepath of standaloneFiles ){
         let varname = filepath.substr(filepath.indexOf("/") + 1);
         varname = varname.substr(0, varname.indexOf("."));
 
-        // @ts-ignore 
+        // @ts-ignore
         const file = window[varname];
-        // @ts-ignore 
+        // @ts-ignore
         window[varname] = "loaded"; // make sure it can be gc'ed if necessary
 
         connectionStore.addGroupFromQlogFile(  {fileContentsJSON: file, filename: varname} ).then( () => {
             console.log("Loaded ", varname, file );
-        }); 
+        });
     };
 
     scriptelement.onerror = (err) => {
@@ -59,9 +59,9 @@ for ( const filepath of standaloneFiles ){
     };
 
     scriptelement.src = "standalone_data/" + filepath;
-    document.head.appendChild(scriptelement); 
+    document.head.appendChild(scriptelement);
 }
-  
+
 Vue.config.productionTip = false;
 Vue.use(BootstrapVue);
 
