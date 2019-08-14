@@ -115,7 +115,7 @@ export default class ConnectionStore extends VuexModule {
                 };*/
                 const filename = "Loaded via URL parameters";
 
-                this.context.dispatch('AddGroupFromQlogFile', {fileContents, filename});
+                this.context.dispatch('addGroupFromQlogFile', {fileContents, filename});
             }
             else{
                 alert("ConnectionStore:LoadFilesFromServer : " + apireturns.error + " // " + apireturns.data.error + " // " + apireturns.data.qlog.connections);
