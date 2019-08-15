@@ -56,6 +56,7 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit( "addGroup", group );
         }
         else{
+            console.error("ConnectionStore:addGroupFromQlogFile : Qlog file could not be loaded!", fileContentsJSON, filename)
             alert("Qlog file could not be loaded! " + filename);
         }
     }
@@ -91,8 +92,8 @@ export default class ConnectionStore extends VuexModule {
 
         if ( Object.keys(parameters).length === 0 ){
             // empty parameter, nothing to be fetched
-            console.error("ConnectionSTore:LoadFilesFromSErver : no parameters passed, doing nothing. ", parameters);
-            
+            console.log("ConnectionSTore:LoadFilesFromServer : no URL parameters present, doing nothing. ", parameters);
+
             return;
         }
 
@@ -102,6 +103,10 @@ export default class ConnectionStore extends VuexModule {
             if ( window.location.toString().indexOf("localhost:8080") >= 0 ){
                 url = "https://localhost/loadfiles";
             }
+            else if (window.location.toString().indexOf(":8080") >= 0 ){
+                // local testing, but with online service
+                url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
+            }
 
             // for documentation on the expected form of these parameters,
             // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
@@ -109,20 +114,26 @@ export default class ConnectionStore extends VuexModule {
 
             if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
-                const fileContents:any = JSON.parse(apireturns.data.qlog); /*= {
-                    qlog_version: "0xff00001",
-                    connections: [],
-                };*/
+                let fileContents:any = {};
+                if ( typeof apireturns.data.qlog === "object" ) {
+                    fileContents = apireturns.data.qlog; // returned json has multiple fields, the actual qlog is inside the .qlog field
+                }
+                else {
+                    fileContents = JSON.parse(apireturns.data.qlog);
+                }
+                 
                 const filename = "Loaded via URL parameters";
 
-                this.context.dispatch('AddGroupFromQlogFile', {fileContents, filename});
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
             }
             else{
-                alert("ConnectionStore:LoadFilesFromServer : " + apireturns.error + " // " + apireturns.data.error + " // " + apireturns.data.qlog.connections);
+                console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", apireturns.error, apireturns.data.error, apireturns.data.qlog.connections)
+                alert("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : " + apireturns.error + " // " + apireturns.data.error + " // " + apireturns.data.qlog.connections);
             }
         }
         catch (e) {
-            alert("ConnectionStore:LoadFilesFromServer : " + e);
+            console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", e, parameters);
+            alert("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : " + e);
         }
     }
     

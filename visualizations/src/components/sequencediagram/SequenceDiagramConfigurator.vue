@@ -63,8 +63,14 @@
             // then we want to set vantagepoint.NETWORK and vantagepoint.SERVER as the next two, if they exist
             // this of course also implies adding new connections to this.config.connections
 
-            // for now, just select all other connections after this one from the same parent if there are more than 1 in a group
-            if ( connectionIndex === 0 && connection.parent.getConnections().length > 1 ){
+            // if we selected a group with just 1, we probably want to auto-generate its counterpart, so de-select any others we might have had before
+            if ( connectionIndex === 0 && connection.parent.getConnections().length === 1 ){
+                const connections = connection.parent.getConnections();
+                this.config.connections = connections.slice();
+            }
+
+            // just select all other connections after this one from the same parent if there are more than 1 in a group
+            else if ( connectionIndex === 0 && connection.parent.getConnections().length > 1 ){
                 const connections = connection.parent.getConnections();
                 const connectionIndexInParent = connections.indexOf(connection);
                 let rendererIndex = 1;

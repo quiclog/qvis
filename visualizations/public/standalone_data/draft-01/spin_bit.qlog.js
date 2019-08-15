@@ -1,11 +1,9 @@
 var spin_bit = {
     "qlog_version": "draft-01",
-    "title": "qlog from pcap spin_bit.pcap",
-    "description": "qlog from pcap spin_bit.pcap",
+    "description": "",
     "traces": [
         {
-            "title": "Connection 1 in qlog from pcap spin_bit.pcap",
-            "description": "Connection 1 in qlog from pcap spin_bit.pcap",
+            "title": "Connection 1",
             "vantage_point": {
                 "name": "TODO",
                 "type": "network",
@@ -56,13 +54,14 @@ var spin_bit = {
                     {
                         "type": "initial",
                         "header": {
-                            "form": "long",
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
                             "dcid": "0f721e1c6aae0420",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": "1225"
+                            "payload_length": 1224,
+                            "packet_number": "0",
+                            "packet_size": 1251
                         },
                         "frames": [
                             {
@@ -84,13 +83,14 @@ var spin_bit = {
                     {
                         "type": "initial",
                         "header": {
-                            "form": "long",
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
                             "dcid": "1b51237b269288d6",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": "601"
+                            "payload_length": 181,
+                            "packet_number": "0",
+                            "packet_size": 208
                         },
                         "frames": [
                             {
@@ -129,13 +129,14 @@ var spin_bit = {
                     {
                         "type": "handshake",
                         "header": {
-                            "form": "long",
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
                             "dcid": "1b51237b269288d6",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": "601"
+                            "payload_length": 600,
+                            "packet_number": "0",
+                            "packet_size": 626
                         },
                         "frames": [
                             {
@@ -163,13 +164,14 @@ var spin_bit = {
                     {
                         "type": "initial",
                         "header": {
-                            "form": "long",
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
                             "dcid": "9605d1700dd8829c",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": "23"
+                            "payload_length": 22,
+                            "packet_number": "1",
+                            "packet_size": 48
                         },
                         "frames": [
                             {
@@ -193,13 +195,14 @@ var spin_bit = {
                     {
                         "type": "handshake",
                         "header": {
-                            "form": "long",
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
                             "dcid": "9605d1700dd8829c",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": "78"
+                            "payload_length": 77,
+                            "packet_number": "0",
+                            "packet_size": 103
                         },
                         "frames": [
                             {
@@ -228,9 +231,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 128
+                            "payload_length": 128,
+                            "packet_number": "0",
+                            "packet_size": 138
                         },
                         "frames": [
                             {
@@ -276,17 +280,18 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 36
+                            "payload_length": 36,
+                            "packet_number": "0",
+                            "packet_size": 46
                         },
                         "frames": [
                             {
                                 "frame_type": "stream",
                                 "id": "0",
+                                "offset": "0",
                                 "length": "17",
-                                "fin": true,
-                                "raw": "474554202f696e6465782e68746d6c0d0a"
+                                "fin": true
                             }
                         ]
                     }
@@ -299,9 +304,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 22
+                            "payload_length": 22,
+                            "packet_number": "1",
+                            "packet_size": 32
                         },
                         "frames": [
                             {
@@ -334,13 +340,14 @@ var spin_bit = {
                     {
                         "type": "handshake",
                         "header": {
-                            "form": "short",
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
                             "dcid": "1b51237b269288d6",
                             "scil": "8",
                             "dcil": "8",
-                            "payload_length": 114
+                            "payload_length": 21,
+                            "packet_number": "1",
+                            "packet_size": 47
                         },
                         "frames": [
                             {
@@ -364,13 +371,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
-                            "version": "0xff000016",
-                            "scid": "9605d1700dd8829c",
                             "dcid": "1b51237b269288d6",
-                            "scil": "8",
-                            "dcil": "8",
-                            "payload_length": 114
+                            "payload_length": 114,
+                            "packet_number": "1",
+                            "packet_size": 124
                         },
                         "frames": [
                             {
@@ -408,9 +412,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 22
+                            "payload_length": 22,
+                            "packet_number": "2",
+                            "packet_size": 32
                         },
                         "frames": [
                             {
@@ -418,7 +423,7 @@ var spin_bit = {
                                 "ack_delay": "322",
                                 "acked_ranges": [
                                     [
-                                        "1",
+                                        "0",
                                         "1"
                                     ]
                                 ]
@@ -443,9 +448,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 23
+                            "payload_length": 23,
+                            "packet_number": "2",
+                            "packet_size": 33
                         },
                         "frames": [
                             {
@@ -453,7 +459,7 @@ var spin_bit = {
                                 "ack_delay": "16",
                                 "acked_ranges": [
                                     [
-                                        "1",
+                                        "0",
                                         "1"
                                     ]
                                 ]
@@ -473,9 +479,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 22
+                            "payload_length": 22,
+                            "packet_number": "3",
+                            "packet_size": 32
                         },
                         "frames": [
                             {
@@ -483,7 +490,7 @@ var spin_bit = {
                                 "ack_delay": "310",
                                 "acked_ranges": [
                                     [
-                                        "2",
+                                        "0",
                                         "2"
                                     ]
                                 ]
@@ -508,9 +515,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 238
+                            "payload_length": 238,
+                            "packet_number": "3",
+                            "packet_size": 248
                         },
                         "frames": [
                             {
@@ -518,7 +526,7 @@ var spin_bit = {
                                 "ack_delay": "1394",
                                 "acked_ranges": [
                                     [
-                                        "1",
+                                        "0",
                                         "1"
                                     ]
                                 ]
@@ -530,9 +538,9 @@ var spin_bit = {
                             {
                                 "frame_type": "stream",
                                 "id": "0",
+                                "offset": "0",
                                 "length": "207",
-                                "fin": true,
-                                "raw": "3c21444f43545950452068746d6c3e0a3c68746d6c206c616e673d22656e223e0a3c686561643e0a20203c7469746c653e51554943207465737420706167653c2f7469746c653e0a3c2f686561643e0a3c626f64793e0a20203c68313e48656c6c6f20576f726c64213c2f68313e0a20203c6120687265663d22384d223e384d6942206f662072616e646f6d20646174613c2f613e0a20203c6120687265663d2233324d223e33324d6942206f662072616e646f6d20646174613c2f613e0a3c2f626f64793e0a3c2f68746d6c3e0a"
+                                "fin": true
                             }
                         ]
                     }
@@ -554,9 +562,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 73
+                            "payload_length": 73,
+                            "packet_number": "4",
+                            "packet_size": 83
                         },
                         "frames": [
                             {
@@ -573,7 +582,7 @@ var spin_bit = {
                                 "ack_delay": "321",
                                 "acked_ranges": [
                                     [
-                                        "3",
+                                        "0",
                                         "3"
                                     ]
                                 ]
@@ -581,16 +590,16 @@ var spin_bit = {
                             {
                                 "frame_type": "stream",
                                 "id": "8",
+                                "offset": "0",
                                 "length": "17",
-                                "fin": true,
-                                "raw": "474554202f696e6465782e68746d6c0d0a"
+                                "fin": true
                             },
                             {
                                 "frame_type": "stream",
                                 "id": "4",
+                                "offset": "0",
                                 "length": "17",
-                                "fin": true,
-                                "raw": "474554202f696e6465782e68746d6c0d0a"
+                                "fin": true
                             }
                         ]
                     }
@@ -612,9 +621,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 21
+                            "payload_length": 21,
+                            "packet_number": "4",
+                            "packet_size": 31
                         },
                         "frames": [
                             {
@@ -638,9 +648,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 451
+                            "payload_length": 451,
+                            "packet_number": "5",
+                            "packet_size": 461
                         },
                         "frames": [
                             {
@@ -664,16 +675,16 @@ var spin_bit = {
                             {
                                 "frame_type": "stream",
                                 "id": "4",
+                                "offset": "0",
                                 "length": "207",
-                                "fin": true,
-                                "raw": "3c21444f43545950452068746d6c3e0a3c68746d6c206c616e673d22656e223e0a3c686561643e0a20203c7469746c653e51554943207465737420706167653c2f7469746c653e0a3c2f686561643e0a3c626f64793e0a20203c68313e48656c6c6f20576f726c64213c2f68313e0a20203c6120687265663d22384d223e384d6942206f662072616e646f6d20646174613c2f613e0a20203c6120687265663d2233324d223e33324d6942206f662072616e646f6d20646174613c2f613e0a3c2f626f64793e0a3c2f68746d6c3e0a"
+                                "fin": true
                             },
                             {
                                 "frame_type": "stream",
                                 "id": "8",
+                                "offset": "0",
                                 "length": "207",
-                                "fin": true,
-                                "raw": "3c21444f43545950452068746d6c3e0a3c68746d6c206c616e673d22656e223e0a3c686561643e0a20203c7469746c653e51554943207465737420706167653c2f7469746c653e0a3c2f686561643e0a3c626f64793e0a20203c68313e48656c6c6f20576f726c64213c2f68313e0a20203c6120687265663d22384d223e384d6942206f662072616e646f6d20646174613c2f613e0a20203c6120687265663d2233324d223e33324d6942206f662072616e646f6d20646174613c2f613e0a3c2f626f64793e0a3c2f68746d6c3e0a"
+                                "fin": true
                             }
                         ]
                     }
@@ -686,9 +697,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 39
+                            "payload_length": 39,
+                            "packet_number": "5",
+                            "packet_size": 49
                         },
                         "frames": [
                             {
@@ -710,7 +722,7 @@ var spin_bit = {
                                 "ack_delay": "320",
                                 "acked_ranges": [
                                     [
-                                        "5",
+                                        "0",
                                         "5"
                                     ]
                                 ]
@@ -735,9 +747,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 21
+                            "payload_length": 21,
+                            "packet_number": "6",
+                            "packet_size": 31
                         },
                         "frames": [
                             {
@@ -745,7 +758,7 @@ var spin_bit = {
                                 "ack_delay": "7",
                                 "acked_ranges": [
                                     [
-                                        "0",
+                                        "5",
                                         "5"
                                     ]
                                 ]
@@ -761,9 +774,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "9605d1700dd8829c",
-                            "payload_length": 27
+                            "payload_length": 27,
+                            "packet_number": "6",
+                            "packet_size": 37
                         },
                         "frames": [
                             {
@@ -771,7 +785,7 @@ var spin_bit = {
                                 "ack_delay": "1196985",
                                 "acked_ranges": [
                                     [
-                                        "6",
+                                        "0",
                                         "6"
                                     ]
                                 ]
@@ -811,9 +825,10 @@ var spin_bit = {
                     {
                         "type": "1RTT",
                         "header": {
-                            "form": "short",
                             "dcid": "1b51237b269288d6",
-                            "payload_length": 20
+                            "payload_length": 20,
+                            "packet_number": "7",
+                            "packet_size": 30
                         },
                         "frames": [
                             {
