@@ -24,12 +24,14 @@ export class QlogLoader {
                 return QlogLoader.fromDraft01(json);
             }
             else {
+                console.error("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported!", version, json);
                 alert("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported! You provided: " + version);
 
                 return undefined;
             }
         }
         else {
+            console.error("QlogLoader: qlog files MUST have a qlog_version field in their top-level object!", json);
             alert("QlogLoader: qlog files MUST have a qlog_version field in their top-level object!");
 
             return undefined;
@@ -271,8 +273,8 @@ export class EventFieldsParser implements IQlogEventParser {
             if ( this.timeIndex === -1 ){
                 this.timeTrackingMethod = TimeTrackingMethod.DELTA_TIME;
 
+                console.error("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!", trace.eventFieldNames);
                 alert("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!");
-                console.log("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!", trace.eventFieldNames);
             }
             else {
                 this.timeTrackingMethod = TimeTrackingMethod.REFERENCE_TIME;
@@ -281,8 +283,8 @@ export class EventFieldsParser implements IQlogEventParser {
                     this.startTime = parseFloat(trace.commonFields.reference_time);
                 }
                 else {
+                    console.error("QlogLoader: Using relative_time but no reference_time found in common_fields", trace.eventFieldNames, trace.commonFields);
                     alert("QlogLoader: Using relative_time but no reference_time found in common_fields");
-                    console.log("QlogLoader: Using relative_time but no reference_time found in common_fields", trace.eventFieldNames, trace.commonFields);
                     this.startTime = 0;
                 }
             }
