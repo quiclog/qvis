@@ -20,7 +20,7 @@
             <b-tab title="Disabled" disabled><p>I'm a disabled tab!</p></b-tab>
         </b-tabs> -->
         <b-row>
-            <b-col cols="1" md="auto" class="align-middle"><h3>qvis</h3></b-col>
+            <b-col cols="1" md="auto" class="align-middle"><h3 style="width: 290px;">qvis</h3></b-col>
             <b-col>
                 <b-nav tabs align="center">
                     <b-nav-item to="/files" class="files-link" :active="this.$route.fullPath === '/files' || $route.fullPath === ''">
@@ -35,7 +35,8 @@
                 </b-nav>
             </b-col>
             <b-col cols="1" md="auto">
-                <b-button variant="danger">Report issue</b-button>
+                <b-button variant="success" href="https://github.com/quiclog/qvis/issues/new?template=feature_request.md&title=Feature+request" target="_blank" style="margin-right: 5px;">Request feature</b-button>
+                <b-button variant="danger"  href="https://github.com/quiclog/qvis/issues/new?template=bug-report-in-live-version.md&amp;title=Bug+in+live+version" target="_blank">Report issue</b-button>
             </b-col>
         </b-row>
     </b-container>
