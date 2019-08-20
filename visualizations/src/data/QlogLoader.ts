@@ -25,7 +25,7 @@ export class QlogLoader {
             }
             else {
                 console.error("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported!", version, json);
-                
+
                 return undefined;
             }
         }
@@ -34,7 +34,6 @@ export class QlogLoader {
 
             return undefined;
         }
-
     }
 
     protected static fromDraft01(json:any) : QlogConnectionGroup {

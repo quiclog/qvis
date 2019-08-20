@@ -1,7 +1,7 @@
 <template>
-    <div style="background-color: red; color: white; padding: 0px 10px;" >
+    <div style="background-color: #d4edda; padding: 0px 10px;" >
 
-        <p>Select one or more traces via the dropdown(s) below to visualize them in the sequence diagram</p>
+        <p>Select a trace via the dropdown(s) below to visualize it in the congestion graph</p>
 
         <b-button @click="loadTrace()">Load trace</b-button>
         <b-button @click="resetZoom()">Reset zoom</b-button>

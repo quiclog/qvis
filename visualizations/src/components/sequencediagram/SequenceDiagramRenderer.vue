@@ -3,7 +3,7 @@
         <!-- <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div> -->
 
-        <div id="sequence-diagram" style="width: 100%; border:5px solid red; min-height: 200px;">
+        <div id="sequence-diagram" style="width: 100%; border:5px solid #cce5ff; min-height: 200px;">
             <svg id="sequence-diagram-svg">
                 
             </svg>

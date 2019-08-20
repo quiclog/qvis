@@ -1,5 +1,5 @@
 <template>
-    <div style="background-color: red; color: white; padding: 0px 10px;" >
+    <div style="background-color: #cce5ff; padding: 0px 10px;" >
         <!--<div>{{(config ? config.manualRTT + " - " + config.scale : "UNKNOWN" )}}</div>-->
         <!--<b-button @click="adjustConfigTest()">Adjust config</b-button> -->
 
@@ -18,7 +18,7 @@
         </div>
     -->
 
-        <b-button @click="addConnection()">&#43;<!-- PLUS + --></b-button>
+        <b-button @click="addConnection()">Add trace</b-button><!-- &#43; PLUS + -->
     </div>
 </template>
 

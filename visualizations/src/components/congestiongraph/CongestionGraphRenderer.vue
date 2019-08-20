@@ -1,6 +1,6 @@
 <template>
     <div>
-        <div id="congestion-graph" style="width: 100%; border:5px solid red; min-height: 200px;">
+        <div id="congestion-graph" style="width: 100%; border:5px solid #d4edda; min-height: 200px;">
         </div>
     </div>
 </template>
