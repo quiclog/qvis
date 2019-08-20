@@ -26,7 +26,7 @@
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue, Prop } from "vue-property-decorator";
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig";
-    import ConnectionConfigurator from "./ConnectionConfigurator.vue";
+    import ConnectionConfigurator from "@/components/shared/ConnectionConfigurator.vue";
 
     import ConnectionStore from "@/store/ConnectionStore";
     import ConnectionGroup from "@/data/ConnectionGroup";

@@ -28,7 +28,6 @@
 <script lang="ts">
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
-    import SequenceDiagramConfig from "./data/SequenceDiagramConfig";
 
     import ConnectionGroup from "@/data/ConnectionGroup";
     import Connection from "@/data/Connection";
