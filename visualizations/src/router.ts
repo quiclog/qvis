@@ -2,6 +2,7 @@ import Vue from "vue";
 import Router from "vue-router";
 import MainMenu from "./views/MainMenu.vue";
 import VUEDebug from "./views/VUEDebug.vue";
+import FileManager from "./views/FileManager.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
 import CongestionGraph from "./views/CongestionGraph.vue";
 
@@ -11,13 +12,21 @@ const router = new Router({
   routes: [
     {
       path: "/",
-      redirect: "/sequence",
+      redirect: "/files",
     },
     {
       path: "/debug",
       name: "VUEDebug",
       components: {
         default: VUEDebug,
+        menu: MainMenu,
+      },
+    },
+    {
+      path: "/files",
+      name: "FileManager",
+      components: {
+        default: FileManager,
         menu: MainMenu,
       },
     },

@@ -49,11 +49,40 @@
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
         // however, this feels more explicit
         @Watch('config', { immediate: true, deep: true })
-        protected onConfigChanged(newConfig: SequenceDiagramConfig, oldConfig: SequenceDiagramConfig) {
+        protected async onConfigChanged(newConfig: SequenceDiagramConfig, oldConfig: SequenceDiagramConfig) {
             console.log("SequenceDiagramRenderer:onConfigChanged : ", newConfig, oldConfig);
 
             if ( this.renderer ) {
-                this.renderer.render( newConfig.connections );
+
+                // Because of the Vue reactivity, we come into this function multiple times but we just want to do the first
+                // so the .rendering var helps deal with that
+                // TODO: fix this OR bring this logic into this component, rather than on the renderer
+                if ( !this.renderer.rendering ){
+
+                    if ( newConfig.connections && newConfig.connections[0].getEvents().length > 10000 ){
+                        Vue.notify({
+                            group: "default",
+                            title: "Trace might take long to render",
+                            type: "warn",
+                            text: "Some large traces can take a long time to render. Please be patient.",
+                        });
+
+                        // give time to show the warning
+                        await new Promise( (resolve) => setTimeout(resolve, 200));
+                    }
+
+                    this.renderer.render( newConfig.connections ).then( (rendered) => {
+
+                        if ( !rendered ) {
+                            Vue.notify({
+                                group: "default",
+                                title: "Trace could not be rendered",
+                                type: "error",
+                                text: "This trace could not be rendered. There could be an error or a previous file was still rendering.<br/>See the JavaScript devtools for more information.",
+                            });
+                        }
+                    });
+                }
             }
         }
 

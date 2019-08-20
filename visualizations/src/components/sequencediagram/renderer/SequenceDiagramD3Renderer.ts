@@ -63,9 +63,9 @@ export default class SequenceDiagramD3Renderer {
         this.svgID = svgID;
     }
    
-    public render(traces:Array<QlogConnection>) {
+    public async render(traces:Array<QlogConnection>):Promise<boolean> {
         if ( this.rendering ) {
-            return;
+            return false;
         }
 
         console.log("SequenceDiagramRenderer:render", traces);
@@ -82,12 +82,13 @@ export default class SequenceDiagramD3Renderer {
         if ( !canContinue ) {
             this.rendering = false;
 
-            return;
+            return false;
         }
 
-        this.renderPartialExtents().then( () => {
-            this.rendering = false;
-        });
+        await this.renderPartialExtents();
+        this.rendering = false;
+
+        return true;
     }
 
     // runs once before each render. Used to bootstrap everything.
@@ -129,6 +130,7 @@ export default class SequenceDiagramD3Renderer {
         }
 
         // TODO: potentially do this outside? In SequenceDiagramRenderer? or maybe ConnectionConfigurator itself?
+        const timeBeforeCloning:number = performance.now();
         this.ensureMoreThanOneTrace();
 
         for ( const trace of this.traces ){
@@ -610,8 +612,10 @@ export default class SequenceDiagramD3Renderer {
                 const evt = startParser.load(rawevt).data as qlog.IEventPacketSent;
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
-                if ( !evt.header!.packet_number ){
-                    console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
+                if ( evt.header!.packet_number === undefined ){
+                    if ( evt.type !== qlog.PacketType.version_negotation && evt.type !== qlog.PacketType.retry ){
+                        console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
+                    }
                     continue;
                 }
 
@@ -970,25 +974,27 @@ export default class SequenceDiagramD3Renderer {
                         textSpanFront.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
                         textContainer.appendChild(textSpanFront);
 
-                        for ( const frameRaw of evt.data.frames ) {
-                            const frame = frameRaw as qlog.QuicFrame;
+                        if ( evt.data.frames ){
+                            for ( const frameRaw of evt.data.frames ) {
+                                const frame = frameRaw as qlog.QuicFrame;
 
-                            const textSpan = document.createElement("span");
-                            const [bgColor, textColor] = this.frameTypeToColor( frame.frame_type );
-                            textSpan.textContent = this.frameToShortString( frame );
-                            textSpan.style.color = textColor;
-                            textSpan.style.backgroundColor = bgColor;
-                            textSpan.style.paddingLeft = "5px";
-                            textSpan.style.paddingRight = "5px";
-                            textSpan.style.border = "1px white";
-                            textSpan.style.borderStyle = "none solid";
-                            textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                            textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
-                            if ( directionText === ">" ) {
-                                textContainer.prepend(textSpan);
-                            }
-                            else {
-                                textContainer.appendChild(textSpan);
+                                const textSpan = document.createElement("span");
+                                const [bgColor, textColor] = this.frameTypeToColor( frame.frame_type );
+                                textSpan.textContent = this.frameToShortString( frame );
+                                textSpan.style.color = textColor;
+                                textSpan.style.backgroundColor = bgColor;
+                                textSpan.style.paddingLeft = "5px";
+                                textSpan.style.paddingRight = "5px";
+                                textSpan.style.border = "1px white";
+                                textSpan.style.borderStyle = "none solid";
+                                textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
+                                textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                                if ( directionText === ">" ) {
+                                    textContainer.prepend(textSpan);
+                                }
+                                else {
+                                    textContainer.appendChild(textSpan);
+                                }
                             }
                         }
 

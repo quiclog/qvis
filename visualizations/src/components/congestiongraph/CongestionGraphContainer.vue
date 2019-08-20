@@ -34,6 +34,7 @@
     export default class CongestionGraphContainer extends Vue {
 
         protected store:ConfigurationStore = getModule(ConfigurationStore, this.$store);
+        // tslint:disable-next-line:member-ordering
         public config:CongestionGraphConfig = this.store.congestionGraphConfig;
 
         public created(){

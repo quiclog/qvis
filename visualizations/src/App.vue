@@ -2,6 +2,7 @@
     <div id="app">
         <router-view name="menu"/>
         <router-view />
+        <notifications group="default" position="bottom center" width="50%" />
     </div>
 </template>
 
@@ -19,6 +20,16 @@
         text-align: left;
         color: #2c3e50;
     }
+
+    .vue-notification.warn, .vue-notification.error {
+        color: black;
+    }
+
+    /* .vue-notification .end {
+        background-color: #007bff;
+        border-left-color: #003f83;
+    } */
+
 </style>
 
 

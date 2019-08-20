@@ -25,14 +25,12 @@ export class QlogLoader {
             }
             else {
                 console.error("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported!", version, json);
-                alert("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported! You provided: " + version);
-
+                
                 return undefined;
             }
         }
         else {
             console.error("QlogLoader: qlog files MUST have a qlog_version field in their top-level object!", json);
-            alert("QlogLoader: qlog files MUST have a qlog_version field in their top-level object!");
 
             return undefined;
         }
@@ -64,7 +62,14 @@ export class QlogLoader {
 
                 connection.title = jsonconnection.title!;
                 connection.description = jsonconnection.description!;
-                connection.vantagePoint = jsonconnection.vantage_point!;
+                
+                connection.vantagePoint = jsonconnection.vantage_point || {} as qlog01.IVantagePoint;
+
+                if ( !connection.vantagePoint.type ){
+                    connection.vantagePoint.type = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.name = "No VantagePoint set";
+                }
 
                 connection.eventFieldNames = jsonconnection.event_fields;
                 connection.commonFields = jsonconnection.common_fields!;
@@ -96,8 +101,10 @@ export class QlogLoader {
             connection.title = jsonconnection.title;
             connection.description = jsonconnection.description;
 
+            connection.vantagePoint = {} as qlog01.IVantagePoint;
             if ( jsonconnection.vantage_point ){
-                connection.vantagePoint = {} as qlog01.IVantagePoint;
+                connection.vantagePoint.name = jsonconnection.vantage_point.name || "";
+
                 if ( jsonconnection.vantage_point.type === "SERVER" ){
                     connection.vantagePoint.type = qlog01.VantagePointType.server;
                 }
@@ -108,6 +115,12 @@ export class QlogLoader {
                     connection.vantagePoint.type = qlog01.VantagePointType.network;
                     connection.vantagePoint.flow = qlog01.VantagePointType.client;
                 }
+            }
+
+            if ( !connection.vantagePoint.type ){
+                connection.vantagePoint.type = qlog01.VantagePointType.unknown;
+                connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
+                connection.vantagePoint.name = "No VantagePoint set";
             }
 
             connection.eventFieldNames = jsonconnection.event_fields;
@@ -125,6 +138,11 @@ export class QlogLoader {
                             frame.frame_type = frame.frame_type.toLowerCase();
                         }
                     }
+                }
+                
+                if ( data.packet_type ){
+                    data.packet_type = data.packet_type.toLowerCase();
+                    data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                 }
             }
         }
@@ -289,7 +307,6 @@ export class EventFieldsParser implements IQlogEventParser {
                 this.timeTrackingMethod = TimeTrackingMethod.DELTA_TIME;
 
                 console.error("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!", trace.eventFieldNames);
-                alert("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!");
             }
             else {
                 this.timeTrackingMethod = TimeTrackingMethod.REFERENCE_TIME;
@@ -299,7 +316,6 @@ export class EventFieldsParser implements IQlogEventParser {
                 }
                 else {
                     console.error("QlogLoader: Using relative_time but no reference_time found in common_fields", trace.eventFieldNames, trace.commonFields);
-                    alert("QlogLoader: Using relative_time but no reference_time found in common_fields");
                     this.startTime = 0;
                 }
             }

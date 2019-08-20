@@ -1,10 +1,11 @@
 import {VuexModule, Module, Mutation, Action} from 'vuex-module-decorators';
 import { Module as Modx } from 'vuex';
-import axios from 'axios';
+import axios, {AxiosResponse} from "axios";
 import QlogConnectionGroup from "@/data/ConnectionGroup";
 import QlogConnection from '@/data/Connection';
 import { QlogLoader, PreSpecEventParser } from '@/data/QlogLoader';
 import { IQlogRawEvent } from '@/data/QlogEventParser';
+import Vue from 'vue';
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -56,8 +57,15 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit( "addGroup", group );
         }
         else{
-            console.error("ConnectionStore:addGroupFromQlogFile : Qlog file could not be loaded!", fileContentsJSON, filename)
-            alert("Qlog file could not be loaded! " + filename);
+            console.error("ConnectionStore:addGroupFromQlogFile : Qlog file could not be parsed!", fileContentsJSON, filename);
+
+            Vue.notify({
+                group: "default",
+                title: "ERROR parsing qlog file " + filename,
+                type: "error",
+                duration: 6000,
+                text: "File was successfully loaded but could not be parsed.<br/>Make sure you have a well-formed qlog file.<br/>View the devtools JavaScript console for more information.",
+            });
         }
     }
 
@@ -86,16 +94,33 @@ export default class ConnectionStore extends VuexModule {
     }
 
     @Action
-    public async loadFilesFromServer(parameters:any){
+    public async loadFilesFromServer(queryParameters:any){
 
-        console.log("ConnectionStore:LoadFilesFromServer ", parameters);
+        console.log("ConnectionStore:LoadFilesFromServer ", queryParameters);
 
-        if ( Object.keys(parameters).length === 0 ){
+        if ( Object.keys(queryParameters).length === 0 ){
             // empty parameter, nothing to be fetched
-            console.log("ConnectionSTore:LoadFilesFromServer : no URL parameters present, doing nothing. ", parameters);
+            console.log("ConnectionSTore:LoadFilesFromServer : no URL query parameters present, doing nothing. ", queryParameters);
 
             return;
         }
+
+        let urlToLoad = "";
+        if (queryParameters.file){
+            urlToLoad = queryParameters.file;
+        }
+        else if ( queryParameters.list ){
+            urlToLoad = queryParameters.list;
+        }
+        else if ( queryParameters.file1 ){
+            urlToLoad = queryParameters.file1 + " etc.";
+        }
+
+        Vue.notify({
+            group: "default",
+            title: "Loading file(s) via URL",
+            text: "Loading files via URL " + urlToLoad + ".<br/>The backend server downloads the files, possibly transforms them into qlog, then sends them back. This can take a while.",
+        });
 
         try{
             let url = '/loadfiles';
@@ -110,7 +135,7 @@ export default class ConnectionStore extends VuexModule {
 
             // for documentation on the expected form of these parameters,
             // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
-            const apireturns:any = await axios.get(url, { params: parameters });
+            const apireturns:any = await axios.get(url, { params: queryParameters });
 
             if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
@@ -122,19 +147,95 @@ export default class ConnectionStore extends VuexModule {
                     fileContents = JSON.parse(apireturns.data.qlog);
                 }
                  
-                const filename = "Loaded via URL parameters";
+                const filename = "Loaded via URL";
 
                 this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
+
+                Vue.notify({
+                    group: "default",
+                    title: "Loaded files via URL",
+                    type: "success",
+                    text: "The loaded files are now available for visualization " + urlToLoad + ".<br/>Use the menu above to switch views.",
+                });
             }
             else{
-                console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", apireturns.error, apireturns.data.error, apireturns.data.qlog.connections)
-                alert("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : " + apireturns.error + " // " + apireturns.data.error + " // " + apireturns.data.qlog.connections);
+                console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", apireturns.error, apireturns.data.error, apireturns.data.qlog.connections);
+
+                Vue.notify({
+                    group: "default",
+                    title: "ERROR loading URL " + urlToLoad,
+                    type: "error",
+                    duration: 6000,
+                    text: "File(s) could not be loaded from " + urlToLoad + ".<br/>View the devtools JavaScript console for more information.",
+                });
             }
         }
         catch (e) {
-            console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", e, parameters);
-            alert("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : " + e);
+            console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", e, queryParameters);
+
+            Vue.notify({
+                group: "default",
+                title: "ERROR loading URL " + urlToLoad,
+                type: "error",
+                duration: 6000,
+                text: "File(s) could not be loaded from " + urlToLoad + ".<br/>View the devtools JavaScript console for more information.",
+            });
         }
+    }
+
+    // we put this here because we want to load Demo files outside of the FileManager as well (so we don't always have to switch when testing)
+    @Action
+    public loadExamplesForDemo() {
+        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/new_cid.qlog", filename: "DEMO_new_cid.qlog (<1MB)"} );
+        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/spin_bit.qlog", filename: "DEMO_spin_bit.qlog (<1MB)"} );
+        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/quictrace_example_github.qlog", filename: "DEMO_quictrace_example.qlog (3.7MB)"} );
+    }
+
+    @Action
+    public loadQlogDirectlyFromURL( { url, filename } : { url:any, filename:string } ) {
+
+        Vue.notify({
+            group: "default",
+            title: "Loading qlog file directly",
+            text: "Loading qlog file \"" + filename + "\" from URL " + url + ". Large files can take a while to load.",
+        });
+
+        axios.get( url, {responseType: "json"} )
+        .then( (res:AxiosResponse<any> ) => {
+
+            const fileContents:any = res.data;
+
+            if ( fileContents && !fileContents.error && fileContents.qlog_version ){
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
+
+                Vue.notify({
+                    group: "default",
+                    title: "Loaded " + filename,
+                    type: "success",
+                    text: "This file is now available for visualization, use the menu above to switch views.",
+                });
+            }
+            else{
+                console.error("FileManagerContainer:loadDirectlyFromURL: error downloading file : ", url, res);
+                
+                Vue.notify({
+                    group: "default",
+                    title: "ERROR loading " + filename,
+                    type: "error",
+                    duration: 6000,
+                    text: "This file could not be loaded from " + url + ".<br/>View the devtools JavaScript console for more information.",
+                });
+            }
+        })  
+        .catch( (e) => {
+            Vue.notify({
+                group: "default",
+                title: "ERROR loading " + filename,
+                type: "error",
+                duration: 6000,
+                text: "This file could not be loaded from " + url + ".<br/>View the devtools JavaScript console for more information. " + e,
+            });
+        })
     }
     
     protected createDummyConnection() : QlogConnection{
