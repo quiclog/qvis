@@ -51,10 +51,10 @@ export default class QlogConnection {
         output.title = this.title;
         output.description = this.description;
         output.eventFieldNames = this.eventFieldNames.slice();
-        output.commonFields = JSON.parse( JSON.stringify(this.commonFields) );
-        output.configuration = JSON.parse( JSON.stringify(this.configuration) );
-        output.vantagePoint = JSON.parse( JSON.stringify(this.vantagePoint) );
-        const events = JSON.parse( JSON.stringify(this.events) );
+        output.commonFields = JSON.parse( JSON.stringify(this.commonFields || []) );
+        output.configuration = JSON.parse( JSON.stringify(this.configuration || {}) );
+        output.vantagePoint = JSON.parse( JSON.stringify(this.vantagePoint || {}) );
+        const events = JSON.parse( JSON.stringify(this.events || []) );
         (events as any)._isVue = true;
         output.events = events;
 

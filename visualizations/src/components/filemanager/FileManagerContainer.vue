@@ -88,7 +88,7 @@
                 </div>
                 <div>
                     <p>
-                        This will load 4 example files that you can visualize to get an idea of what's possible.<br/>
+                        This will load a few example files that you can visualize to get an idea of what's possible.<br/>
                     </p>
                 </div>
             </b-col>
@@ -198,8 +198,12 @@
                 return;
             }
 
-            const params:any = {
-                file: this.urlToLoad,
+            const params:any = {};
+            if ( this.urlToLoad.endsWith(".json") ){
+                params.list = this.urlToLoad;
+            }
+            else {
+                params.file = this.urlToLoad;
             };
 
             if ( this.secretsToLoad !== "" ){
@@ -285,7 +289,7 @@
         public loadExamples(){
             let alreadyLoaded = false;
             for (const  group of this.store.groups ){
-                if ( group.filename.indexOf("DEMO") >= 0 ){
+                if ( group.filename.indexOf("DEMO") === 0 ){
                     alreadyLoaded = true;
                     break;
                 }
@@ -309,7 +313,7 @@
         public loadMassiveExample(){
             let alreadyLoaded = false;
             for (const  group of this.store.groups ){
-                if ( group.filename.indexOf("DEMO_mvfst_large") >= 0 ){
+                if ( group.filename.indexOf("MASSIVE_DEMO_mvfst_large") >= 0 ){
                     alreadyLoaded = true;
                     break;
                 }
@@ -321,13 +325,13 @@
                     group: "default",
                     title: "Example file already loaded",
                     type: "warn",
-                    text: "Example file was already loaded, it is called 'DEMO_mvfst_large'.",
+                    text: "Example file was already loaded, it is called 'MASSIVE_DEMO_mvfst_large'.",
                 });
 
                 return;
             }
 
-            this.store.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/mvfst_large.qlog", filename: "DEMO_mvfst_large.qlog (31MB)"} );
+            this.store.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/mvfst_large.qlog", filename: "MASSIVE_DEMO_mvfst_large.qlog (31MB)"} );
         }
 
         protected get urlIsPcap(){

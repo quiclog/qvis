@@ -74,7 +74,7 @@ export class QlogLoader {
 
                 connection.eventFieldNames = jsonconnection.event_fields;
                 connection.commonFields = jsonconnection.common_fields!;
-                connection.configuration = jsonconnection.configuration!;
+                connection.configuration = jsonconnection.configuration || {};
 
                 connection.setEvents( jsonconnection.events );
 
@@ -127,7 +127,7 @@ export class QlogLoader {
 
             connection.eventFieldNames = jsonconnection.event_fields;
             connection.commonFields = jsonconnection.common_fields;
-            connection.configuration = jsonconnection.configuration;
+            connection.configuration = jsonconnection.configuration || {};
             connection.setEvents( jsonconnection.events as any );
 
             connection.setEventParser( new EventFieldsParser() );

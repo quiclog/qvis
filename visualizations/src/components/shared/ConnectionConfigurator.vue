@@ -147,7 +147,7 @@
                 this.onGroupSelected( this.selectedGroup );
             }
 
-            if( this.allowConnectionSelection ){
+            if ( this.allowConnectionSelection ){
                 // auto-select the first connection in the list
                 this.selectedConnection = newlySelected.getConnections()[0];
 

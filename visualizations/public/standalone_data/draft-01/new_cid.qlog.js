@@ -370,7 +370,7 @@ var new_cid = {
                 [
                     "29",
                     "transport",
-                    "packet_sent",
+                    "packet_received",
                     "line",
                     {
                         "type": "1RTT",
