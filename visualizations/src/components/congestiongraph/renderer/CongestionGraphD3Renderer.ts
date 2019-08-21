@@ -713,6 +713,7 @@ export default class CongestionGraphD3Renderer {
         let totalSentByteCount = 0;
         let totalReceivedByteCount = 0;
 
+        let DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsSent) {
             const parsedPacket = this.config.connection!.parseEvent(packet)
             const data = parsedPacket.data;
@@ -722,7 +723,7 @@ export default class CongestionGraphD3Renderer {
             const extraData = ((packet as any) as IEventExtension).qvis.congestion;
 
             if (!data.header.packet_size || data.header.packet_size === 0) {
-                console.error("Packet had invalid size! Not counting!", packet);
+                ++DEBUG_packetsWithInvalidSize;
                 continue;
             }
 
@@ -742,6 +743,11 @@ export default class CongestionGraphD3Renderer {
             sent.yMax = sent.yMax < totalSentByteCount ? totalSentByteCount : sent.yMax;
         }
 
+        if ( DEBUG_packetsWithInvalidSize > 0 ){
+            console.error("CongestionGraphD3Renderer:parseQlog : There were " + DEBUG_packetsWithInvalidSize + " sent packets with invalid size! They were not used!");
+        }
+
+        DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsReceived) {
             const parsedPacket = this.config.connection!.parseEvent(packet)
             const data = parsedPacket.data;
@@ -765,7 +771,7 @@ export default class CongestionGraphD3Renderer {
                 received.yMin = received.yMin > packetOffsetStart ? packetOffsetStart : received.yMin;
                 received.yMax = received.yMax < totalReceivedByteCount ? totalReceivedByteCount : received.yMax;
             } else {
-                console.error("Packet had invalid size! not counting!");
+                ++DEBUG_packetsWithInvalidSize;
             }
 
             // List of received packets also contains all ACKs this endpoint has received
@@ -817,6 +823,10 @@ export default class CongestionGraphD3Renderer {
                     }
                 }
             }
+        }
+
+        if ( DEBUG_packetsWithInvalidSize > 0 ){
+            console.error("CongestionGraphD3Renderer:parseQlog : There were " + DEBUG_packetsWithInvalidSize + " received packets with invalid size! They were not used!");
         }
 
         // Loop over sent packets once more now that we have a list in which we can look up received packets
@@ -1358,13 +1368,15 @@ export default class CongestionGraphD3Renderer {
     private fixMetricUpdates(originalUpdates: Array<[number, number]>) {
         const output: Array<[number, number]> = [];
 
-        if( originalUpdates.length == 0 )
+        if( originalUpdates.length == 0 ) {
             return output;
+        }
 
         let lastValue = 0;
         for( let point of originalUpdates ){
-            if( originalUpdates.length > 0 )
+            if( originalUpdates.length > 0 ) {
                 output.push( [point[0], lastValue] );
+            }
 
             output.push( point );
             lastValue = point[1];

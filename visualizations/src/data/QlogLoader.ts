@@ -25,7 +25,7 @@ export class QlogLoader {
             }
             else {
                 console.error("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported!", version, json);
-
+                
                 return undefined;
             }
         }
@@ -34,6 +34,7 @@ export class QlogLoader {
 
             return undefined;
         }
+
     }
 
     protected static fromDraft01(json:any) : QlogConnectionGroup {
@@ -43,6 +44,7 @@ export class QlogLoader {
         console.log("QlogLoader:fromDraft01 : ", fileContents, fileContents.traces);
 
         const group = new QlogConnectionGroup();
+        group.version = fileContents.qlog_version;
         group.title = fileContents.title || "";
         group.description = fileContents.description || "";
 
@@ -90,6 +92,7 @@ export class QlogLoader {
         console.log("QlogLoader:fromDraft00 : ", fileContents, fileContents.traces);
 
         const group = new QlogConnectionGroup();
+        group.version = fileContents.qlog_version;
         group.title = fileContents.title || "";
         group.description = fileContents.description || "";
 
@@ -160,6 +163,7 @@ export class QlogLoader {
         // for example 1 log for the server and 1 for the client and 1 for the network, all contained in 1 file
         // This is why we call it a ConnectionGroup here, instead of QlogFile or something
         const group = new QlogConnectionGroup();
+        group.version = fileContents.qlog_version;
         group.description = fileContents.description || "";
 
         for ( const jsonconnection of fileContents.connections ){

@@ -5,56 +5,65 @@ import VUEDebug from "./views/VUEDebug.vue";
 import FileManager from "./views/FileManager.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
 import CongestionGraph from "./views/CongestionGraph.vue";
+import Statistics from "./views/Statistics.vue";
 
 Vue.use(Router);
 
 const router = new Router({
-  routes: [
-    {
-      path: "/",
-      redirect: "/files",
-    },
-    {
-      path: "/debug",
-      name: "VUEDebug",
-      components: {
-        default: VUEDebug,
-        menu: MainMenu,
-      },
-    },
-    {
-      path: "/files",
-      name: "FileManager",
-      components: {
-        default: FileManager,
-        menu: MainMenu,
-      },
-    },
-    {
-      path: "/sequence",
-      name: "sequence",
-      // route level code-splitting
-      // this generates a separate chunk (about.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
-      components: {
-        default: SequenceDiagram,
-        menu: MainMenu,
-      },
-    },
-    {
-      path: "/congestion",
-      name: "congestion",
-      // route level code-splitting
-      // this generates a separate chunk (about.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
-      components: {
-        default: CongestionGraph,
-        menu: MainMenu,
-      },
-    },
-  ],
+    routes: [
+        {
+            path: "/",
+            redirect: "/files",
+        },
+        {
+            path: "/debug",
+            name: "VUEDebug",
+            components: {
+                default: VUEDebug,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/files",
+            name: "FileManager",
+            components: {
+                default: FileManager,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/sequence",
+            name: "sequence",
+            // route level code-splitting
+            // this generates a separate chunk (about.[hash].js) for this route
+            // which is lazy-loaded when the route is visited.
+            // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
+            components: {
+                default: SequenceDiagram,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/congestion",
+            name: "congestion",
+            // route level code-splitting
+            // this generates a separate chunk (about.[hash].js) for this route
+            // which is lazy-loaded when the route is visited.
+            // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
+            components: {
+                default: CongestionGraph,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/stats",
+            name: "Statistics",
+            components: {
+                default: Statistics,
+                menu: MainMenu,
+            },
+        },
+    ],
 });
 
 function hasQueryParams(route:any) {

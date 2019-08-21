@@ -11,7 +11,7 @@
     "@quictools/qlog-schema": "0.0.13",
     "@types/d3": "^5.7.2",
     "axios": "^0.18.1",
-    "bootstrap-vue": "^2.0.0-rc.27",
+    "bootstrap-vue": "^2.0.0-rc.28",
     "d3": "^5.9.7",
     "vue": "^2.6.10",
     "vue-class-component": "^6.0.0",

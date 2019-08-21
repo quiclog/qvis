@@ -32,10 +32,13 @@
                     <b-nav-item to="/congestion" class="congestion-link" :active="$route.fullPath === '/congestion'">
                         Congestion
                     </b-nav-item>
+                    <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath === '/stats'">
+                        qlog stats
+                    </b-nav-item>
                 </b-nav>
             </b-col>
             <b-col cols="1" md="auto">
-                <b-button variant="success" href="https://github.com/quiclog/qvis/issues/new?template=feature_request.md&title=Feature+request" target="_blank" style="margin-right: 5px;">Request feature</b-button>
+                <b-button variant="success" href="https://github.com/quiclog/qvis/issues/new?template=feature_request.md&amp;title=Feature+request" target="_blank" style="margin-right: 5px;">Request feature</b-button>
                 <b-button variant="danger"  href="https://github.com/quiclog/qvis/issues/new?template=bug-report-in-live-version.md&amp;title=Bug+in+live+version" target="_blank">Report issue</b-button>
             </b-col>
         </b-row>
@@ -90,6 +93,13 @@
         font-weight: bold;
         background-color: #d4edda;
         border-bottom-color: #d4edda;
+    }
+
+    #MainMenu li.stats-link a.active {
+        color: black;
+        font-weight: bold;
+        background-color: #fff3cd;
+        border-bottom-color: #fff3cd;
     }
 
     /* #MainMenu a.router-link-exact-active {

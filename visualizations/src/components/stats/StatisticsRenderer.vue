@@ -1,0 +1,297 @@
+<template>
+    <div>
+        <div id="statistics-container" style="width: 100%; border:5px solid #fff3cd; min-height: 200px;">
+            <div v-if="group !== undefined" style="width: 50%; min-width: 1024px; margin-left: auto; margin-right: auto;">
+
+                <h3>File info</h3>
+                <b-table-simple fixed bordered small responsive>
+                    <colgroup><col width="20%" align="right"></colgroup>
+                    <b-thead head-variant="dark">
+                    <b-tr>
+                        <b-th>Aspect</b-th>
+                        <b-th>Value</b-th>
+                    </b-tr>
+                    </b-thead>
+                    <b-tbody>
+                        <b-tr v-if="group.filename !== ''">
+                            <b-td>Filename</b-td>
+                            <b-td>{{group.filename}}</b-td>
+                        </b-tr>
+                        <b-tr v-if="group.title !== ''">
+                            <b-td>Title</b-td>
+                            <b-td>{{group.title}}</b-td>
+                        </b-tr>
+                        <b-tr v-if="group.description !== ''">
+                            <b-td>Description</b-td>
+                            <b-td>{{group.description}}</b-td>
+                        </b-tr>
+                        <b-tr>
+                            <b-td>qlog version</b-td>
+                            <b-td>{{group.version}}</b-td>
+                        </b-tr>
+                        <b-tr v-if="Object.keys(group.summary).length > 0">
+                            <b-td>Summary</b-td>
+                            <b-td>{{JSON.stringify(group.summary, null, 4)}}</b-td>
+                        </b-tr>
+                        <b-tr>
+                            <b-td>Trace count</b-td>
+                            <b-td>{{group.getConnections().length}}</b-td>
+                        </b-tr>
+                        <b-tr>
+                            <b-td>Total event count</b-td>
+                            <b-td>{{totalEventCount}}</b-td>
+                        </b-tr>
+                    </b-tbody>
+                </b-table-simple>
+                
+                <div v-if="totalEventCount > 0" v-for="(connection,index) in group.getConnections()" :key="'conn_' +index">
+                    <h3>Trace {{index + 1}} info</h3>
+                    <b-table-simple fixed bordered small responsive id="toplevel">
+                        <colgroup><col width="20%"></colgroup>
+                        <b-tbody>
+                            <b-tr v-if="connection.title && connection.title > 0">
+                                <b-td>Title</b-td>
+                                <b-td>{{connection.title}}</b-td>
+                            </b-tr>
+                            <b-tr v-if="connection.description && connection.description.length > 0">
+                                <b-td>Description</b-td>
+                                <b-td>{{connection.description}}</b-td>
+                            </b-tr>
+                            <b-tr v-if="connection.vantagePoint">
+                                <b-td>Vantage point</b-td>
+                                <b-td>
+                                    <span v-if="connection.vantagePoint.name !== ''">{{connection.vantagePoint.name}}<br/></span>
+                                    <span v-if="connection.vantagePoint.type === qlogns.VantagePointType.network">{{connection.vantagePoint.type}} : with {{connection.vantagePoint.flow}} perspective</span>
+                                    <span v-else>{{connection.vantagePoint.type}}</span>
+                                </b-td>
+                            </b-tr>
+                            <b-tr>
+                                <b-td>Event count</b-td>
+                                <b-td>{{connection.getEvents().length}}</b-td>
+                            </b-tr>
+
+                            <b-tr>
+                                <b-td>Events</b-td>
+                                <b-td>
+                                    <b-table-simple fixed small borderless responsive style="border-bottom: 0px;">
+                                    <colgroup><col width="20%"></colgroup>
+                                        <b-tbody>
+                                            <b-tr>
+                                                <b-th>Category</b-th>
+                                                <b-th>Event type</b-th>
+                                                <b-th>Event count</b-th>
+                                                <b-th>% of total occurence</b-th>
+                                            </b-tr>
+                                            
+                                            <template v-for="(catmap,index1) in connection.getLookupTable().entries()">
+                                                <b-tr v-for="(evtmap,index2) in catmap[1]" :key="'evt_' + index1 + '_' + index2">
+                                                    <b-td v-if="index2 === 0" :rowspan="catmap[1].size">{{catmap[0]}}</b-td>
+                                                    <b-td>
+                                                        {{evtmap[0]}}
+                                                    </b-td>
+                                                    <b-td>
+                                                        {{evtmap[1].length}}
+                                                    </b-td>
+                                                    <b-td>
+                                                        <b-progress :value="evtmap[1].length" :max="connection.getEvents().length" :precision="2" show-progress></b-progress>
+                                                    </b-td>
+                                                </b-tr>
+                                            </template>
+                                        </b-tbody>
+                                    </b-table-simple>
+                                </b-td>
+                            </b-tr>
+
+                            <b-tr>
+                                <b-td>Frame count</b-td>
+                                <b-td>{{totalFrameCount}}</b-td>
+                            </b-tr>
+                            <b-tr>
+                                <b-td>Frames</b-td>
+                                <b-td>
+                                    <b-table-simple fixed small borderless responsive style="border-bottom: 0px;">
+                                    <colgroup><col width="20%"></colgroup>
+                                        <b-tbody>
+                                            <b-tr>
+                                                <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                                <b-th>Frame type</b-th>
+                                                <b-th>Frame count</b-th>
+                                                <b-th>% of total occurence</b-th>
+                                            </b-tr>
+                                            
+                                            <b-tr v-for="(framemap,index2) in frameLUT" :key="'frame_' + index2">
+                                                <b-td>
+                                                </b-td>
+                                                <b-td>
+                                                    {{framemap[0]}}
+                                                </b-td>
+                                                <b-td>
+                                                    {{framemap[1]}}
+                                                </b-td>
+                                                <b-td>
+                                                    <b-progress :value="framemap[1]" show-progress :precision="2" :max="totalFrameCount"></b-progress>
+                                                </b-td>
+                                            </b-tr>
+                                        </b-tbody>
+                                    </b-table-simple>
+                                </b-td>
+                            </b-tr>
+
+                            <b-tr>
+                                <b-td>Encryption level count</b-td>
+                                <b-td>{{ Array.from(encryptionLUT.keys()).length }}</b-td>
+                            </b-tr>
+                            <b-tr>
+                                <b-td>Encryption levels</b-td>
+                                <b-td v-if="encryptionLUT.size > 0">
+                                    <b-table-simple fixed small borderless responsive style="border-bottom: 0px;">
+                                    <colgroup><col width="20%"></colgroup>
+                                        <b-tbody>
+                                            <b-tr>
+                                                <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                                <b-th>Encryption level</b-th>
+                                                <b-th>Packet count</b-th>
+                                                <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                            </b-tr>
+                                            
+                                            <b-tr v-for="(encmap,index1) in encryptionLUT" :key="'enc_' + index1">
+                                                <b-td>
+                                                </b-td>
+                                                <b-td>
+                                                    {{encmap[0]}}
+                                                </b-td>
+                                                <b-td>
+                                                    {{encmap[1]}}
+                                                </b-td>
+                                                <b-td>
+                                                </b-td>
+                                            </b-tr>
+                                        </b-tbody>
+                                    </b-table-simple>
+                                </b-td>
+                                <b-td v-else variant="danger">
+                                    None of the events in this trace had data.packet_type set!
+                                </b-td>
+                            </b-tr>
+
+                        </b-tbody>
+                    </b-table-simple>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</template>
+
+<style scoped>
+    #toplevel > tr[role="row"] td:first-of-type {
+        text-align: right;
+        font-weight: bold;
+        padding-right: 10px;
+    }
+</style>
+
+<script lang="ts">
+    import { Component, Vue, Prop, Watch } from "vue-property-decorator";
+    import StatisticsConfig from "./data/StatisticsConfig";
+    import * as qlog from '@quictools/qlog-schema';
+
+    @Component
+    export default class StatisticsRenderer extends Vue {
+        @Prop()
+        public config!: StatisticsConfig;
+
+        protected frameLookupTable:Map<string, number> = new Map<string, number>();
+        protected encryptionLookupTable:Map<string, number> = new Map<string, number>(); 
+
+        protected get group() {
+            return this.config.group;
+        }
+
+        protected get totalEventCount() {
+            if ( !this.config.group ) {
+                return -1;
+            }
+                
+            let output = 0;
+
+            for ( const trace of this.config.group!.getConnections() ){
+                output += trace.getEvents().length;
+            }
+
+            return output;
+        }
+
+        protected get qlogns(){
+            return qlog;
+        }
+
+        protected beforeUpdate() {
+            console.log("DEBUG Clearing frameLUT");
+
+            this.frameLookupTable = new Map<string, number>();
+            this.encryptionLookupTable = new Map<string, number>(); 
+        }
+
+        protected get totalFrameCount() {
+            let totalFrameCounter = 0;
+
+            // Reactivity strikes again! If we keep the frameCounter in a var and update it in frameLUT, this leads to infinite update loops...
+            for ( const trace of this.config.group!.getConnections() ) {
+                for ( const rawEvt of trace.getEvents() ){
+                    const evt = trace.parseEvent( rawEvt );
+                    if ( evt.data && evt.data.frames ){ // QUIC level, e.g., packet_sent
+                        for ( const frame of evt.data.frames ){
+                            ++totalFrameCounter;
+                        }
+                    }
+
+                    if ( evt.data && evt.data.frame ){ // HTTP level, e.g., frame_created
+                        ++totalFrameCounter;
+                    }
+                }
+            }
+
+            return totalFrameCounter;
+        }
+
+        protected get frameLUT() {
+
+            for ( const trace of this.config.group!.getConnections() ) {
+                for ( const rawEvt of trace.getEvents() ){
+                    const evt = trace.parseEvent( rawEvt );
+                    if ( evt.data && evt.data.frames ){ // QUIC level, e.g., packet_sent
+                        for ( const frame of evt.data.frames ){
+                            const count = this.frameLookupTable.get( frame.frame_type ) || 0;
+                            this.frameLookupTable.set( frame.frame_type, count + 1 );
+                        }
+                    }
+
+                    if ( evt.data && evt.data.frame ){ // HTTP level, e.g., frame_created
+                        const count = this.frameLookupTable.get( evt.data.frame.frame_type ) || 0;
+                        this.frameLookupTable.set( evt.data.frame.frame_type, count + 1 );
+                    }
+                }
+            }
+
+            return this.frameLookupTable;
+        }
+
+        protected get encryptionLUT() {
+
+            for ( const trace of this.config.group!.getConnections() ) {
+                for ( const rawEvt of trace.getEvents() ){
+                    const evt = trace.parseEvent( rawEvt );
+
+                    if ( evt.data && evt.data.packet_type ){
+                        const count = this.encryptionLookupTable.get( evt.data.packet_type ) || 0;
+                        this.encryptionLookupTable.set( evt.data.packet_type, count + 1 );
+                    }
+                }
+            }
+
+            return this.encryptionLookupTable;
+        }
+    }
+
+</script>

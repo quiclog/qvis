@@ -123,7 +123,12 @@ export default class QlogConnection {
 
             categoryDictionary!.get(eventType)!.push( evt );
         }
+    }
 
+    public getLookupTable(){
+        this.setupLookupTable();
+        
+        return this.lookupTable;
     }
 
     public lookup(category: qlog.EventCategory | string, eventType: qlog.EventType | string):Array<IQlogRawEvent> {

@@ -3,7 +3,7 @@
 
         <b-container fluid>
             <b-row align-h="center">
-                <p>Select a trace via the dropdown(s) below to visualize it in the congestion graph</p>
+                <p  style="margin-top: 10px;">Select a trace via the dropdown(s) below to visualize it in the congestion graph</p>
             </b-row>
             <b-row align-h="center">
                 <ConnectionConfigurator :allGroups="store.groups" :connection="config.connection" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />

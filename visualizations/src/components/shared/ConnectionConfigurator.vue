@@ -1,24 +1,30 @@
 <template>
     <b-col style="background-color: white; color: black; border: black 1px solid; max-width: 50%;">
         <b-container fluid>
-            <div v-if="tooManyOptions">
-                <!-- separate-select mode -->
-                <!--<div>{{selectedGroup.filename}} - {{selectedGroup.description}}</div> -->
-                <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
-
-                <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
-                <b-form-select v-model="selectedConnection" :options="connectionOptions" @change="onConnectionSelectionChanged" class="mb-3" />
-            
-                <b-button v-if="canBeRemoved" @click="removeMyself">&minus;</b-button> 
+            <div v-if="allowGroupSelection && !allowConnectionSelection">
+                <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3 mt-3" />
             </div>
 
             <div v-else>
-                <!-- combined-select mode -->
-                <div>{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
-                <b-row class="mb-3">
-                    <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
-                    <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
-                </b-row>
+                <div v-if="tooManyOptions">
+                    <!-- separate-select mode -->
+                    <!--<div>{{selectedGroup.filename}} - {{selectedGroup.description}}</div> -->
+                    <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
+
+                    <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
+                    <b-form-select v-model="selectedConnection" :options="connectionOptions" @change="onConnectionSelectionChanged" class="mb-3" />
+                
+                    <b-button v-if="canBeRemoved" @click="removeMyself">&minus;</b-button> 
+                </div>
+
+                <div v-else>
+                    <!-- combined-select mode -->
+                    <div>{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
+                    <b-row class="mb-3">
+                        <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
+                        <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
+                    </b-row>
+                </div>
             </div>
         
         </b-container>
@@ -45,10 +51,22 @@
         protected connection!:Connection;
 
         @Prop()
+        protected group!:ConnectionGroup;
+
+        @Prop()
         protected allGroups!:Array<ConnectionGroup>; 
 
         @Prop({ default: true })
         protected canBeRemoved!:boolean;
+
+        @Prop({ default: false })
+        protected allowGroupSelection!:boolean;
+
+        @Prop({ default: true })
+        protected allowConnectionSelection!:boolean;
+
+        @Prop()
+        protected onGroupSelected!:(group: ConnectionGroup) => void;
 
         @Prop()
         protected onConnectionSelected!:(conn: QlogConnection) => void;
@@ -57,7 +75,7 @@
         protected onRemoved!:() => void;
 
         protected selectedConnection:Connection = this.connection;
-        protected selectedGroup:ConnectionGroup = this.connection.parent;
+        protected selectedGroup:ConnectionGroup = (this.group) ? this.group : this.connection.parent;
 
         // Firstly, when we change our selection from inside this component, we propagate it to our parent in onSelectionChanged
         // The parent then sets this.connection, but this.selectedGroup is not automatically co-updated
@@ -105,7 +123,7 @@
             const options:any = [];
 
             for ( const group of this.allGroups ) {
-                options.push( { value: null, text: group.filename, disabled: true } );
+                options.push( { value: null, text: group.filename, disabled: !this.allowGroupSelection } );
 
                 for ( const connection of group.getConnections() ) {
                     let connectionName = connection.vantagePoint ? connection.vantagePoint.type : "UNKNOWN";
@@ -125,10 +143,16 @@
             // this.selectedGroup is the PREVIOUS selection for some reason 
             console.log("Selected a new group", this.selectedGroup, newlySelected);
 
-            // auto-select the first connection in the list
-            this.selectedConnection = newlySelected.getConnections()[0];
+            if ( this.allowGroupSelection && this.onGroupSelected ){
+                this.onGroupSelected( this.selectedGroup );
+            }
 
-            this.onConnectionSelectionChanged( this.selectedConnection );
+            if( this.allowConnectionSelection ){
+                // auto-select the first connection in the list
+                this.selectedConnection = newlySelected.getConnections()[0];
+
+                this.onConnectionSelectionChanged( this.selectedConnection );
+            }
         }
 
         // used in separate-select and combined-select mode
