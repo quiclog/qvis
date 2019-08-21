@@ -231,6 +231,11 @@ export class EventFieldsParser implements IQlogEventParser {
     private triggerIndex:number = 3;
     private dataIndex:number = 4;
 
+    private categoryCommon:string = "unknown";
+    private nameCommon:string = "unknown";
+    private triggerCommon:string = "unknown";
+
+
     private currentEvent:IQlogRawEvent|undefined;
 
     public get time():number {
@@ -245,14 +250,14 @@ export class EventFieldsParser implements IQlogEventParser {
     }
     public get category():string {
         if ( this.categoryIndex === -1 ) {
-            return "unknown";
+            return this.categoryCommon;
         }
 
         return (this.currentEvent as IQlogRawEvent)[this.categoryIndex].toLowerCase();
     }
     public get name():string {
         if ( this.nameIndex === -1 ) {
-            return "unknown";
+            return this.nameCommon;
         }
 
         return (this.currentEvent as IQlogRawEvent)[this.nameIndex].toLowerCase();
@@ -266,7 +271,7 @@ export class EventFieldsParser implements IQlogEventParser {
     }
     public get trigger():string {
         if ( this.triggerIndex === -1 ) {
-            return "unknown";
+            return this.triggerCommon;
         }
 
         return (this.currentEvent as IQlogRawEvent)[this.triggerIndex].toLowerCase();
@@ -285,6 +290,21 @@ export class EventFieldsParser implements IQlogEventParser {
 
     public init( trace:QlogConnection ) {
         this.currentEvent = undefined;
+
+        if (trace.commonFields ){
+            if ( trace.commonFields.category || trace.commonFields.CATEGORY ) {
+                this.categoryCommon = trace.commonFields.category || trace.commonFields.CATEGORY;
+                this.categoryCommon = this.categoryCommon.toLowerCase();
+            }
+            if ( trace.commonFields.event || trace.commonFields.EVENT_TYPE ) {
+                this.nameCommon = trace.commonFields.event || trace.commonFields.EVENT_TYPE;
+                this.nameCommon = this.nameCommon.toLowerCase();
+            }
+            if ( trace.commonFields.trigger || trace.commonFields.TRIGGER ) {
+                this.triggerCommon = trace.commonFields.trigger || trace.commonFields.TRIGGER;
+                this.triggerCommon = this.triggerCommon.toLowerCase();
+            }
+        }
 
         // events are a flat array of values
         // the "column names" are in a separate list: eventFieldNames

@@ -146,8 +146,13 @@ export default class ConnectionStore extends VuexModule {
                 else {
                     fileContents = JSON.parse(apireturns.data.qlog);
                 }
-                 
-                const filename = "Loaded via URL";
+                
+                let urlToLoadShort = urlToLoad;
+                if ( urlToLoadShort.length > 50 ){
+                    urlToLoadShort = urlToLoadShort.substr(0, 25) + "..." + urlToLoadShort.substr( urlToLoadShort.length - 26, urlToLoadShort.length);
+                }
+
+                const filename = "Loaded via URL (" + urlToLoadShort + ")";
 
                 this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
 

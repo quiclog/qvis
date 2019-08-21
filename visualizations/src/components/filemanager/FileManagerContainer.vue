@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <h1>Welcome to qvis, the QUIC and HTTP/3 visualization toolsuite!</h1>
+        <h1>Welcome to qvis v0.1, the QUIC and HTTP/3 visualization toolsuite!</h1>
         <p>To be able to visualize something, you need to load some data. We have several options for that:</p>
 
         <b-container id="FileManagerContainer" class="table-striped" fluid>
@@ -25,7 +25,7 @@
                 <div>
                     <p style="margin-top: 5px;">
                         You can load .qlog, .pcap and .pcapng files.<br/>
-                        You can also load a .json file that lists several other files to be fetched (for the format, see <a href="https://github.com/quiclog/pcap2qlog#options">the pcap2qlog documentation</a>).<br/><br/>
+                        You can also load a .json file that lists several other files to be fetched (for the format, see <a href="https://github.com/quiclog/pcap2qlog#options">the pcap2qlog documentation</a>. Or try <a href="https://quic-tracker.info.ucl.ac.be/traces/20190820/list/quant.eggert.org:4433?.json">an example</a>).<br/><br/>
                         If you're looking for inspiration, <a href="https://quant.eggert.org/">quant</a> has public qlogs, as does <a href="http://fb.mvfst.net:8080/">mvfst</a>.<br/>
                         <a href="https://quic-tracker.info.ucl.ac.be">QUIC Tracker</a> provides .pcap files for all its tests and has a convenient integration with qvis from its UI.
                     </p>

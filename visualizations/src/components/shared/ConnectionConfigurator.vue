@@ -9,7 +9,7 @@
                 <div v-if="tooManyOptions">
                     <!-- separate-select mode -->
                     <!--<div>{{selectedGroup.filename}} - {{selectedGroup.description}}</div> -->
-                    <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3" />
+                    <b-form-select v-model="selectedGroup" :options="groupOptions" @change="onGroupSelectionChanged" class="mb-3 mt-3" />
 
                     <!--<div>{{selectedConnection.events.length}} - {{selectedConnection.parent.description}}</div> -->
                     <b-form-select v-model="selectedConnection" :options="connectionOptions" @change="onConnectionSelectionChanged" class="mb-3" />
@@ -19,7 +19,7 @@
 
                 <div v-else>
                     <!-- combined-select mode -->
-                    <div>{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
+                    <div class="mt-3">{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
                     <b-row class="mb-3">
                         <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
                         <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
@@ -102,7 +102,7 @@
         protected get groupOptions(){
             const options:any = [];
             for ( const group of this.allGroups ) {
-                options.push( { value: group, text: group.filename + " (" + group.description + ")" } );
+                options.push( { value: group, text: group.filename + " (" + (group.title ? group.title + " : " : "") + group.description + ")" } );
             } 
 
             return options;
@@ -112,7 +112,24 @@
         protected get connectionOptions(){ 
             const options:any = [];
             for ( const connection of this.selectedGroup.getConnections() ) {
-                options.push( { value: connection, text: connection.title } );
+
+                let connectionName = "";
+                if ( connection.vantagePoint ){
+                    if (connection.vantagePoint.name){
+                        connectionName = connection.vantagePoint.name + " : ";
+                    }
+                    if (connection.vantagePoint.type){
+                        connectionName = connection.vantagePoint.type;
+                    }
+                    else {
+                        connectionName += "UNKNOWN";
+                    }
+
+                    connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " (flow = " + connection.vantagePoint.flow + ") : " : " : ";
+                }
+                connectionName += connection.title + " : " + connection.description;
+
+                options.push( { value: connection, text: connectionName } );
             }
 
             return options;
@@ -126,10 +143,21 @@
                 options.push( { value: null, text: group.filename, disabled: !this.allowGroupSelection } );
 
                 for ( const connection of group.getConnections() ) {
-                    let connectionName = connection.vantagePoint ? connection.vantagePoint.type : "UNKNOWN";
-                    connectionName += " : ";
-                    connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " flow " + connection.vantagePoint.flow + " : " : "";
-                    connectionName += connection.title;
+                    let connectionName = "";
+                    if ( connection.vantagePoint ){
+                        if (connection.vantagePoint.name){
+                            connectionName = connection.vantagePoint.name + " : ";
+                        }
+                        if (connection.vantagePoint.type){
+                            connectionName = connection.vantagePoint.type;
+                        }
+                        else {
+                            connectionName += "UNKNOWN";
+                        }
+
+                        connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " (flow = " + connection.vantagePoint.flow + ") : " : " : ";
+                    }
+                    connectionName += connection.title + " : " + connection.description;
                     
                     options.push( { value: connection, text: "↳ " + connectionName } );
                 }

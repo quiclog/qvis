@@ -33,6 +33,11 @@ export default class QlogConnection {
         this.description = "";
         this.events = new Array<IQlogRawEvent>();
 
+        this.vantagePoint = {
+            type: qlog.VantagePointType.unknown,
+            flow: qlog.VantagePointType.unknown,
+        };
+
         (this.events as any)._isVue = true;
 
         this.parent.addConnection( this );
@@ -102,6 +107,19 @@ export default class QlogConnection {
         this.events = events;
     }
     public getEvents():Array<Array<any>> { return this.events; }
+
+    public getVantagePointPerspective() {
+        if ( this.vantagePoint.type === qlog.VantagePointType.server || 
+             this.vantagePoint.type === qlog.VantagePointType.client ) {
+                return this.vantagePoint.type;
+        }
+        else{
+            // either network or unknown
+            // for both, we look towards the .flow for guidance
+            // according to the spec, there shouldn't be a flow for "unknown", but let's be robust shall we
+            return this.vantagePoint.flow ? this.vantagePoint.flow : qlog.VantagePointType.unknown;
+        }
+    }
 
     public setupLookupTable() {
         if ( this.lookupTable.size !== 0 ){
