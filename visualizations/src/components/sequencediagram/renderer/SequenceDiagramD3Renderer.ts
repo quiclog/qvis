@@ -644,7 +644,7 @@ export default class SequenceDiagramD3Renderer {
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
                 if ( evt.header!.packet_number === undefined ){
-                    if ( evt.type !== qlog.PacketType.version_negotation && evt.type !== qlog.PacketType.retry ){
+                    if ( (evt as any).packet_type !== qlog.PacketType.version_negotation && (evt as any).packet_type !== qlog.PacketType.retry ){
                         console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
                     }
                     continue;
@@ -664,7 +664,7 @@ export default class SequenceDiagramD3Renderer {
                     const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacketReceived; 
                     
                     // need to check for .type as well to deal with different packet number spaces
-                    if (candidate.type === evt.type && candidate.header!.packet_number === evt.header!.packet_number ){
+                    if ((candidate as any).packet_type === (evt as any).packet_type && candidate.header!.packet_number === evt.header!.packet_number ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
                         break;
@@ -994,7 +994,7 @@ export default class SequenceDiagramD3Renderer {
                         }
 
                         const textSpanFront = document.createElement("span");
-                        textSpanFront.textContent = "" + evt.data.type + " : " + evt.data.header.packet_number;
+                        textSpanFront.textContent = "" + evt.data.packet_type + " : " + evt.data.header.packet_number;
                         textSpanFront.style.color = "#383d41"; // dark grey
                         textSpanFront.style.backgroundColor = "#d6d8db"; // light grey
                         textSpanFront.style.paddingLeft = "5px";
