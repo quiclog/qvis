@@ -8,6 +8,10 @@
                 
             </svg>
         </div>
+        <b-modal ref="event-modal" hide-footer title="Event detail">
+            <pre class="d-block">{{ eventDetail }}</pre>
+            <b-button class="mt-3" block @click="hideEventModal">Close</b-button>
+        </b-modal>
     </div>
 </template> 
 
@@ -28,6 +32,8 @@
         @Prop()
         public config!: SequenceDiagramConfig;
 
+        public eventDetail: string = '';
+
         protected get connections(){
             return this.config.connections;
         }
@@ -35,7 +41,7 @@
         protected renderer: SequenceDiagramD3Renderer | undefined = undefined;
 
         public created(){
-            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg");
+            this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg", this.showEventModal);
             // this.renderer = new SequenceDiagramCanvasRenderer("sequence-diagram");
         }
 
@@ -44,6 +50,15 @@
             if ( this.config && this.renderer ) {
                 this.renderer.render( this.config.connections );
             }
+        }
+
+        hideEventModal() {
+            this.$refs["event-modal"].hide();
+        }
+
+        showEventModal(event: any) {
+            this.eventDetail = JSON.stringify(event, null, 2);
+            this.$refs["event-modal"].show();
         }
 
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
