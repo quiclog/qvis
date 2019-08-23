@@ -8,7 +8,7 @@
                 
             </svg>
         </div>
-        <b-modal ref="event-modal" hide-footer title="Event detail">
+        <b-modal id="event-modal" hide-footer title="Event detail">
             <pre class="d-block">{{ eventDetail }}</pre>
             <b-button class="mt-3" block @click="hideEventModal">Close</b-button>
         </b-modal>
@@ -52,13 +52,13 @@
             }
         }
 
-        hideEventModal() {
-            this.$refs["event-modal"].hide();
+        protected hideEventModal() {
+            this.$bvModal.hide("event-modal");
         }
 
-        showEventModal(event: any) {
+        protected showEventModal(event: any) {
             this.eventDetail = JSON.stringify(event, null, 2);
-            this.$refs["event-modal"].show();
+            this.$bvModal.show("event-modal");
         }
 
         // Note: we could use .beforeUpdate or use an explicit event or a computed property as well
