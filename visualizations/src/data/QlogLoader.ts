@@ -83,10 +83,10 @@ export class QlogLoader {
                 for ( const evt of connection.getEvents() ){
                     const data = connection.parseEvent(evt).data;
                     
-                    if ( data.type ){
+                    if ( data && data.type ){
                         data.packet_type = data.type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
-                    else if ( data.packet_type ){
+                    else if ( data && data.packet_type ){
                         data.type = data.packet_type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
                 }

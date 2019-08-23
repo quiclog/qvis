@@ -644,7 +644,7 @@ export default class SequenceDiagramD3Renderer {
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
                 if ( evt.header!.packet_number === undefined ){
-                    if ( (evt as any).packet_type !== qlog.PacketType.version_negotation && (evt as any).packet_type !== qlog.PacketType.retry ){
+                    if ( evt.packet_type !== qlog.PacketType.version_negotation && evt.packet_type !== qlog.PacketType.retry ){
                         console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
                     }
                     continue;
@@ -661,10 +661,10 @@ export default class SequenceDiagramD3Renderer {
                 for ( let c = startCandidateIndex; c <= endCandidateIndex; ++c ) {
                     // note : event can be either sent or received, but interfaces are the same, so doesn't matter atm
                     // TODO: define separate interface for this in the qlog schema!
-                    const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacketReceived; 
+                    const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacket;
                     
                     // need to check for .type as well to deal with different packet number spaces
-                    if ((candidate as any).packet_type === (evt as any).packet_type && candidate.header!.packet_number === evt.header!.packet_number ){
+                    if (candidate.packet_type === evt.packet_type && candidate.header!.packet_number === evt.header!.packet_number ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
                         break;

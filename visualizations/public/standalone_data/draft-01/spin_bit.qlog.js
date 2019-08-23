@@ -13,7 +13,7 @@ var spin_bit = {
                 "time_offset": "0",
                 "time_units": "ms",
                 "original_uris": [
-                    "file:///home/tom/Code/pcap2qlog/examples/draft-01/spin_bit.json"
+                    "file:///srv/pcap2qlog/examples/draft-01/spin_bit.json"
                 ]
             },
             "common_fields": {
@@ -52,7 +52,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "initial",
+                        "packet_type": "initial",
                         "header": {
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
@@ -81,7 +81,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "initial",
+                        "packet_type": "initial",
                         "header": {
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
@@ -127,7 +127,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "handshake",
+                        "packet_type": "handshake",
                         "header": {
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
@@ -151,6 +151,7 @@ var spin_bit = {
                     "93",
                     "transport",
                     "ALPN_update",
+                    "line",
                     {
                         "old": "",
                         "new": "hq-22"
@@ -162,7 +163,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "initial",
+                        "packet_type": "initial",
                         "header": {
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
@@ -193,7 +194,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "handshake",
+                        "packet_type": "handshake",
                         "header": {
                             "version": "0xff000016",
                             "scid": "1b51237b269288d6",
@@ -229,7 +230,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 128,
@@ -278,7 +279,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 36,
@@ -302,7 +303,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 22,
@@ -338,7 +339,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "handshake",
+                        "packet_type": "handshake",
                         "header": {
                             "version": "0xff000016",
                             "scid": "9605d1700dd8829c",
@@ -369,7 +370,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 114,
@@ -410,7 +411,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 22,
@@ -446,7 +447,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 23,
@@ -466,6 +467,7 @@ var spin_bit = {
                             },
                             {
                                 "frame_type": "max_streams",
+                                "stream_type": "bidirectional",
                                 "maximum": "33"
                             }
                         ]
@@ -477,7 +479,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 22,
@@ -513,7 +515,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 238,
@@ -560,7 +562,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 73,
@@ -619,7 +621,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 21,
@@ -646,7 +648,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 451,
@@ -670,6 +672,7 @@ var spin_bit = {
                             },
                             {
                                 "frame_type": "max_streams",
+                                "stream_type": "bidirectional",
                                 "maximum": "35"
                             },
                             {
@@ -695,7 +698,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 39,
@@ -745,7 +748,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 21,
@@ -772,7 +775,7 @@ var spin_bit = {
                     "packet_sent",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "9605d1700dd8829c",
                             "payload_length": 27,
@@ -804,6 +807,7 @@ var spin_bit = {
                     "10001",
                     "connectivity",
                     "connection_close",
+                    "line",
                     {
                         "src_id": "1b51237b269288d6"
                     }
@@ -823,7 +827,7 @@ var spin_bit = {
                     "packet_received",
                     "line",
                     {
-                        "type": "1RTT",
+                        "packet_type": "1RTT",
                         "header": {
                             "dcid": "1b51237b269288d6",
                             "payload_length": 20,
@@ -846,6 +850,7 @@ var spin_bit = {
                     "10091",
                     "connectivity",
                     "connection_close",
+                    "line",
                     {
                         "src_id": "9605d1700dd8829c"
                     }
