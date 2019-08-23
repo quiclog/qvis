@@ -58,9 +58,12 @@ export default class SequenceDiagramD3Renderer {
 
     private frameTypeToColorLUT:Map<string, Array<string>> = new Map<string, Array<string>>();
 
-    constructor(containerID:string, svgID:string){
+    private onEventClicked: (event: any) => void;
+
+    constructor(containerID:string, svgID:string, onEventClicked: (packet: any) => void) {
         this.containerID = containerID;
         this.svgID = svgID;
+        this.onEventClicked = onEventClicked;
     }
    
     public async render(traces:Array<QlogConnection>):Promise<boolean> {
@@ -877,7 +880,7 @@ export default class SequenceDiagramD3Renderer {
                     rect.setAttribute('width', ""  + (rectSize));
                     rect.setAttribute('height', "" + (rectSize));
                     rect.setAttribute('fill', 'green');
-                    rect.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                    rect.onclick = (evt_in) => this.onEventClicked(rawEvt);
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
@@ -1002,7 +1005,7 @@ export default class SequenceDiagramD3Renderer {
                         textSpanFront.style.border = "1px white";
                         textSpanFront.style.borderStyle = "none solid";
                         textSpanFront.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                        textSpanFront.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                        textSpanFront.onclick = (evt_in) => this.onEventClicked(rawEvt);
                         textContainer.appendChild(textSpanFront);
 
                         if ( evt.data.frames ){
@@ -1019,7 +1022,7 @@ export default class SequenceDiagramD3Renderer {
                                 textSpan.style.border = "1px white";
                                 textSpan.style.borderStyle = "none solid";
                                 textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                textSpan.onclick = (evt_in) => { alert("Clicked on " + JSON.stringify(rawEvt)); };
+                                textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
                                 if ( directionText === ">" ) {
                                     textContainer.prepend(textSpan);
                                 }
