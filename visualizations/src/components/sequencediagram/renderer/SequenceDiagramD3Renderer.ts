@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import SequenceDiagramConfig from '../data/SequenceDiagramConfig';
 import { VantagePointType } from '@quictools/qlog-schema';
-import { IQlogRawEvent } from '@/data/QlogEventParser';
+import { IQlogRawEvent, IQlogEventParser } from '@/data/QlogEventParser';
 
 interface VerticalRange {
     svgGroup:HTMLOrSVGElement | undefined,
@@ -884,13 +884,14 @@ export default class SequenceDiagramD3Renderer {
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
+                    const timeText = evt.time.toFixed(2);
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('class', "timestamp");
                     text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -pixelsPerMillisecond * 2 : pixelsPerMillisecond * 2)));
                     text.setAttribute('y', "" + (currentY));
                     text.setAttribute('dominant-baseline', "middle");
                     text.setAttribute('text-anchor', (i === 0) ? "end" : "start");
-                    text.textContent = "" + evt.time.toFixed(2);
+                    text.textContent = "" + timeText;
                     extentContainer.appendChild( text );
 
                     // TODO: now we're using left and right and client is always left, server always right
@@ -1047,27 +1048,69 @@ export default class SequenceDiagramD3Renderer {
                         textForeign.appendChild( textContainer );
                         extentContainer.appendChild( textForeign );
 
-                        // <g class="clickable" v-bind:transform="'translate(200,' + (y_coord - 5) + ') rotate(' + angle + ')'" v-if="clientsend">
-
-                        // </g>
-
-
-                        // centerpoint_text(){
-                        //     // see ArrowInfo for how the text is translated. These values are based on x-translates of 200 and 450
-                        //     // this is basically a LERP of the y-value across the line at the correct percentage 
-                        //     if (this.clientsend)
-                        //         return this.y_receive * 0.0714285; // starts at 200, which is 50 more than the start of 150. total x-range is 850 - 150 = 700. 50/700 = 0.0714285
-                        //     else
-                        //         return this.y_receive * 0.5714286;// starts at 450, 300 more than the start of 150:  400/700 = 0.5714286
-                        // },
-
 
 
                     }
+                    else if ( evt.name !== qlog.TransportEventType.packet_sent &&
+                              evt.name !== qlog.TransportEventType.packet_received ) {
 
-                    
+                        // if we get here, the event was not a packet_sent or packet_received event, so we want to show what it was on the side 
+                        const sideOffset = (timeText.length * 1.3 * 11); // (pixelsPerMillisecond / 2) * (timeText.length * 1.75); // magic numbers, nothing logical about them
+                        // const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        // text.setAttribute('class', "timestamp");
+                        // text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -sideOffset : sideOffset)));
+                        // text.setAttribute('y', "" + (currentY));
+                        // text.setAttribute('dominant-baseline', "bottom");
+                        // text.setAttribute('text-anchor', (i === 0) ? "end" : "start");
+                        // text.textContent = "" + evt.name;
+                        // extentContainer.appendChild( text );
 
+                        let x = (currentX + (pixelsPerMillisecond / 2) + sideOffset);
+                        let width = ((this.bandWidth / 2) * 0.9);
+                        let align = "left";
 
+                        if ( i === 0 ){
+                            align = "right";
+                            width = ((this.bandWidth / 2) * 0.9) - sideOffset;
+                            x = (this.bandWidth / 2) * 0.05;
+                        }
+
+                        const textHeight = pixelsPerMillisecond * 0.9;
+
+                        const textForeign = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+                        textForeign.setAttribute('x', "" + x);
+                        textForeign.setAttribute('y', "" + (currentY - (textHeight / 1.25))); // magic number
+                        textForeign.setAttribute('width',  "" + width);
+                        textForeign.setAttribute('height', "" + textHeight); 
+                        textForeign.style.overflow = "visible";
+
+                        // on the left of the graph, we want to have our text overflowing to the LEFT instead of the right
+                        // this is a bit finicky, requiring a float: right inside of an encapsulating div
+                        const textContainerOuter = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+                        textContainerOuter.style.width = "" + width;
+                        textContainerOuter.style.textAlign = align;
+
+                        // const textContainer = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+                        // textContainer.style.cssFloat = (i === 0) ? "right" : "left";
+
+                        const textSpan = document.createElement("span");
+                        const [bgColor, textColor] = this.eventTypeToColor( evt );
+                        textSpan.textContent = this.eventToShortString( evt );
+                        textSpan.style.color = textColor;
+                        textSpan.style.backgroundColor = bgColor;
+                        textSpan.style.paddingLeft = "5px";
+                        textSpan.style.paddingRight = "5px";
+                        textSpan.style.border = "1px white";
+                        textSpan.style.borderStyle = "none solid";
+                        // textSpan.style.cssFloat = "right";
+                        textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
+                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                        // textContainer.appendChild(textSpan);
+                        
+                        textContainerOuter.appendChild(textSpan);
+                        textForeign.appendChild( textContainerOuter );
+                        extentContainer.appendChild( textForeign );
+                    }
                 }
             }
 
@@ -1097,9 +1140,9 @@ export default class SequenceDiagramD3Renderer {
             this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.retire_connection_id,   ["#068484", "#FFFFFF"] ); // dark green
 
 
-            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.ping,              ["#d6dd02", "#FFFFFF"] ); // ugly yellow
-            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_challenge,    ["#d6dd02", "#FFFFFF"] ); // ugly yellow
-            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_response,     ["#d6dd02", "#FFFFFF"] ); // ugly yellow
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.ping,              ["#d6dd02", "#000000"] ); // ugly yellow
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_challenge,    ["#d6dd02", "#000000"] ); // ugly yellow
+            this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.path_response,     ["#d6dd02", "#000000"] ); // ugly yellow
 
             this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.max_data,              ["#5f0984", "#FFFFFF"] ); // dark purple
             this.frameTypeToColorLUT.set( qlog.QUICFrameTypeName.max_stream_data,       ["#5f0984", "#FFFFFF"] ); // dark purple
@@ -1117,7 +1160,7 @@ export default class SequenceDiagramD3Renderer {
         }
     }
 
-    protected frameToShortString( frame:qlog.QuicFrame ){
+    protected frameToShortString( frame:qlog.QuicFrame ):string {
         let output = "";
         switch ( frame.frame_type ){
             case qlog.QUICFrameTypeName.ack:
@@ -1157,6 +1200,52 @@ export default class SequenceDiagramD3Renderer {
 
             default:
                 return frame.frame_type;
+                break;
+        }
+    }
+
+    protected eventTypeToColor( evt:IQlogEventParser ) : Array<string> {
+
+        if ( evt.name === qlog.ConnectivityEventType.connection_id_update ){
+            return this.frameTypeToColor( qlog.QUICFrameTypeName.new_connection_id );
+        }
+        else if ( evt.name === qlog.ConnectivityEventType.spin_bit_update ){
+            return this.frameTypeToColor( qlog.QUICFrameTypeName.ping );
+        }
+        else if ( evt.name === qlog.ConnectivityEventType.connection_close ){
+            return this.frameTypeToColor( qlog.QUICFrameTypeName.connection_close );
+        }
+        else if ( evt.name === qlog.RecoveryEventType.metric_update ){
+            return this.frameTypeToColor( qlog.QUICFrameTypeName.max_data );
+        }
+        else {
+            return ["#FF0000", "#FFFFFF"];
+        }
+    }
+
+    protected eventToShortString( evt:IQlogEventParser ) : string {
+        
+        switch ( evt.name ){
+
+            case qlog.ConnectivityEventType.spin_bit_update:
+                return "Spin " + ((evt.data as qlog.IEventSpinBitUpdate).state ? "ON" : "OFF");
+                break;
+
+            case qlog.RecoveryEventType.metric_update:
+                let output = "";
+                const metricNames = Object.keys(evt.data);
+                for ( let i = 0; i < metricNames.length; ++i  ) {
+                    output += "" + metricNames[i] + ": " + evt.data[metricNames[i]];
+                    if (i !== metricNames.length - 1 ) {
+                        output += ", ";
+                    }
+                }
+
+                return "" + output;
+                break;
+
+            default:
+                return evt.name;
                 break;
         }
     }

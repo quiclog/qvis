@@ -249,15 +249,28 @@
             const reader = new FileReader();
 
             reader.onload = (evt) => {
-                const contentsJSON = JSON.parse( (evt!.target as any).result );
-                this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
+                try{
+                    const contentsJSON = JSON.parse( (evt!.target as any).result );
+                    this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
 
-                Vue.notify({
-                    group: "default",
-                    title: "Uploaded file",
-                    type: "success",
-                    text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
-                });
+                    Vue.notify({
+                        group: "default",
+                        title: "Uploaded file",
+                        type: "success",
+                        text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
+                    });
+                }
+                catch (e){
+                    
+                    console.error("FileManagerContainer:uploadFile : ", e);
+                    Vue.notify({
+                        group: "default",
+                        title: "Error uploading file",
+                        type: "error",
+                        duration: 6000,
+                        text: "Something went wrong. For more information, view the devtools console.",
+                    });
+                }
             };
             
             reader.readAsText(this.fileToUpload);
