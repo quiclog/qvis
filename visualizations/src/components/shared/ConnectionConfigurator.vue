@@ -19,12 +19,19 @@
 
                 <div v-else>
                     <!-- combined-select mode -->
-                    <div class="mt-3">{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div>
+                    <b-row class="mt-3">
+                        <b-col><div>{{selectedConnection.parent.filename}} ({{selectedConnection.parent.description}})</div></b-col>
+                        <b-col cols="2" v-if="numericalInputName"><div v-b-tooltip.hover title="This value is automatically calculated, but can be manually adjusted.">{{numericalInputName}} : </div></b-col>
+                        <b-col style="max-width: 36px;" v-if="canBeRemoved"></b-col>
+                    </b-row>
                     <b-row class="mb-3">
                         <b-col><b-form-select v-model="selectedConnection" :options="combinedOptions" @change="onConnectionSelectionChanged"  /></b-col>
-                        <b-col v-if="canBeRemoved" cols="auto" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col> 
+                        <b-col cols="2" v-if="numericalInputName"><b-input type="number" v-model="numericalValue" @change="onNumericalValueUpdated" /></b-col>
+                        <b-col cols="auto" v-if="canBeRemoved" class="px-0"><b-button @click="removeMyself">&minus;</b-button></b-col>
                     </b-row>
                 </div>
+
+                
             </div>
         
         </b-container>
@@ -56,6 +63,12 @@
         @Prop()
         protected allGroups!:Array<ConnectionGroup>; 
 
+        @Prop()
+        protected numericalInputValue?:number;
+
+        @Prop()
+        protected numericalInputName?:string;
+
         @Prop({ default: true })
         protected canBeRemoved!:boolean;
 
@@ -72,10 +85,15 @@
         protected onConnectionSelected!:(conn: QlogConnection) => void;
 
         @Prop()
+        protected onNumericalValueChanged!:(offset:number) => void;
+
+        @Prop()
         protected onRemoved!:() => void;
 
         protected selectedConnection:Connection = this.connection;
         protected selectedGroup:ConnectionGroup = (this.group) ? this.group : this.connection.parent;
+
+        protected numericalValue?:number = this.numericalInputValue;
 
         // Firstly, when we change our selection from inside this component, we propagate it to our parent in onSelectionChanged
         // The parent then sets this.connection, but this.selectedGroup is not automatically co-updated
@@ -89,6 +107,8 @@
             if ( this.selectedConnection !== newConnection ) {
                 this.selectedConnection = newConnection;
             }
+
+            this.numericalValue = this.numericalInputValue;
         }
 
         protected get tooManyOptions(){
@@ -116,10 +136,10 @@
                 let connectionName = "";
                 if ( connection.vantagePoint ){
                     if (connection.vantagePoint.name){
-                        connectionName = connection.vantagePoint.name + " : ";
+                        connectionName += connection.vantagePoint.name + " : ";
                     }
                     if (connection.vantagePoint.type){
-                        connectionName = connection.vantagePoint.type;
+                        connectionName += connection.vantagePoint.type;
                     }
                     else {
                         connectionName += "UNKNOWN";
@@ -127,7 +147,12 @@
 
                     connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " (flow = " + connection.vantagePoint.flow + ") : " : " : ";
                 }
-                connectionName += connection.title + " : " + connection.description;
+                if ( connection.title ) {
+                    connectionName += connection.title;
+                }
+                if (connection.description) {
+                    connectionName +=  " : " + connection.description;
+                }
 
                 options.push( { value: connection, text: connectionName } );
             }
@@ -146,10 +171,10 @@
                     let connectionName = "";
                     if ( connection.vantagePoint ){
                         if (connection.vantagePoint.name){
-                            connectionName = connection.vantagePoint.name + " : ";
+                            connectionName += connection.vantagePoint.name + " : ";
                         }
                         if (connection.vantagePoint.type){
-                            connectionName = connection.vantagePoint.type;
+                            connectionName += connection.vantagePoint.type;
                         }
                         else {
                             connectionName += "UNKNOWN";
@@ -157,7 +182,12 @@
 
                         connectionName += (connection.vantagePoint && connection.vantagePoint.flow) ? " (flow = " + connection.vantagePoint.flow + ") : " : " : ";
                     }
-                    connectionName += connection.title + " : " + connection.description;
+                    if ( connection.title ) {
+                        connectionName += connection.title;
+                    }
+                    if (connection.description) {
+                        connectionName +=  " : " + connection.description;
+                    }
                     
                     options.push( { value: connection, text: "↳ " + connectionName } );
                 }
@@ -191,6 +221,12 @@
 
         protected removeMyself(){
             this.onRemoved();
+        }
+
+        protected onNumericalValueUpdated(val:any){
+            if ( this.onNumericalValueChanged ) {
+                this.onNumericalValueChanged( parseFloat(val) );
+            }
         }
     } 
 

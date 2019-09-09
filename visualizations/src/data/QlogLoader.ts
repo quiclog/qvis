@@ -234,7 +234,7 @@ export class EventFieldsParser implements IQlogEventParser {
     private startTime:number = 0;
     private subtractTime:number = 0;
     private timeMultiplier:number = 1;
-    private timeOffset:number = 0;
+    private _timeOffset:number = 0;
 
     private timeIndex:number = 0;
     private categoryIndex:number = 1;
@@ -257,7 +257,17 @@ export class EventFieldsParser implements IQlogEventParser {
         // TODO: now we do this calculation whenever we access the .time property
         // probably faster to do this in a loop for each event in init(), but this doesn't fit well with the streaming use case...
         // can probably do the parseFloat up-front though?
-        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + this.timeOffset;
+        // return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + this._timeOffset;
+        return this.timeWithCustomOffset( this._timeOffset );
+    }
+
+
+    public timeWithCustomOffset( offsetInMs:number ){
+        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + offsetInMs;
+    }
+
+    public get timeOffset():number {
+        return this._timeOffset;
     }
     public get category():string {
         if ( this.categoryIndex === -1 ) {
@@ -365,7 +375,7 @@ export class EventFieldsParser implements IQlogEventParser {
         }
 
         if ( trace.configuration && trace.configuration.time_offset ){
-            this.timeOffset = parseFloat( trace.configuration.time_offset ) * this.timeMultiplier;
+            this._timeOffset = parseFloat( trace.configuration.time_offset ) * this.timeMultiplier;
         }
 
         this.startTime *= this.timeMultiplier;
@@ -384,8 +394,13 @@ export class PreSpecEventParser implements IQlogEventParser {
     private currentEvent:IQlogRawEvent|undefined;
 
     public get time():number {
-        return parseFloat( (this.currentEvent as IQlogRawEvent)[0] );
+        return this.timeWithCustomOffset(0);
     }
+    
+    public timeWithCustomOffset( offsetInMs:number ):number {
+        return parseFloat( (this.currentEvent as IQlogRawEvent)[0] ) + offsetInMs;
+    }
+
     public get category():string {
         return (this.currentEvent as IQlogRawEvent)[1];
     }
@@ -400,6 +415,10 @@ export class PreSpecEventParser implements IQlogEventParser {
     }
     public get data():any|undefined {
         return (this.currentEvent as IQlogRawEvent)[4];
+    }
+
+    public get timeOffset():number {
+        return 0;
     }
 
     public init( trace:QlogConnection ) {

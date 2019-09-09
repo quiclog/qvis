@@ -8,10 +8,14 @@ export interface IQlogEventParser {
     readonly trigger:string;
     readonly data:any|undefined;
 
+    readonly timeOffset:number;
+
     timeToMilliseconds(time: string | number): number;
 
     init( connection:QlogConnection) : void;
     load( evt:IQlogRawEvent ) : IQlogEventParser;
+
+    timeWithCustomOffset( offset:number ):number;
 }
 
 export type IQlogRawEvent = Array<any>;

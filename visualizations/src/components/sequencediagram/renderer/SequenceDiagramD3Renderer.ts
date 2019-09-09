@@ -1,7 +1,7 @@
 import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
-import SequenceDiagramConfig from '../data/SequenceDiagramConfig';
+import SequenceDiagramConfig, { SequenceDiagramConnection } from '../data/SequenceDiagramConfig';
 import { VantagePointType } from '@quictools/qlog-schema';
 import { IQlogRawEvent, IQlogEventParser } from '@/data/QlogEventParser';
 
@@ -42,8 +42,8 @@ export default class SequenceDiagramD3Renderer {
 
     private svg!:d3.Selection<d3.BaseType, unknown, HTMLElement, any>;
 
-    private selectedTraces!:Array<QlogConnection>;
-    private traces!:Array<QlogConnection>;
+    private selectedTraces!:Array<SequenceDiagramConnection>; // traces we get from our parent originally, e.g., used for coupling with Vue
+    private traces!:Array<SequenceDiagramConnection>; // traces we actually work on, e.g., filtered, added with custom generated traces, etc.
 
     private scrollHandler:((e:any) => void) | undefined = undefined;
 
@@ -66,7 +66,7 @@ export default class SequenceDiagramD3Renderer {
         this.onEventClicked = onEventClicked;
     }
    
-    public async render(traces:Array<QlogConnection>):Promise<boolean> {
+    public async render(traces:Array<SequenceDiagramConnection>):Promise<boolean> {
         if ( this.rendering ) {
             return false;
         }
@@ -95,7 +95,7 @@ export default class SequenceDiagramD3Renderer {
     }
 
     // runs once before each render. Used to bootstrap everything.
-    protected setup(tracesInput:Array<QlogConnection>):boolean {
+    protected setup(tracesInput:Array<SequenceDiagramConnection>):boolean {
 
         // 0. make sure the containers exist
         // 1. make sure we have at least 2 traces to draw (sequence diagram doesn't make much sense with just one)
@@ -118,10 +118,10 @@ export default class SequenceDiagramD3Renderer {
         }
 
         // 1.
-        this.traces = new Array<QlogConnection>();
+        this.traces = new Array<SequenceDiagramConnection>();
         // new array, because a) we might want to add a trace if there's only 1 and b) we might have invalid traces in there
         for (const trace of tracesInput) {
-            if ( trace.getEvents().length > 0 ){
+            if ( trace.connection.getEvents().length > 0 ){
                 this.traces.push( trace );
             }
         }
@@ -137,7 +137,7 @@ export default class SequenceDiagramD3Renderer {
         this.ensureMoreThanOneTrace();
 
         for ( const trace of this.traces ){
-            trace.setupLookupTable();
+            trace.connection.setupLookupTable();
         }
 
         // 2. 
@@ -155,6 +155,7 @@ export default class SequenceDiagramD3Renderer {
             shortenIntervalsLongerThan: 120,
         };
 
+        this.calculateTimeOffsets( this.traces );
         this.dimensions.height = this.calculateCoordinates( this.traces );
         this.calculateConnections();
 
@@ -177,6 +178,7 @@ export default class SequenceDiagramD3Renderer {
         this.bandWidth = (this.dimensions.width / this.traces.length);
         for ( let i = 0; i < this.traces.length; ++i ){
             const currentX =  this.bandWidth * i + (this.bandWidth * 0.5); // get center of the band
+            const trace = this.traces[i].connection;
 
             this.svg.append('rect').attr("x", currentX - 1).attr("y", this.dimensions.margin.top).attr("width", 2).attr("height", this.dimensions.height).attr("fill", "black");
 
@@ -186,14 +188,14 @@ export default class SequenceDiagramD3Renderer {
             text.setAttribute('y', "" + 20);
             text.setAttribute('dominant-baseline', "middle");
             text.setAttribute('text-anchor', "middle");
-            text.textContent = "" + this.traces[i].parent.filename;
+            text.textContent = "" + trace.parent.filename;
             (this.svg.node()! as HTMLElement).appendChild( text );
             
 
 
-            let vantagePoint:VantagePointType | string = this.traces[i].vantagePoint.type;
+            let vantagePoint:VantagePointType | string = trace.vantagePoint.type;
             if ( vantagePoint === qlog.VantagePointType.network ){
-                vantagePoint = "" + vantagePoint + " : from " + this.traces[i].vantagePoint.flow + "'s viewpoint";
+                vantagePoint = "" + vantagePoint + " : from " + trace.vantagePoint.flow + "'s viewpoint";
             }
 
             text = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -328,14 +330,14 @@ export default class SequenceDiagramD3Renderer {
             }
         }
 
-        if ( this.traces[0].parent.getConnections().length > 1 ){
+        if ( this.traces[0].connection.parent.getConnections().length > 1 ){
             // traces.length is currently just 1, so we need see if we can add its next sibling automatically as trace here 
-            const nextSibling = this.traces[0].parent.getConnections()[1];
+            const nextSibling = this.traces[0].connection.parent.getConnections()[1];
 
             // e.g., if we load a list of all tests for a single domain from quic-tracker, they will all have the client perspective and we want to generate servers for them
-            if ( nextSibling.getVantagePointPerspective() !== this.traces[0].getVantagePointPerspective() ){
-                this.traces.push( nextSibling );
-                this.selectedTraces.push( nextSibling );
+            if ( nextSibling.getVantagePointPerspective() !== this.traces[0].connection.getVantagePointPerspective() ){
+                this.traces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(nextSibling) );
+                this.selectedTraces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(nextSibling) );
 
                 return;
             }
@@ -346,40 +348,41 @@ export default class SequenceDiagramD3Renderer {
 
             const sibling = (this.traces[0] as any).qvis.sequencediagram.generatedSibling;
 
-            this.traces.push( sibling );
-            this.selectedTraces.push( sibling );
+            this.traces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(sibling) );
+            this.selectedTraces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(sibling) );
 
             return;
         }
 
         // we cannot just visualize a single trace on a sequence diagram...
         // so we copy the trace and pretend like the copy is one from the other side
-        const newTrace = this.traces[0].clone();
+        const newTrace = this.traces[0].connection.clone();
         newTrace.title = "Simulated, autogenerated trace from SequenceDiagram : " + newTrace.title;
         newTrace.description = "Simulated, autogenerated trace from SequenceDiagram : " + newTrace.description;
         newTrace.vantagePoint.name = "GENERATED";
+        newTrace.wasAutoGenerated = true;
 
         // we have a single trace, we need to copy it so we can simulate client + server
-        if ( this.traces[0].vantagePoint.type === qlog.VantagePointType.server || 
-             this.traces[0].vantagePoint.flow === qlog.VantagePointType.server ){
+        if ( this.traces[0].connection.vantagePoint.type === qlog.VantagePointType.server || 
+             this.traces[0].connection.vantagePoint.flow === qlog.VantagePointType.server ){
             newTrace.vantagePoint.type = qlog.VantagePointType.client;
             newTrace.vantagePoint.flow = qlog.VantagePointType.unknown;
-            this.traces.unshift( newTrace );
+            this.traces.unshift( SequenceDiagramConfig.createConnectionWithTimeoffset(newTrace) );
         }
-        else if ( this.traces[0].vantagePoint.type === qlog.VantagePointType.client || 
-                  this.traces[0].vantagePoint.flow === qlog.VantagePointType.client ){
+        else if ( this.traces[0].connection.vantagePoint.type === qlog.VantagePointType.client || 
+                  this.traces[0].connection.vantagePoint.flow === qlog.VantagePointType.client ){
             newTrace.vantagePoint.type = qlog.VantagePointType.server;
             newTrace.vantagePoint.flow = qlog.VantagePointType.unknown;
-            this.traces.push( newTrace );
+            this.traces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(newTrace) );
         }
         else { // the vantagepoint is unknown... we will pretend it's the client then
             // this.traces[0].vantagePoint.type = qlog.VantagePointType.client;
-            this.traces[0].vantagePoint.name = "vantage point type was unknown, pretending it's client";
+            this.traces[0].connection.vantagePoint.name = "vantage point type was unknown, pretending it's client";
 
             newTrace.vantagePoint.name = "vantage point type was unknown, pretending it's server";
             newTrace.vantagePoint.type = qlog.VantagePointType.server;
             newTrace.vantagePoint.flow = qlog.VantagePointType.unknown;
-            this.traces.push( newTrace );
+            this.traces.push( SequenceDiagramConfig.createConnectionWithTimeoffset(newTrace) );
         }
 
         for ( const event of newTrace.getEvents() ){
@@ -418,7 +421,165 @@ export default class SequenceDiagramD3Renderer {
         }
     }
 
-    protected calculateCoordinates(traces:Array<QlogConnection>):number {
+    protected calculateTimeOffsets(traces:Array<SequenceDiagramConnection>):void {
+
+        // FIXME: add support for more than 2 traces!
+        if ( traces.length > 2){
+            console.warn("SequenceDiagramD3Renderer:calculateTimeOffsets : no time offsets auto-calculated for more than 2 traces. Use the UI to assign them manually if needed.");
+
+            return;
+        }
+
+        // we might need to calculate custom time offsets in latency here
+        // however, there are a couple early outs
+        const clientConnection = traces[0];
+        const serverConnection = traces[1];
+
+        if ( serverConnection.connection.wasAutoGenerated || clientConnection.connection.wasAutoGenerated ){
+            return;
+        }
+
+        // was already set manually in the qlog file, don't want to override that!
+        if ( serverConnection.connection.getEventParser().timeOffset !== 0 ){
+            return;
+        }
+
+        // was manually overridden while viewing this file
+        if ( serverConnection.timeOffset ){
+            // make sure that the manual value from the UI is also persisted
+            this.createPrivateNamespace(serverConnection.connection);
+            (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset = serverConnection.timeOffset ;
+
+            return; 
+        }
+
+        // was already calculated or manually overridden in a previous viewing of this file
+        if ( (serverConnection.connection as any).qvis && 
+             (serverConnection.connection as any).qvis.sequencediagram && 
+             (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset !== undefined ) {
+
+            serverConnection.timeOffset = (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset;
+
+            return;
+        }
+
+        // So, concept: we have 1 trace from the client, 1 from the server
+        // both run on different, non-synchronized clocks and were started at different moments in time, so even relative time with offset 0 is not the same time. 
+        // the only thing we know, is that the client initiates the connection and needs to wait for an answer from the server to continue 
+        // (because the client always initiates the QUIC connection)
+        // as such, if we take the time between the client sending their INITIAL and receiving the first packet from the server,
+        // assuming there was no weird loss or jitter, we have an initial RTT estimate.
+        // However, some implementations might also log metric_update events, containing the rtt! so first look for those!
+        let latencyOneWay = -1;
+
+        const clientMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
+        for ( const evt of clientMetricUpdates ){
+            const update = clientConnection.connection.parseEvent(evt).data as qlog.IEventMetricUpdate;
+            if ( update.latest_rtt ){
+                latencyOneWay = update.latest_rtt / 2;
+            }
+            else if ( update.smoothed_rtt ){
+                latencyOneWay = update.smoothed_rtt / 2;
+            }
+
+            if ( latencyOneWay > -1 ) {
+                break;
+            }
+        }
+
+        if ( latencyOneWay === -1 ){
+
+            const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
+            for ( const evt of serverMetricUpdates ){ 
+                const update = serverConnection.connection.parseEvent(evt).data as qlog.IEventMetricUpdate;
+                if ( update.latest_rtt ){
+                    latencyOneWay = update.latest_rtt / 2;
+                }
+                else if ( update.smoothed_rtt ){
+                    latencyOneWay = update.smoothed_rtt / 2;
+                }
+
+                if ( latencyOneWay > -1 ) {
+                    break;
+                }
+            }
+        }
+
+        if ( latencyOneWay === -1 ) {
+            let initialSent:IQlogRawEvent|undefined = undefined;
+            let initialReceived:IQlogRawEvent|undefined = undefined;
+            let serverInitialReceived:IQlogRawEvent|undefined = undefined;
+
+            for ( const rawEvt of clientConnection.connection.getEvents() ) {
+                const evt = clientConnection.connection.parseEvent( rawEvt );
+
+                if ( evt.name === qlog.TransportEventType.packet_sent &&
+                     evt.data.packet_type === qlog.PacketType.initial && 
+                     evt.data.header.packet_number === "0" ) {
+                        initialSent = rawEvt;
+                        continue;
+                }
+
+                if ( evt.name === qlog.TransportEventType.packet_received &&
+                    evt.data.packet_type === qlog.PacketType.initial && 
+                    evt.data.header.packet_number === "0" ) {
+                       initialReceived = rawEvt;
+                }
+
+                if ( initialSent && initialReceived ) {
+                    break;
+                }
+            }
+
+            for ( const rawEvt of serverConnection.connection.getEvents() ) {
+                const evt = serverConnection.connection.parseEvent( rawEvt );
+
+                if ( evt.name === qlog.TransportEventType.packet_received &&
+                    evt.data.packet_type === qlog.PacketType.initial && 
+                    evt.data.header.packet_number === "0" ) {
+                        serverInitialReceived = rawEvt;
+                }
+
+                if ( serverInitialReceived ) {
+                    break;
+                }
+            }
+
+            if (initialSent && initialReceived && serverInitialReceived){
+                const rtt = clientConnection.connection.parseEvent(initialReceived).time - clientConnection.connection.parseEvent(initialSent).time;
+                if (rtt <= 0 ){
+                    console.error("SequenceDiagramD3Renderer:calculateTimeOffset : initial received is earlier than sent! ", rtt);
+
+                    return;
+                }
+
+                // so, we now know at what time we would like the serverInitialReceived to have happened (clientInitialSent + rtt/2)
+                // so we see where it is right now, then offset by that
+                const serverReceiveTime = serverConnection.connection.parseEvent(serverInitialReceived).time;
+                const expectedServerReceiveTime = clientConnection.connection.parseEvent(initialSent).time + rtt / 2;
+                if ( serverReceiveTime > expectedServerReceiveTime ){
+                    latencyOneWay = serverReceiveTime - expectedServerReceiveTime;
+                }
+                else {
+                    latencyOneWay = expectedServerReceiveTime - serverReceiveTime;
+                }
+            }
+        }
+
+        if (latencyOneWay === -1 ) {
+            return;
+        }
+
+        console.log("SequenceDiagramD3Renderer:calculateTimeOffset : offset determined at ", latencyOneWay);
+        // this forces update of the UI, but this value is not persisted when changing connections 
+        // (e.g., changing back to this one later resets the .timeOffset value due to the current implementation)
+        serverConnection.timeOffset = latencyOneWay;
+        // so... we also keep the timeoffset in our local data so we can use that when we come back to it
+        this.createPrivateNamespace(serverConnection.connection);
+        (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset = latencyOneWay;
+    }
+
+    protected calculateCoordinates(traces:Array<SequenceDiagramConnection>):number {
 
         const pixelsPerMillisecond = this.dimensions.pixelsPerMillisecond;
 
@@ -464,8 +625,11 @@ export default class SequenceDiagramD3Renderer {
                     continue;
                 }
 
-                const evt = traces[t].getEvents()[ heads[t] ];
-                const time = traces[t].parseEvent(evt).time;
+                const trace = traces[t].connection;
+                const timeOffset = traces[t].timeOffset;
+
+                const evt = trace.getEvents()[ heads[t] ];
+                const time = trace.parseEvent(evt).timeWithCustomOffset(timeOffset);
                 
                 // < instead of <= so we always favor rendering a single trace as long as possible before switching to the next. 
                 // Important for overlap prevention.
@@ -590,7 +754,7 @@ export default class SequenceDiagramD3Renderer {
             previousMinimumTrace = currentMinimumTrace;
 
             heads[ currentMinimumTrace ] += 1;
-            if ( heads[currentMinimumTrace] >= traces[currentMinimumTrace].getEvents().length ) {
+            if ( heads[currentMinimumTrace] >= traces[currentMinimumTrace].connection.getEvents().length ) {
                 heads[ currentMinimumTrace ] = -1;
                 ++doneCount;
             }
@@ -713,7 +877,7 @@ export default class SequenceDiagramD3Renderer {
             const start = this.traces[t];
             const end   = this.traces[t + 1];
 
-            connectTraces(arrowTargetProperty.right, start, end);
+            connectTraces(arrowTargetProperty.right, start.connection, end.connection);
         }
 
         // packets flowing from server to client (right to left)
@@ -721,7 +885,7 @@ export default class SequenceDiagramD3Renderer {
             const start = this.traces[t];
             const end   = this.traces[t - 1];
 
-            connectTraces(arrowTargetProperty.left, start, end);
+            connectTraces(arrowTargetProperty.left, start.connection, end.connection);
 
         }
     }
@@ -855,12 +1019,12 @@ export default class SequenceDiagramD3Renderer {
                 const trace = this.traces[i];
                 const currentX = this.bandWidth * i + (this.bandWidth * 0.5); // center of the horizontal band
 
-                const events = trace.getEvents();
+                const events = trace.connection.getEvents();
                 
                 let currentY = 0;
                 let currentMetadata = undefined;
                 for ( const rawEvt of events ){
-                    const evt = trace.parseEvent(rawEvt);
+                    const evt = trace.connection.parseEvent(rawEvt);
                     currentMetadata = (rawEvt as any).qvis.sequencediagram;
                     currentY = currentMetadata.y;
 
@@ -884,7 +1048,8 @@ export default class SequenceDiagramD3Renderer {
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
-                    const timeText = evt.time.toFixed(2);
+                    let timeText:any = evt.timeWithCustomOffset(trace.timeOffset);
+                    timeText = timeText.toFixed(2);
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('class', "timestamp");
                     text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -pixelsPerMillisecond * 2 : pixelsPerMillisecond * 2)));

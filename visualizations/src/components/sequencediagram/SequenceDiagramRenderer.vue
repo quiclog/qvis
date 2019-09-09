@@ -74,7 +74,7 @@
                 // TODO: fix this OR bring this logic into this component, rather than on the renderer
                 if ( !this.renderer.rendering ){
 
-                    if ( newConfig.connections && newConfig.connections[0].getEvents().length > 10000 ){
+                    if ( newConfig.connections && newConfig.connections[0].connection.getEvents().length > 10000 ){
                         Vue.notify({
                             group: "default",
                             title: "Trace might take long to render",
