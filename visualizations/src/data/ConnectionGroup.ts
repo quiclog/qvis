@@ -1,6 +1,8 @@
 import QlogConnection from "@/data/Connection"
 
 // This is basically the wrapper for a single qlog file, which contains multiple traces ("connections")
+// NOTE: this has nothing directly to do with the "group_id" concept! 
+// TODO: rename this class to QlogCollection or QlogTraceCollection or QlogTraceFile or something
 export default class QlogConnectionGroup {
     
     public version:string;

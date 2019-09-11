@@ -50,19 +50,55 @@ export class QlogLoader {
 
         for ( let jsonconnection of fileContents.traces ){
 
-            const connection = new QlogConnection(group);
+            // a single trace can contain multiple component "traces" if group_id is used and we need to split them out first
+            const qlogconnections:Array<QlogConnection> = new Array<QlogConnection>();
 
             if ( (jsonconnection as qlog01.ITraceError).error_description !== undefined ) {
                 jsonconnection = jsonconnection as qlog01.ITraceError;
 
-                connection.title = "ERROR";
-                connection.description = jsonconnection.uri + " : " + jsonconnection.error_description;
+                const conn = new QlogConnection(group);
+                conn.title = "ERROR";
+                conn.description = jsonconnection.uri + " : " + jsonconnection.error_description;
+                continue;
+            }
+
+            jsonconnection = jsonconnection as qlog01.ITrace;
+
+            const groupIDIndex:number = jsonconnection.event_fields.indexOf("group_id");
+            if ( jsonconnection.event_fields && groupIDIndex >= 0 ) {
+                const groupLUT:Map<string, QlogConnection> = new Map<string, QlogConnection>();
+
+                for ( const event of jsonconnection.events ) {
+
+                    let groupID = event[ groupIDIndex ];
+                    if ( typeof groupID !== "string" ) {
+                        groupID = JSON.stringify(groupID);
+                    }
+
+                    let conn = groupLUT.get(groupID as string);
+                    if ( !conn ){
+                        conn = new QlogConnection(group);
+                        conn.title = "Group " + groupID + " : ";
+                        groupLUT.set( groupID as string, conn );
+
+                        qlogconnections.push( conn );
+                    }
+
+                    conn.getEvents().push( event );
+                }
             }
             else {
-                jsonconnection = jsonconnection as qlog01.ITrace;
+                // just one component trace, easy mode
+                const conn = new QlogConnection(group);
+                qlogconnections.push( conn );
+                conn.setEvents( jsonconnection.events as any );
+            }
 
-                connection.title = jsonconnection.title!;
-                connection.description = jsonconnection.description!;
+            // component traces share most properties of the overlapping parent trace (e.g., vantage point etc.)
+            for ( const connection of qlogconnections ){
+
+                connection.title += jsonconnection.title ? jsonconnection.title : "";
+                connection.description += jsonconnection.description ? jsonconnection.description : "";
                 
                 connection.vantagePoint = jsonconnection.vantage_point || {} as qlog01.IVantagePoint;
 
@@ -75,8 +111,6 @@ export class QlogLoader {
                 connection.eventFieldNames = jsonconnection.event_fields;
                 connection.commonFields = jsonconnection.common_fields!;
                 connection.configuration = jsonconnection.configuration || {};
-
-                connection.setEvents( jsonconnection.events );
 
                 connection.setEventParser( new EventFieldsParser() );
 
@@ -102,6 +136,7 @@ export class QlogLoader {
 
         console.log("QlogLoader:fromDraft00 : ", fileContents, fileContents.traces);
 
+        // TODO: rename QlogConnectionGroup because it's confusing with the group_id (they are NOT the same concepts!)
         const group = new QlogConnectionGroup();
         group.version = fileContents.qlog_version;
         group.title = fileContents.title || "";
@@ -109,53 +144,86 @@ export class QlogLoader {
 
         for ( const jsonconnection of fileContents.traces ){
 
-            const connection = new QlogConnection(group);
+            // a single trace can contain multiple component "traces" if group_id is used and we need to split them out first
+            const qlogconnections:Array<QlogConnection> = new Array<QlogConnection>();
 
-            connection.title = jsonconnection.title;
-            connection.description = jsonconnection.description;
+            const groupIDIndex:number = jsonconnection.event_fields.indexOf("group_id");
+            if ( jsonconnection.event_fields && groupIDIndex >= 0 ) {
+                const groupLUT:Map<string, QlogConnection> = new Map<string, QlogConnection>();
 
-            connection.vantagePoint = {} as qlog01.IVantagePoint;
-            if ( jsonconnection.vantage_point ){
-                connection.vantagePoint.name = jsonconnection.vantage_point.name || "";
+                for ( const event of jsonconnection.events ) {
+                    let groupID = event[ groupIDIndex ];
+                    if ( typeof groupID !== "string" ) {
+                        groupID = JSON.stringify(groupID);
+                    }
 
-                if ( jsonconnection.vantage_point.type === "SERVER" ){
-                    connection.vantagePoint.type = qlog01.VantagePointType.server;
-                }
-                else if ( jsonconnection.vantage_point.type === "CLIENT" ){
-                    connection.vantagePoint.type = qlog01.VantagePointType.client;
-                }
-                else if ( jsonconnection.vantage_point.type === "NETWORK" ){
-                    connection.vantagePoint.type = qlog01.VantagePointType.network;
-                    connection.vantagePoint.flow = qlog01.VantagePointType.client;
+                    let conn = groupLUT.get(groupID);
+                    if ( !conn ){
+                        conn = new QlogConnection(group);
+                        conn.title = "Group " + groupID + " : ";
+                        groupLUT.set( groupID, conn );
+
+                        qlogconnections.push( conn );
+                    }
+
+                    conn.getEvents().push( event );
                 }
             }
-
-            if ( !connection.vantagePoint.type ){
-                connection.vantagePoint.type = qlog01.VantagePointType.unknown;
-                connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
-                connection.vantagePoint.name = "No VantagePoint set";
+            else {
+                // just one component trace, easy mode
+                const conn = new QlogConnection(group);
+                qlogconnections.push( conn );
+                conn.setEvents( jsonconnection.events as any );
             }
 
-            connection.eventFieldNames = jsonconnection.event_fields;
-            connection.commonFields = jsonconnection.common_fields;
-            connection.configuration = jsonconnection.configuration || {};
-            connection.setEvents( jsonconnection.events as any );
+            // component traces share most properties of the overlapping parent trace (e.g., vantage point etc.)
+            for ( const connection of qlogconnections ){
 
-            connection.setEventParser( new EventFieldsParser() );
+                connection.title += jsonconnection.title ? jsonconnection.title : "";
+                connection.description += jsonconnection.description ? jsonconnection.description : "";
 
-            for ( const evt of connection.getEvents() ){
-                const data = connection.parseEvent(evt).data;
-                if ( data.frames ) {
-                    for ( const frame of data.frames ){
-                        if ( frame.frame_type ){
-                            frame.frame_type = frame.frame_type.toLowerCase();
-                        }
+                connection.vantagePoint = {} as qlog01.IVantagePoint;
+                if ( jsonconnection.vantage_point ){
+                    connection.vantagePoint.name = jsonconnection.vantage_point.name || "";
+
+                    if ( jsonconnection.vantage_point.type === "SERVER" ){
+                        connection.vantagePoint.type = qlog01.VantagePointType.server;
+                    }
+                    else if ( jsonconnection.vantage_point.type === "CLIENT" ){
+                        connection.vantagePoint.type = qlog01.VantagePointType.client;
+                    }
+                    else if ( jsonconnection.vantage_point.type === "NETWORK" ){
+                        connection.vantagePoint.type = qlog01.VantagePointType.network;
+                        connection.vantagePoint.flow = qlog01.VantagePointType.client;
                     }
                 }
-                
-                if ( data.packet_type ){
-                    data.packet_type = data.packet_type.toLowerCase();
-                    data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
+
+                if ( !connection.vantagePoint.type ){
+                    connection.vantagePoint.type = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.name = "No VantagePoint set";
+                }
+
+                connection.eventFieldNames = jsonconnection.event_fields;
+                connection.commonFields = jsonconnection.common_fields;
+                connection.configuration = jsonconnection.configuration || {};
+
+                connection.setEventParser( new EventFieldsParser() );
+
+                for ( const evt of connection.getEvents() ){
+                    const data = connection.parseEvent(evt).data;
+                    if ( data.frames ) {
+                        for ( const frame of data.frames ){
+                            if ( frame.frame_type ){
+                                frame.frame_type = frame.frame_type.toLowerCase();
+                            }
+                        }
+                    }
+                    
+                    if ( data.packet_type ){
+                        data.packet_type = data.packet_type.toLowerCase();
+                        data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
+                    }
                 }
             }
         }

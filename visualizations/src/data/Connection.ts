@@ -31,7 +31,7 @@ export default class QlogConnection {
 
     public constructor(parent:QlogConnectionGroup) {
         this.parent = parent;
-        this.title = "NewConnection";
+        this.title = "";
         this.description = "";
         this.events = new Array<IQlogRawEvent>();
 
