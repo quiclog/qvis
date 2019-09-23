@@ -186,13 +186,13 @@ export class QlogLoader {
                 if ( jsonconnection.vantage_point ){
                     connection.vantagePoint.name = jsonconnection.vantage_point.name || "";
 
-                    if ( jsonconnection.vantage_point.type === "SERVER" ){
+                    if ( jsonconnection.vantage_point.type === "SERVER" || jsonconnection.vantage_point.type === "server" ){
                         connection.vantagePoint.type = qlog01.VantagePointType.server;
                     }
-                    else if ( jsonconnection.vantage_point.type === "CLIENT" ){
+                    else if ( jsonconnection.vantage_point.type === "CLIENT" || jsonconnection.vantage_point.type === "client" ){
                         connection.vantagePoint.type = qlog01.VantagePointType.client;
                     }
-                    else if ( jsonconnection.vantage_point.type === "NETWORK" ){
+                    else if ( jsonconnection.vantage_point.type === "NETWORK" || jsonconnection.vantage_point.type === "network" ){
                         connection.vantagePoint.type = qlog01.VantagePointType.network;
                         connection.vantagePoint.flow = qlog01.VantagePointType.client;
                     }
@@ -263,13 +263,13 @@ export class QlogLoader {
 
             if ( jsonconnection.vantagepoint ){
                 connection.vantagePoint = {} as qlog01.IVantagePoint;
-                if ( jsonconnection.vantagepoint === "SERVER" ){
+                if ( jsonconnection.vantagepoint === "SERVER" || (jsonconnection.vantagepoint as any) === "server" ){
                     connection.vantagePoint.type = qlog01.VantagePointType.server;
                 }
-                else if ( jsonconnection.vantagepoint === "CLIENT" ){
+                else if ( jsonconnection.vantagepoint === "CLIENT" || (jsonconnection.vantagepoint as any) === "client" ){
                     connection.vantagePoint.type = qlog01.VantagePointType.client;
                 }
-                else if ( jsonconnection.vantagepoint === "NETWORK" ){
+                else if ( jsonconnection.vantagepoint === "NETWORK" || (jsonconnection.vantagepoint as any) === "network" ){
                     connection.vantagePoint.type = qlog01.VantagePointType.network;
                     connection.vantagePoint.flow = qlog01.VantagePointType.client;
                 }
