@@ -427,7 +427,7 @@ export class EventFieldsParser implements IQlogEventParser {
                     this.startTime = parseFloat(trace.commonFields.reference_time);
                 }
                 else {
-                    console.error("QlogLoader: Using relative_time but no reference_time found in common_fields", trace.eventFieldNames, trace.commonFields);
+                    console.error("QlogLoader: Using relative_time but no reference_time found in common_fields. Assuming 0.", trace.eventFieldNames, trace.commonFields);
                     this.startTime = 0;
                 }
             }

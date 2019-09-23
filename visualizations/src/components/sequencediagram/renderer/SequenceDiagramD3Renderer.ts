@@ -1382,16 +1382,18 @@ export default class SequenceDiagramD3Renderer {
         switch ( frame.frame_type ){
             case qlog.QUICFrameTypeName.ack:
                 output = frame.frame_type + " ";
-                const ranges = frame.acked_ranges;
-                for ( let r = 0; r < ranges.length; ++r  ){
-                    if ( ranges[r][0] !== ranges[r][1] ){
-                        output += ranges[r][0] + "-" + ranges[r][1];
-                    }
-                    else{
-                        output += ranges[r][0];
-                    }
-                    if ( r < ranges.length - 1 ){
-                        output += ","
+                if ( frame.acked_ranges ){
+                    const ranges = frame.acked_ranges;
+                    for ( let r = 0; r < ranges.length; ++r  ){
+                        if ( ranges[r][0] !== ranges[r][1] ){
+                            output += ranges[r][0] + "-" + ranges[r][1];
+                        }
+                        else{
+                            output += ranges[r][0];
+                        }
+                        if ( r < ranges.length - 1 ){
+                            output += ","
+                        }
                     }
                 }
 
