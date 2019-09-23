@@ -796,6 +796,9 @@ export default class CongestionGraphD3Renderer {
             // now we have the ACK frames. These are composed of ACK blocks, each ACKing a range of packet numbers
             // we go over them all, look them up individually, and add them to packetAckedList
             for (const frame of ackFrames) {
+                if ( !frame.acked_ranges ) {
+                    continue;
+                }
                 for (const range of frame.acked_ranges) {
                     const from = parseInt(range[0], 10);
                     const to = parseInt(range[1], 10); // up to and including
@@ -857,6 +860,9 @@ export default class CongestionGraphD3Renderer {
             // now we have the ACK frames. These are composed of ACK blocks, each ACKing a range of packet numbers
             // we go over them all, look them up individually, and add them to packetAckedList
             for (const frame of ackFrames) {
+                if ( !frame.acked_ranges ) {
+                    continue;
+                }
                 for (const range of frame.acked_ranges) {
                     const from = parseInt(range[0], 10);
                     const to = parseInt(range[1], 10); // up to and including
