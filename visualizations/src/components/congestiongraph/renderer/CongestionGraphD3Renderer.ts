@@ -536,7 +536,7 @@ export default class CongestionGraphD3Renderer {
             const extraData = ((packet as any) as IEventExtension).qvis.congestion;
 
             const height = currentPerspective.yScale(extraData.to) - currentPerspective.yScale(extraData.from);
-            const x = currentPerspective.xScale(parsedPacket.time);
+            const x = currentPerspective.xScale(parsedPacket.relativeTime);
             const y = currentPerspective.yScale(extraData.to);
 
             // Only draw within bounds
@@ -548,7 +548,7 @@ export default class CongestionGraphD3Renderer {
             if (extraData.correspondingAck) {
                 const parsedAck = this.config.connection!.parseEvent(extraData.correspondingAck);
 
-                const ackX = currentPerspective.xScale(parsedAck.time);
+                const ackX = currentPerspective.xScale(parsedAck.relativeTime);
 
                 // Only draw within bounds
                 if (ackX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && y + height >= 0 && y <= this.mainGraphState.innerHeight) {
@@ -560,7 +560,7 @@ export default class CongestionGraphD3Renderer {
             if (extraData.correspondingLoss) {
                 const parsedLoss = this.config.connection!.parseEvent(extraData.correspondingLoss);
 
-                const lossX = currentPerspective.xScale(parsedLoss.time);
+                const lossX = currentPerspective.xScale(parsedLoss.relativeTime);
 
                 // Only draw within bounds
                 if (lossX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && y + height >= 0 && y <= this.mainGraphState.innerHeight) {
@@ -737,8 +737,8 @@ export default class CongestionGraphD3Renderer {
             packetSentList[ parseInt( data.header.packet_number, 10 ) ] = packet;
 
             // Update extrema
-            sent.xMin = sent.xMin > parsedPacket.time ? parsedPacket.time : sent.xMin;
-            sent.xMax = sent.xMax < parsedPacket.time ? parsedPacket.time : sent.xMax;
+            sent.xMin = sent.xMin > parsedPacket.relativeTime ? parsedPacket.relativeTime : sent.xMin;
+            sent.xMax = sent.xMax < parsedPacket.relativeTime ? parsedPacket.relativeTime : sent.xMax;
             sent.yMin = sent.yMin > packetOffsetStart ? packetOffsetStart : sent.yMin;
             sent.yMax = sent.yMax < totalSentByteCount ? totalSentByteCount : sent.yMax;
         }
@@ -766,8 +766,8 @@ export default class CongestionGraphD3Renderer {
                 packetReceivedList[ parseInt( data.header.packet_number, 10 ) ] = packet; // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
 
                 // Update extrema
-                received.xMin = received.xMin > parsedPacket.time ? parsedPacket.time : received.xMin;
-                received.xMax = received.xMax < parsedPacket.time ? parsedPacket.time : received.xMax;
+                received.xMin = received.xMin > parsedPacket.relativeTime ? parsedPacket.relativeTime : received.xMin;
+                received.xMax = received.xMax < parsedPacket.relativeTime ? parsedPacket.relativeTime : received.xMax;
                 received.yMin = received.yMin > packetOffsetStart ? packetOffsetStart : received.yMin;
                 received.yMax = received.yMax < totalReceivedByteCount ? totalReceivedByteCount : received.yMax;
             } else {
@@ -923,34 +923,34 @@ export default class CongestionGraphD3Renderer {
                 const y = data.bytes_in_flight;
                 sent.minCongestionY = sent.minCongestionY > y ? y : sent.minCongestionY;
                 sent.maxCongestionY = sent.maxCongestionY < y ? y : sent.maxCongestionY;
-                this.mainGraphState.metricUpdateLines.bytes.push([parsedUpdate.time, y]);
+                this.mainGraphState.metricUpdateLines.bytes.push([parsedUpdate.relativeTime, y]);
             }
             if (data.cwnd) {
                 const y = data.cwnd;
                 sent.minCongestionY = sent.minCongestionY > y ? y : sent.minCongestionY;
                 sent.maxCongestionY = sent.maxCongestionY < y ? y : sent.maxCongestionY;
-                this.mainGraphState.metricUpdateLines.cwnd.push([parsedUpdate.time, y]);
+                this.mainGraphState.metricUpdateLines.cwnd.push([parsedUpdate.relativeTime, y]);
             }
             if (data.min_rtt) {
                 // Time can be in microseconds so make sure to convert it to ms
                 const y = parsedUpdate.timeToMilliseconds(data.min_rtt);
                 sent.minRTT = sent.minRTT > y ? y : sent.minRTT;
                 sent.maxRTT = sent.maxRTT < y ? y : sent.maxRTT;
-                this.mainGraphState.metricUpdateLines.minRTT.push([parsedUpdate.time, y]);
+                this.mainGraphState.metricUpdateLines.minRTT.push([parsedUpdate.relativeTime, y]);
             }
             if (data.smoothed_rtt) {
                 // Time can be in microseconds so make sure to convert it to ms
                 const y = parsedUpdate.timeToMilliseconds(data.smoothed_rtt);
                 sent.minRTT = sent.minRTT > y ? y : sent.minRTT;
                 sent.maxRTT = sent.maxRTT < y ? y : sent.maxRTT;
-                this.mainGraphState.metricUpdateLines.smoothedRTT.push([parsedUpdate.time, y]);
+                this.mainGraphState.metricUpdateLines.smoothedRTT.push([parsedUpdate.relativeTime, y]);
             }
             if (data.latest_rtt) {
                 // Time can be in microseconds so make sure to convert it to ms
                 const y = parsedUpdate.timeToMilliseconds(data.latest_rtt);
                 sent.minRTT = sent.minRTT > y ? y : sent.minRTT;
                 sent.maxRTT = sent.maxRTT < y ? y : sent.maxRTT;
-                this.mainGraphState.metricUpdateLines.lastRTT.push([parsedUpdate.time, y]);
+                this.mainGraphState.metricUpdateLines.lastRTT.push([parsedUpdate.relativeTime, y]);
             }
         }
 
@@ -1080,7 +1080,7 @@ export default class CongestionGraphD3Renderer {
 
         for (const packet of packetList) {
             const parsedPacket = this.config.connection!.parseEvent(packet); // parsedPacket will change if parseEvent is called again, only saves last parsedEvent so make sure to save vars we need
-            const parsedPacketTime = parsedPacket.time;
+            const parsedPacketTime = parsedPacket.relativeTime;
             const parsedPacketData = parsedPacket.data;
             const extraDetails = ((packet as any) as IEventExtension).qvis.congestion;
 
@@ -1108,7 +1108,7 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("display", "block");
                     this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
-                    this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedAckPacket.time);
+                    this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedAckPacket.relativeTime);
                     this.mainGraphState.packetInformationDiv!.select("#ackedFrom").text("Acked from: " + extraDetails.from);
                     this.mainGraphState.packetInformationDiv!.select("#ackedTo").text("Acked to: " + extraDetails.to);
 
@@ -1118,7 +1118,7 @@ export default class CongestionGraphD3Renderer {
                     const topY = this.mainGraphState.currentPerspective().yScale!(extraDetails.from);
                     const bottomY = this.mainGraphState.currentPerspective().yScale!(extraDetails.to);
                     const height = (topY - bottomY) * this.mainGraphState.currentPerspective().drawScaleY;
-                    const width = this.mainGraphState.currentPerspective().xScale!(parsedAckPacket.time) - this.mainGraphState.currentPerspective().xScale!(parsedPacketTime);
+                    const width = this.mainGraphState.currentPerspective().xScale!(parsedAckPacket.relativeTime) - this.mainGraphState.currentPerspective().xScale!(parsedPacketTime);
 
                     this.mainGraphState.graphSvg!
                         .append("rect")
@@ -1140,8 +1140,8 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.style("display", "block");
                         this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
-                        this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.time);
-                        this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.time);
+                        this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.relativeTime);
+                        this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.relativeTime);
                         this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedLostPacket.data.header.packet_number);
                         this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.header.packet_size);
                         return;
@@ -1303,7 +1303,7 @@ export default class CongestionGraphD3Renderer {
             const parsedPacket = this.config.connection!.parseEvent(packet);
             const extraData = ((packet as any) as IEventExtension).qvis.congestion;
 
-            if (minX <= parsedPacket.time && parsedPacket.time <= maxX) {
+            if (minX <= parsedPacket.relativeTime && parsedPacket.relativeTime <= maxX) {
                 min = min > extraData.to ? extraData.to : min;
                 max = max < extraData.to ? extraData.to : max;
             }
@@ -1329,27 +1329,27 @@ export default class CongestionGraphD3Renderer {
             const parsedUpdate = this.config.connection!.parseEvent(update);
             const data = parsedUpdate.data;
 
-            if (data.bytes_in_flight && minX <= parsedUpdate.time && parsedUpdate.time <= maxX) {
+            if (data.bytes_in_flight && minX <= parsedUpdate.relativeTime && parsedUpdate.relativeTime <= maxX) {
                 const y = data.bytes_in_flight;
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }
-            if (data.cwnd && minX <= parsedUpdate.time && parsedUpdate.time <= maxX) {
+            if (data.cwnd && minX <= parsedUpdate.relativeTime && parsedUpdate.relativeTime <= maxX) {
                 const y = data.cwnd;
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }
-            if (data.min_rtt && minX <= parsedUpdate.time && parsedUpdate.time <= maxX) {
+            if (data.min_rtt && minX <= parsedUpdate.relativeTime && parsedUpdate.relativeTime <= maxX) {
                 const y = parsedUpdate.timeToMilliseconds(data.min_rtt);
                 minRTT = minRTT > y ? y : minRTT;
                 maxRTT = maxRTT < y ? y : maxRTT;
             }
-            if (data.smoothed_rtt && minX <= parsedUpdate.time && parsedUpdate.time <= maxX) {
+            if (data.smoothed_rtt && minX <= parsedUpdate.relativeTime && parsedUpdate.relativeTime <= maxX) {
                 const y = parsedUpdate.timeToMilliseconds(data.smoothed_rtt);
                 minRTT = minRTT > y ? y : minRTT;
                 maxRTT = maxRTT < y ? y : maxRTT;
             }
-            if (data.latest_rtt && minX <= parsedUpdate.time && parsedUpdate.time <= maxX) {
+            if (data.latest_rtt && minX <= parsedUpdate.relativeTime && parsedUpdate.relativeTime <= maxX) {
                 const y = parsedUpdate.timeToMilliseconds(data.latest_rtt);
                 minRTT = minRTT > y ? y : minRTT;
                 maxRTT = maxRTT < y ? y : maxRTT;

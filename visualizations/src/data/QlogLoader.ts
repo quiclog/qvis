@@ -224,6 +224,11 @@ export class QlogLoader {
                         data.packet_type = data.packet_type.toLowerCase();
                         data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
+
+                    if ( data.header && data.header.packet_number !== undefined ){
+                        // some draft-00 traces use simple ints instead of strings for packet numbers. This breaks things.
+                        data.header.packet_number = "" + data.header.packet_number;
+                    }
                 }
             }
         }
@@ -289,8 +294,8 @@ export class QlogLoader {
 }
 
 enum TimeTrackingMethod {
-    RAW,
-    REFERENCE_TIME,
+    ABSOLUTE_TIME,
+    RELATIVE_TIME,
     DELTA_TIME,
 }
 
@@ -298,8 +303,9 @@ enum TimeTrackingMethod {
 // tslint:disable max-classes-per-file
 export class EventFieldsParser implements IQlogEventParser {
 
-    private timeTrackingMethod = TimeTrackingMethod.RAW;
-    private startTime:number = 0;
+    private timeTrackingMethod = TimeTrackingMethod.ABSOLUTE_TIME;
+    
+    private addTime:number = 0;
     private subtractTime:number = 0;
     private timeMultiplier:number = 1;
     private _timeOffset:number = 0;
@@ -317,7 +323,7 @@ export class EventFieldsParser implements IQlogEventParser {
 
     private currentEvent:IQlogRawEvent|undefined;
 
-    public get time():number {
+    public get relativeTime():number {
         if ( this.timeIndex === -1 ) {
             return 0;
         }
@@ -326,12 +332,31 @@ export class EventFieldsParser implements IQlogEventParser {
         // probably faster to do this in a loop for each event in init(), but this doesn't fit well with the streaming use case...
         // can probably do the parseFloat up-front though?
         // return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + this._timeOffset;
-        return this.timeWithCustomOffset( this._timeOffset );
+        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + this._timeOffset;
     }
 
+    public get absoluteTime():number {
+        if ( this.timeIndex === -1 ) {
+            return 0;
+        }
 
-    public timeWithCustomOffset( offsetInMs:number ){
-        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier - this.subtractTime + offsetInMs;
+        return parseFloat((this.currentEvent as IQlogRawEvent)[this.timeIndex]) * this.timeMultiplier + this.addTime + this._timeOffset;
+    }
+
+    public getAbsoluteStartTime():number {
+        // when relative time, this is reference_time, which is stored in this.addTime
+        // when absolute time, this is the time of the first event, which is stored in this.subtractTime
+        if ( this.timeTrackingMethod === TimeTrackingMethod.RELATIVE_TIME ){
+            return this.addTime;
+        }
+        else if ( this.timeTrackingMethod === TimeTrackingMethod.ABSOLUTE_TIME ){
+            return this.subtractTime;
+        }
+        else {
+            console.error("QlogLoader: No proper startTime present in qlog file. This tool doesn't support delta_time yet!");
+
+            return 0;
+        }
     }
 
     public get timeOffset():number {
@@ -411,6 +436,17 @@ export class EventFieldsParser implements IQlogEventParser {
 
 
 
+        // We have two main time representations: relative or absolute
+        // We want to convert between the two to give outside users their choice of both
+        // to get ABSOLUTE time:
+        // if relative timestamps : need to do reference_time + time
+        // if absolute timestamps : need to do 0 + time
+        // to get RELATIVE time:
+        // if relative: need to return time - 0
+        // if absolute: need to return time - events[0].time
+
+        // so: we need two variables: addTime and subtractTime
+
         this.timeIndex = eventFieldNames.indexOf("time"); // typically 0
         if ( this.timeIndex === -1 ){
             this.timeIndex = eventFieldNames.indexOf("relative_time"); // typically 0
@@ -421,21 +457,25 @@ export class EventFieldsParser implements IQlogEventParser {
                 console.error("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!", trace.eventFieldNames);
             }
             else {
-                this.timeTrackingMethod = TimeTrackingMethod.REFERENCE_TIME;
+                // Timestamps are in RELATIVE time
+                this.timeTrackingMethod = TimeTrackingMethod.RELATIVE_TIME;
 
                 if ( trace.commonFields && trace.commonFields.reference_time !== undefined ){
-                    this.startTime = parseFloat(trace.commonFields.reference_time);
+                    this.addTime = parseFloat(trace.commonFields.reference_time);
+                    this.subtractTime = 0;
                 }
                 else {
                     console.error("QlogLoader: Using relative_time but no reference_time found in common_fields. Assuming 0.", trace.eventFieldNames, trace.commonFields);
-                    this.startTime = 0;
+                    this.addTime = 0;
+                    this.subtractTime = 0;
                 }
             }
         }
         else{
-            this.timeTrackingMethod = TimeTrackingMethod.RAW;
-            this.startTime = parseFloat( trace.getEvents()[0][this.timeIndex] );
-            this.subtractTime = this.startTime;
+            // Timestamps are in ABSOLUTE time
+            this.timeTrackingMethod = TimeTrackingMethod.ABSOLUTE_TIME;
+            this.addTime = 0;
+            this.subtractTime = parseFloat( trace.getEvents()[0][this.timeIndex] );
         }
 
         if ( trace.configuration && trace.configuration.time_units && trace.configuration.time_units === "us" ){
@@ -446,7 +486,8 @@ export class EventFieldsParser implements IQlogEventParser {
             this._timeOffset = parseFloat( trace.configuration.time_offset ) * this.timeMultiplier;
         }
 
-        this.startTime *= this.timeMultiplier;
+        this.addTime        *= this.timeMultiplier;
+        this.subtractTime   *= this.timeMultiplier;
     }
 
     public load( evt:IQlogRawEvent ) : IQlogEventParser {
@@ -461,12 +502,16 @@ export class PreSpecEventParser implements IQlogEventParser {
 
     private currentEvent:IQlogRawEvent|undefined;
 
-    public get time():number {
-        return this.timeWithCustomOffset(0);
+    public get relativeTime():number {
+        return parseFloat( (this.currentEvent as IQlogRawEvent)[0] );
     }
-    
-    public timeWithCustomOffset( offsetInMs:number ):number {
-        return parseFloat( (this.currentEvent as IQlogRawEvent)[0] ) + offsetInMs;
+
+    public get absoluteTime():number {
+        return this.relativeTime;
+    }
+
+    public getAbsoluteStartTime():number {
+        return 0;
     }
 
     public get category():string {

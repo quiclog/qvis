@@ -108,7 +108,7 @@ export default class SequenceDiagramCanvasRenderer {
                 }
 
                 const evt = traces[t].getEvents()[ heads[t] ];
-                const time = traces[t].parseEvent(evt).time;
+                const time = traces[t].parseEvent(evt).relativeTime;
                 
                 if ( time < currentMinimumValue ){
                     currentMinimumTrace = t;
@@ -120,7 +120,7 @@ export default class SequenceDiagramCanvasRenderer {
             // TODO: make sure coordinates for the same timestamp are the same across traces (in the same trace, it should shift down, and also shift other traces down. What do you mean "complex"?)
             // TODO: allow skipping of large periods of inactivity
             this.createPrivateNamespace(currentMinimumEvent);
-            (currentMinimumEvent as any).qvis.sequencediagram.y = traces[currentMinimumTrace].parseEvent(currentMinimumEvent).time * pixelsPerMillisecond; // DEBUG_totalCount * pixelsPerMillisecond;
+            (currentMinimumEvent as any).qvis.sequencediagram.y = traces[currentMinimumTrace].parseEvent(currentMinimumEvent).relativeTime * pixelsPerMillisecond; // DEBUG_totalCount * pixelsPerMillisecond;
             ++DEBUG_totalCount;
 
             maxCoordinate = (currentMinimumEvent as any).qvis.sequencediagram.y;

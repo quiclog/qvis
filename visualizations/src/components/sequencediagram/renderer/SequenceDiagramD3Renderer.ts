@@ -47,7 +47,7 @@ export default class SequenceDiagramD3Renderer {
 
     private scrollHandler:((e:any) => void) | undefined = undefined;
 
-    
+    private absoluteAggregatedStartTime!:number;
     private renderedRanges!:Array<VerticalRange>;
     private rangeHeight!:number;
     private shortenedIntervals:Array<Interval> = new Array<Interval>();
@@ -418,7 +418,7 @@ export default class SequenceDiagramD3Renderer {
 
             let guessedPerspective = qlog.VantagePointType.server; // server is a logical default, probably more of those available
             if ( firstInitialSent && firstInitialReceived ) {
-                if ( firstInitialSent.time < firstInitialReceived.time ){
+                if ( firstInitialSent.absoluteTime < firstInitialReceived.absoluteTime ){
                     guessedPerspective = qlog.VantagePointType.client;
                 }
             }
@@ -502,7 +502,7 @@ export default class SequenceDiagramD3Renderer {
             this.createPrivateNamespace(serverConnection.connection);
             (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset = serverConnection.timeOffset ;
 
-            return; 
+            return;
         }
 
         // was already calculated or manually overridden in a previous viewing of this file
@@ -522,7 +522,7 @@ export default class SequenceDiagramD3Renderer {
         // as such, if we take the time between the client sending their INITIAL and receiving the first packet from the server,
         // assuming there was no weird loss or jitter, we have an initial RTT estimate.
         // However, some implementations might also log metric_update events, containing the rtt! so first look for those!
-        let latencyOneWay = -1;
+        let latencyOneWay = Number.MIN_SAFE_INTEGER;
 
         const clientMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
         for ( const evt of clientMetricUpdates ){
@@ -534,12 +534,13 @@ export default class SequenceDiagramD3Renderer {
                 latencyOneWay = update.smoothed_rtt / 2;
             }
 
-            if ( latencyOneWay > -1 ) {
+            if ( latencyOneWay !== Number.MIN_SAFE_INTEGER ) {
+                latencyOneWay = clientConnection.connection.getEventParser().timeToMilliseconds(latencyOneWay); // latencies could be in microseconds in the events, convert them here
                 break;
             }
         }
 
-        if ( latencyOneWay === -1 ){
+        if ( latencyOneWay === Number.MIN_SAFE_INTEGER ){
 
             const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
             for ( const evt of serverMetricUpdates ){ 
@@ -551,74 +552,81 @@ export default class SequenceDiagramD3Renderer {
                     latencyOneWay = update.smoothed_rtt / 2;
                 }
 
-                if ( latencyOneWay > -1 ) {
+                if ( latencyOneWay !== Number.MIN_SAFE_INTEGER ) {
+                    latencyOneWay = serverConnection.connection.getEventParser().timeToMilliseconds(latencyOneWay); // latencies could be in microseconds in the events, convert them here
                     break;
                 }
             }
         }
 
-        if ( latencyOneWay === -1 ) {
-            let initialSent:IQlogRawEvent|undefined = undefined;
-            let initialReceived:IQlogRawEvent|undefined = undefined;
-            let serverInitialReceived:IQlogRawEvent|undefined = undefined;
+        let initialSent:IQlogRawEvent|undefined = undefined;
+        let initialReceived:IQlogRawEvent|undefined = undefined;
+        let serverInitialReceived:IQlogRawEvent|undefined = undefined;
 
-            for ( const rawEvt of clientConnection.connection.getEvents() ) {
-                const evt = clientConnection.connection.parseEvent( rawEvt );
+        for ( const rawEvt of clientConnection.connection.getEvents() ) {
+            const evt = clientConnection.connection.parseEvent( rawEvt );
 
-                if ( evt.name === qlog.TransportEventType.packet_sent &&
-                     evt.data.packet_type === qlog.PacketType.initial && 
-                     evt.data.header.packet_number === "0" ) {
-                        initialSent = rawEvt;
-                        continue;
-                }
-
-                if ( evt.name === qlog.TransportEventType.packet_received &&
+            if ( evt.name === qlog.TransportEventType.packet_sent &&
                     evt.data.packet_type === qlog.PacketType.initial && 
                     evt.data.header.packet_number === "0" ) {
-                       initialReceived = rawEvt;
-                }
-
-                if ( initialSent && initialReceived ) {
-                    break;
-                }
+                    initialSent = rawEvt;
+                    continue;
             }
 
-            for ( const rawEvt of serverConnection.connection.getEvents() ) {
-                const evt = serverConnection.connection.parseEvent( rawEvt );
-
-                if ( evt.name === qlog.TransportEventType.packet_received &&
-                    evt.data.packet_type === qlog.PacketType.initial && 
-                    evt.data.header.packet_number === "0" ) {
-                        serverInitialReceived = rawEvt;
-                }
-
-                if ( serverInitialReceived ) {
-                    break;
-                }
+            if ( evt.name === qlog.TransportEventType.packet_received &&
+                evt.data.packet_type === qlog.PacketType.initial && 
+                evt.data.header.packet_number === "0" ) {
+                    initialReceived = rawEvt;
             }
 
-            if (initialSent && initialReceived && serverInitialReceived){
-                const rtt = clientConnection.connection.parseEvent(initialReceived).time - clientConnection.connection.parseEvent(initialSent).time;
-                if (rtt <= 0 ){
-                    console.error("SequenceDiagramD3Renderer:calculateTimeOffset : initial received is earlier than sent! ", rtt);
+            if ( initialSent && initialReceived ) {
+                break;
+            }
+        }
+
+        for ( const rawEvt of serverConnection.connection.getEvents() ) {
+            const evt = serverConnection.connection.parseEvent( rawEvt );
+
+            if ( evt.name === qlog.TransportEventType.packet_received &&
+                evt.data.packet_type === qlog.PacketType.initial && 
+                evt.data.header.packet_number === "0" ) {
+                    serverInitialReceived = rawEvt;
+            }
+
+            if ( serverInitialReceived ) {
+                break;
+            }
+        }
+
+        if (initialSent && initialReceived && serverInitialReceived){
+            if (latencyOneWay === Number.MIN_SAFE_INTEGER ){
+                // only if wasn't derived from metric_updates. We assume those are always correct
+                latencyOneWay = (clientConnection.connection.parseEvent(initialReceived).absoluteTime - clientConnection.connection.parseEvent(initialSent).absoluteTime) / 2;
+                if (latencyOneWay <= 0 ){
+                    console.error("SequenceDiagramD3Renderer:calculateTimeOffset : initial received is earlier than sent! ", latencyOneWay);
 
                     return;
                 }
+            }
 
-                // so, we now know at what time we would like the serverInitialReceived to have happened (clientInitialSent + rtt/2)
-                // so we see where it is right now, then offset by that
-                const serverReceiveTime = serverConnection.connection.parseEvent(serverInitialReceived).time;
-                const expectedServerReceiveTime = clientConnection.connection.parseEvent(initialSent).time + rtt / 2;
-                if ( serverReceiveTime > expectedServerReceiveTime ){
-                    latencyOneWay = serverReceiveTime - expectedServerReceiveTime;
-                }
-                else {
-                    latencyOneWay = expectedServerReceiveTime - serverReceiveTime;
-                }
+            // so, we now know at what time we would like the serverInitialReceived to have happened (clientInitialSent + latencyOneWay)
+            // so we see where it is right now, then offset by that
+            // NOTE: if the two clocks are not in sync globally, this might still be off a bit, but nothing we can do about that automagically
+            const serverReceiveTime = serverConnection.connection.parseEvent(serverInitialReceived).absoluteTime;
+            const expectedServerReceiveTime = clientConnection.connection.parseEvent(initialSent).absoluteTime + latencyOneWay;
+            if ( serverReceiveTime > expectedServerReceiveTime ){
+                latencyOneWay = serverReceiveTime - expectedServerReceiveTime;
+            }
+            else {
+                latencyOneWay = expectedServerReceiveTime - serverReceiveTime;
             }
         }
+        else {
+            // we can't accurately calculate the actual offset just from the metric_updates, so abort
+            latencyOneWay = Number.MIN_SAFE_INTEGER;
+        }
 
-        if (latencyOneWay === -1 ) {
+        if (latencyOneWay === Number.MIN_SAFE_INTEGER ) {
             return;
         }
 
@@ -646,12 +654,19 @@ export default class SequenceDiagramD3Renderer {
         const heads:Array<number> = new Array<number>( traces.length ).fill(0); // points to the current index of each trace we're looking at
         const trackers:Array< CoordinateTracker > = new Array<CoordinateTracker>();
 
+        this.absoluteAggregatedStartTime = Number.MAX_VALUE;
+
         for ( const trace of traces ){
+            // a. initiate trackers
             const tracker:CoordinateTracker = {
                 timestamp: 0,
                 y: 0,
             }
             trackers.push( tracker );
+
+            // b. calculate absolute starting time
+            // separate loop would be cleaner, but less performant ;)
+            this.absoluteAggregatedStartTime = Math.min( this.absoluteAggregatedStartTime, trace.connection.getEventParser().getAbsoluteStartTime() );
         }
 
         let done = false;
@@ -681,7 +696,7 @@ export default class SequenceDiagramD3Renderer {
                 const timeOffset = traces[t].timeOffset;
 
                 const evt = trace.getEvents()[ heads[t] ];
-                const time = trace.parseEvent(evt).timeWithCustomOffset(timeOffset);
+                const time = trace.parseEvent(evt).absoluteTime - this.absoluteAggregatedStartTime + timeOffset; // timeWithCustomOffset(timeOffset);
                 
                 // < instead of <= so we always favor rendering a single trace as long as possible before switching to the next. 
                 // Important for overlap prevention.
@@ -1100,7 +1115,7 @@ export default class SequenceDiagramD3Renderer {
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
-                    let timeText:any = evt.timeWithCustomOffset(trace.timeOffset);
+                    let timeText:any = evt.absoluteTime - this.absoluteAggregatedStartTime + trace.timeOffset;
                     timeText = timeText.toFixed(2);
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('class', "timestamp");

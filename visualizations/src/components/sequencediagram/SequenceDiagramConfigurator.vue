@@ -18,8 +18,8 @@
                         :canBeRemoved="(config.connections.length > 2 && index != 0)" 
                         
                         :onConnectionSelected="onConnectionSelected.bind(this, index)" 
-                        :onRemoved="onConnectionRemoved.bind(this,index)" 
-                        :onNumericalValueChanged="onTimeOffsetChange.bind(this,index)" />
+                        :onRemoved="onConnectionRemoved.bind(this, index)" 
+                        :onNumericalValueChanged="onTimeOffsetChange.bind(this, index)" />
                 </b-row>
         </b-container>
     <!--
@@ -84,6 +84,7 @@
 
             // Vue.set(this.config.connections, connectionIndex, connection);
             // if we selected a group with just 1, we probably want to auto-generate its counterpart, so de-select any others we might have had before
+            // However, only if it's the leftmost selector. Otherwise, it might be we're manually selecting e.g., a server trace from another file 
             if ( connectionIndex === 0 && connection.parent.getConnections().length === 1 ){
                 const connections = connection.parent.getConnections();
                 this.config.connections = [ SequenceDiagramConfig.createConnectionWithTimeoffset( connections[0] ) ];
@@ -97,8 +98,9 @@
                 const secondPerspective = secondConnection.getVantagePointPerspective();
 
                 if ( firstPerspective === secondPerspective ){
-                    // they are the same, just take the first
-                    this.config.connections = [ SequenceDiagramConfig.createConnectionWithTimeoffset(firstConnection) ];
+                    // They are the same, so no client + server. This is typically in a file that uses group_id
+                    // We just take the one that was selected
+                    this.config.connections = [ SequenceDiagramConfig.createConnectionWithTimeoffset(connection) ];
                 }
                 else if ( firstPerspective === qlog.VantagePointType.client ){
                     this.config.connections = [ SequenceDiagramConfig.createConnectionWithTimeoffset(firstConnection), SequenceDiagramConfig.createConnectionWithTimeoffset(secondConnection)];
@@ -131,6 +133,10 @@
 
                 this.config.connections = renderables;
             }
+
+            // TODO: try to be clever with (group_id? and) ODCID across trace files
+            // e.g., if you have 1 file with a bunch of client traces, go looking for another file with a server trace with the same ODCID
+
             else {
                 // Vue reactivity cannot detect direct index-based changes to an array, i.e.,
                 // this.config.connections[connectionIndex] = connection;
