@@ -3,7 +3,7 @@
         <!--<div>{{(config ? config.manualRTT + " - " + config.scale : "UNKNOWN" )}}</div>-->
         <!--<b-button @click="adjustConfigTest()">Adjust config</b-button> -->
 
-        <p style="margin-top: 10px;">Select one or more traces via the dropdown(s) below to visualize them in the sequence diagram</p>
+        <p style="padding-top: 10px;">Select one or more traces via the dropdown(s) below to visualize them in the sequence diagram</p>
         <b-container fluid>
                 <b-row>
                     <!-- Note: adding connection.timeOffset to the :key is PARAMOUNT to getting reactivity working! -->
@@ -31,8 +31,11 @@
         </div>
     -->
 
-        <b-button @click="addConnection()">Add trace</b-button><!-- &#43; PLUS + -->
+        <b-button @click="selectDefault()">Add trace</b-button><!-- &#43; PLUS + -->
         <b-alert v-if="connectionIsUnknownPerspective" show variant="danger">The selected trace has an unknown vantage point. We guessed it based on heuristics, but this could be wrong!</b-alert>
+
+        <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">You have to load trace files first before you can visualize them</b-alert>
+        <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
     </div>
 </template>
 
@@ -159,15 +162,20 @@
             // }
         }
 
-        public created(){
-            // TODO: remove, only for debugging
-            if ( this.config.connections.length === 0 ){
-                this.addConnection();
+        public mounted(){
+            if ( this.config.connections.length === 0 && this.store.groups.length > 0 ){
+                this.selectDefault();
             }
         }
 
-        public addConnection(){
-            console.log("addConnection: adding new connection configurator");
+        public updated(){
+            if ( this.config.connections.length === 0 && this.store.groups.length > 0 ){
+                this.selectDefault();
+            }
+        }
+
+        protected selectDefault(){
+            console.log("selectDefault: adding new default connection configurator", this.store.groups);
             this.config.connections.push( SequenceDiagramConfig.createConnectionWithTimeoffset(this.store.groups[0].getConnections()[0]) );
         }
 

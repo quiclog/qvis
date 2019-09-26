@@ -6,8 +6,11 @@
                 <p style="margin-top: 10px;">Select a file via the dropdown(s) below to view its statistics</p>
             </b-row>
             <b-row align-h="center">
-                <ConnectionConfigurator :allGroups="store.groups" :group="config.group" :canBeRemoved="false" :allowGroupSelection="true" :allowConnectionSelection="false" :onGroupSelected="onGroupSelected" />
+                <ConnectionConfigurator v-if="config.group !== undefined" :allGroups="store.groups" :group="config.group" :canBeRemoved="false" :allowGroupSelection="true" :allowConnectionSelection="false" :onGroupSelected="onGroupSelected" />
             </b-row>
+
+            <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">You have to load trace files first before you can visualize them</b-alert>
+            <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
         </b-container>
 
     </div>
@@ -45,23 +48,29 @@
 
         public store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
-        public created(){
-            // TODO: remove, only for debugging
-            if ( this.config.group === undefined ){
-                this.setDummyGroup();
-            }
-        }
-
         public onGroupSelected(group:ConnectionGroup) {
             console.log("StatisticsConfigurator:onGroupSelected : ", this.config, group);
 
             this.config.group = group;
         }
 
-        protected setDummyGroup(){
-            console.log("StatisticsConfigurator:setDummyGroup : adding new connection configurator");
+        public mounted(){
+            if ( this.config.group === undefined && this.store.groups.length > 0 ){
+                this.selectDefault();
+            }
+        }
+
+        public updated(){
+            if ( this.config.group === undefined && this.store.groups.length > 0 ){
+                this.selectDefault();
+            }
+        }
+
+        protected selectDefault(){
+            console.log("selectDefault: adding new default connection configurator", this.store.groups);
             this.config.group = ( this.store.groups[0] );
         }
+
     }
 
 </script>

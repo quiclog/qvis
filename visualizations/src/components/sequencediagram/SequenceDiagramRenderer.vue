@@ -47,7 +47,7 @@
 
         public mounted(){
             // mainly for when we switch away, and then back to the sequenceDiagram
-            if ( this.config && this.renderer ) {
+            if ( this.config && this.renderer && this.config.connections.length > 0 ) {
                 this.renderer.render( this.config.connections );
             }
         }

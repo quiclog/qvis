@@ -99,12 +99,10 @@
         }
 
         protected hideLegend(evt:any) {
-            console.log("Hiding legend ", evt);
             evt.target.classList.add("hiddenLegend");
         }
 
         protected showLegend(evt:any) {
-            console.log("Showing legend ", evt);
             evt.target.classList.remove("hiddenLegend");
         }
 

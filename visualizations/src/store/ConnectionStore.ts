@@ -10,16 +10,25 @@ import Vue from 'vue';
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
 
+    // WARNING : do not use an _ to prefix a variable, this doesn't play well with Vue(x) internals!
     protected grouplist:Array<QlogConnectionGroup> = new Array<QlogConnectionGroup>();
-    protected dummyConnection!:QlogConnection;
+    protected outstandingRequests:number = 0;
 
     public constructor(moduler: Modx<ThisType<{}>, any>){
         super(moduler); 
-        this.dummyConnection = this.createDummyConnection(); 
     }
 
     get groups(): Array<QlogConnectionGroup> {
         return this.grouplist;
+    }
+
+    get outstandingRequestCount(): number {
+        return this.outstandingRequests;
+    }
+
+    @Mutation
+    public adjustOutstandingRequestCount(amount:number) {
+        this.outstandingRequests += amount;
     }
 
     @Mutation
@@ -133,9 +142,13 @@ export default class ConnectionStore extends VuexModule {
                 url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
             }
 
+            this.context.commit("adjustOutstandingRequestCount", 1 );
+
             // for documentation on the expected form of these parameters,
             // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
             const apireturns:any = await axios.get(url, { params: queryParameters });
+
+            this.context.commit("adjustOutstandingRequestCount", -1);
 
             if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
@@ -176,6 +189,8 @@ export default class ConnectionStore extends VuexModule {
             }
         }
         catch (e) {
+            this.context.commit('adjustOutstandingRequestCount', -1);
+
             console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", e, queryParameters);
 
             Vue.notify({
@@ -206,8 +221,12 @@ export default class ConnectionStore extends VuexModule {
             text: "Loading qlog file \"" + filename + "\" from URL " + url + ". Large files can take a while to load.",
         });
 
+        this.context.commit("adjustOutstandingRequestCount", 1 );
+
         axios.get( url, {responseType: "json"} )
         .then( (res:AxiosResponse<any> ) => {
+
+            this.context.commit("adjustOutstandingRequestCount", -1 );
 
             const fileContents:any = res.data;
 
@@ -234,6 +253,8 @@ export default class ConnectionStore extends VuexModule {
             }
         })  
         .catch( (e) => {
+            this.context.commit("adjustOutstandingRequestCount", -1 );
+            
             Vue.notify({
                 group: "default",
                 title: "ERROR loading " + filename,
@@ -242,23 +263,5 @@ export default class ConnectionStore extends VuexModule {
                 text: "This file could not be loaded from " + url + ".<br/>View the devtools JavaScript console for more information. " + e,
             });
         })
-    }
-    
-    protected createDummyConnection() : QlogConnection{
-
-        // We need a way to represent an empty connection in the UI
-        // We can do this with a null-value but that requires us to check for NULL everywhere...
-        // We chose the option of providing an empty dummy connection instead, that has no events and minimal other metadata
-
-        const dummyGroup:QlogConnectionGroup = new QlogConnectionGroup();
-        dummyGroup.description = "None";
-        dummyGroup.title = "None";
-
-        const output:QlogConnection = new QlogConnection(dummyGroup);
-        output.title = "None";
-
-        this.grouplist.push( dummyGroup ); 
-
-        return output;
     }
 }

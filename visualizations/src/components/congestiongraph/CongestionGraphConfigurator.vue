@@ -6,7 +6,7 @@
                 <p  style="margin-top: 10px;">Select a trace via the dropdown(s) below to visualize it in the congestion graph</p>
             </b-row>
             <b-row align-h="center">
-                <ConnectionConfigurator :allGroups="store.groups" :connection="config.connection" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />
+                <ConnectionConfigurator v-if="config.connection !== undefined" :allGroups="store.groups" :connection="config.connection" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />
             </b-row>
             <b-row align-h="center">
                 <b-button @click="resetZoom()">Reset zoom</b-button>
@@ -15,6 +15,10 @@
                 <b-button @click="toggleCongestionGraph()">Toggle congestion info</b-button>
                 <b-button @click="togglePerspective()" v-if="isClientSideTrace"  v-b-tooltip.hover title="You have selected a trace from a client-side perspective, while this tool works best for server-side. Press this button to simulate a server-side view (by swapping packet_sent and packet_received)" variant="danger">Toggle perspective</b-button>
             </b-row>
+
+            <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">You have to load trace files first before you can visualize them</b-alert>
+            <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
+
         </b-container>
 
     </div>
@@ -52,22 +56,10 @@
 
         public store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
-        public created(){
-            // TODO: remove, only for debugging
-            if ( this.config.connection === undefined ){
-                this.setConnection();
-            }
-        }
-
         public onConnectionSelected(connection:Connection) {
             console.log("CongestionGraphConfigurator:onConnectionSelected : ", this.config, connection);
 
             this.config.connection = connection;
-        }
-
-        public setConnection(){
-            console.log("addConnection: adding new connection configurator");
-            this.config.connection = ( this.store.groups[0].getConnections()[0] );
         }
 
         public resetZoom(){
@@ -100,6 +92,23 @@
                     this.config.connection && 
                     this.config.connection.vantagePoint && 
                     (this.config.connection.vantagePoint.type === qlog.VantagePointType.client || this.config.connection.vantagePoint.flow === qlog.VantagePointType.client);
+        }
+
+        public mounted(){
+            if ( this.config.connection === undefined && this.store.groups.length > 0 ){
+                this.selectDefault();
+            }
+        }
+
+        public updated(){
+            if ( this.config.connection === undefined && this.store.groups.length > 0 ){
+                this.selectDefault();
+            }
+        }
+
+        protected selectDefault(){
+            console.log("selectDefault: adding new default connection configurator", this.store.groups);
+            this.config.connection = ( this.store.groups[0].getConnections()[0] );
         }
     }
 

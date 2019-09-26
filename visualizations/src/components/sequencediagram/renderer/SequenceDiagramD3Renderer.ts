@@ -71,7 +71,7 @@ export default class SequenceDiagramD3Renderer {
             return false;
         }
 
-        console.log("SequenceDiagramRenderer:render", traces);
+        console.log("SequenceDiagramD3Renderer:render", traces.length, traces);
 
         this.selectedTraces = traces;
         this.rendering = true;
@@ -654,6 +654,10 @@ export default class SequenceDiagramD3Renderer {
         const heads:Array<number> = new Array<number>( traces.length ).fill(0); // points to the current index of each trace we're looking at
         const trackers:Array< CoordinateTracker > = new Array<CoordinateTracker>();
 
+        // we need to compare / draw timestamps on a single, absolute timeline (mostly: unix timestamps)
+        // However, we don't want to render our times as unix timestamps, as that's not very nice to look at
+        // So, we figure out the start of our "relative" timline, which is the time the earliest of our traces starts
+        // That is then time "0" and all the rest is shown relative to this. This time "0" is the absoluteAggregatedStartTime
         this.absoluteAggregatedStartTime = Number.MAX_VALUE;
 
         for ( const trace of traces ){

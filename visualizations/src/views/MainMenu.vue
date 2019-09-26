@@ -23,16 +23,16 @@
             <b-col cols="1" md="auto" class="align-middle"><h3 style="width: 290px;">qvis</h3></b-col>
             <b-col>
                 <b-nav tabs align="center">
-                    <b-nav-item to="/files" class="files-link" :active="this.$route.fullPath === '/files' || $route.fullPath === ''">
+                    <b-nav-item to="/files" class="files-link" :active="this.$route.fullPath.indexOf('/files') >= 0 || $route.fullPath === ''">
                         Manage files
                     </b-nav-item>
-                    <b-nav-item to="/sequence" class="sequence-link" :active="$route.fullPath === '/sequence'">
+                    <b-nav-item to="/sequence" class="sequence-link" :active="$route.fullPath.indexOf('/sequence') >= 0">
                         Sequence
                     </b-nav-item>
-                    <b-nav-item to="/congestion" class="congestion-link" :active="$route.fullPath === '/congestion'">
+                    <b-nav-item to="/congestion" class="congestion-link" :active="$route.fullPath.indexOf('/congestion') >= 0">
                         Congestion
                     </b-nav-item>
-                    <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath === '/stats'">
+                    <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath.indexOf('/stats') >= 0">
                         qlog stats
                     </b-nav-item>
                 </b-nav>
