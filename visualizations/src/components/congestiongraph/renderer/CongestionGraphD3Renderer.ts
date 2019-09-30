@@ -34,6 +34,71 @@ export default class CongestionGraphD3Renderer {
         this.containerID = containerID;
     }
 
+    public useBrushX(){
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 1);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+    }
+
+    public useBrush2d(){
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 1);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+    }
+
+    public usePanning(){
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 1);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+    }
+
+    public useSelection(){
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 1);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+    }
+
+    public usePicker(){
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 1);
+    }
+
+    public toggleCongestionGraph(){
+        this.mainGraphState.congestionGraphEnabled = this.mainGraphState.congestionGraphEnabled ? false : true;
+
+        this.redrawCanvas(
+            this.mainGraphState.currentPerspective().rangeX[0], 
+            this.mainGraphState.currentPerspective().rangeX[1], 
+            this.mainGraphState.currentPerspective().rangeY[0], 
+            this.mainGraphState.currentPerspective().rangeY[1]);
+    }
+
+    public togglePerspective(){
+        this.setPerspective(this.mainGraphState.useSentPerspective ? false : true, true);
+    }
+
+    public resetZoom(){
+        this.mainGraphState.currentPerspective().rangeX = this.mainGraphState.currentPerspective().originalRangeX;
+        this.mainGraphState.currentPerspective().rangeY = this.mainGraphState.currentPerspective().originalRangeY;
+
+        this.redrawCanvas(
+            this.mainGraphState.currentPerspective().rangeX[0], 
+            this.mainGraphState.currentPerspective().rangeX[1], 
+            this.mainGraphState.currentPerspective().rangeY[0], 
+            this.mainGraphState.currentPerspective().rangeY[1]);
+    }
+
     public render(config:CongestionGraphConfig) {
         if ( this.rendering ) {
             return;
@@ -74,7 +139,7 @@ export default class CongestionGraphD3Renderer {
 
     // Called on first render only
     // Init elements that are used across multiple renders
-    private init() {
+    protected init() {
         // The eventBus can be used for firing events and listening to them
         // It is currently used for clicking events on packets
         // and transmits which packet has been clicked on
@@ -336,7 +401,8 @@ export default class CongestionGraphD3Renderer {
 
         // Find the extrema for each axis which we can use for the domains of the scales
         const [minCongestionY, maxCongestionY, minRTT, maxRTT] = this.findMetricUpdateExtrema();
-        const [localXMin, localXMax] = [settings.minX && settings.minX > 0 ? settings.minX : 0, settings.maxX && settings.maxX < this.mainGraphState.sent.originalRangeX[1] ? settings.maxX : this.mainGraphState.sent.originalRangeX[1]];
+        const [localXMin, localXMax] = [settings.minX && settings.minX > 0 ? settings.minX : 0, 
+                                        settings.maxX && settings.maxX < this.mainGraphState.sent.originalRangeX[1] ? settings.maxX : this.mainGraphState.sent.originalRangeX[1]];
         const [localMinY, localMaxY] = this.findYExtrema(localXMin, localXMax);
 
         // Make the congestion graph take up only 1/3 of the vertical screen space
@@ -436,7 +502,8 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.useSentPerspective = false;
 
         // Find the extrema for each axis which we can use for the domains of the scales
-        const [localXMin, localXMax] = [settings.minX && settings.minX > 0 ? settings.minX : 0, settings.maxX && settings.maxX < this.mainGraphState.received.originalRangeX[1] ? settings.maxX : this.mainGraphState.received.originalRangeX[1]];
+        const [localXMin, localXMax] = [settings.minX && settings.minX > 0 ? settings.minX : 0, 
+                                        settings.maxX && settings.maxX < this.mainGraphState.received.originalRangeX[1] ? settings.maxX : this.mainGraphState.received.originalRangeX[1]];
         const [localMinY, localMaxY] = this.findYExtrema(localXMin, localXMax);
 
         // Create the scales with domains based on the extrema we just found
@@ -483,7 +550,10 @@ export default class CongestionGraphD3Renderer {
 
     // Redraw canvas using the current set boundaries (stored in rangeX and rangeY for the current perspective)
     private async renderParts(){
-        this.redrawCanvas(this.mainGraphState.currentPerspective().rangeX[0], this.mainGraphState.currentPerspective().rangeX[1], this.mainGraphState.currentPerspective().rangeY[0], this.mainGraphState.currentPerspective().rangeY[1])
+        this.redrawCanvas(this.mainGraphState.currentPerspective().rangeX[0], 
+                          this.mainGraphState.currentPerspective().rangeX[1], 
+                          this.mainGraphState.currentPerspective().rangeY[0], 
+                          this.mainGraphState.currentPerspective().rangeY[1]);
     }
 
     // Y corresponds to coordinates for data sent/received in bytes
@@ -574,25 +644,25 @@ export default class CongestionGraphD3Renderer {
         if (this.mainGraphState.useSentPerspective) {
             // Congestion
             if (this.mainGraphState.congestionGraphEnabled) {
-                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.metricUpdateLines["bytes"].map((point) => {
+                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.bytes.map((point) => {
                     return [ this.mainGraphState.sent.xScale!(point[0]), this.mainGraphState.sent.yCongestionScale!(point[1]) ];
                 }), "#808000", this.drawCircle);
 
-                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.metricUpdateLines["cwnd"].map((point) => {
+                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.cwnd.map((point) => {
                     return [ this.mainGraphState.sent.xScale!(point[0]), this.mainGraphState.sent.yCongestionScale!(point[1]) ];
                 }), "#8A2BE2", this.drawCross);
             }
 
             // RTT
-            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines["minRTT"].map((point) => {
+            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.minRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
             }), "#C96480", undefined);
 
-            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines["smoothedRTT"].map((point) => {
+            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.smoothedRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
             }), "#8a554a", undefined);
 
-            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines["lastRTT"].map((point) => {
+            this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.lastRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
             }), "#ff9900", undefined);
         }
@@ -609,7 +679,12 @@ export default class CongestionGraphD3Renderer {
         canvasContext.fill();
     }
 
-    private drawLines(canvasContext: CanvasRenderingContext2D, pointList: Array<[number, number]>, color: string, tickDrawFunction: ((canvasContext: CanvasRenderingContext2D, x: number, y: number, color: string) => void) | undefined) {
+    private drawLines(
+        canvasContext: CanvasRenderingContext2D, 
+        pointList: Array<[number, number]>, 
+        color: string, 
+        tickDrawFunction: ((canvasContext: CanvasRenderingContext2D, x: number, y: number, color: string) => void) | undefined,
+    ) {
         canvasContext.lineWidth = 1 * this.mainGraphState.currentPerspective().drawScaleX;
         if (pointList.length > 0) {
             canvasContext.beginPath();
@@ -675,7 +750,11 @@ export default class CongestionGraphD3Renderer {
         }
 
         if (redraw) {
-            this.redrawCanvas(this.mainGraphState.currentPerspective().rangeX[0], this.mainGraphState.currentPerspective().rangeX[1], this.mainGraphState.currentPerspective().rangeY[0], this.mainGraphState.currentPerspective().rangeY[1])
+            this.redrawCanvas(
+                this.mainGraphState.currentPerspective().rangeX[0], 
+                this.mainGraphState.currentPerspective().rangeX[1], 
+                this.mainGraphState.currentPerspective().rangeY[0], 
+                this.mainGraphState.currentPerspective().rangeY[1] );
         }
     }
 
@@ -1008,7 +1087,9 @@ export default class CongestionGraphD3Renderer {
 
         // Cap at full fit
         const newLeftX = mouseX - zoomedLeftPortion >= 0 ? mouseX - zoomedLeftPortion : 0;
-        const newRightX = mouseX + zoomedRightPortion <= this.mainGraphState.currentPerspective().originalRangeX[1] ? mouseX + zoomedRightPortion : this.mainGraphState.currentPerspective().originalRangeX[1];
+        const newRightX = mouseX + zoomedRightPortion <= this.mainGraphState.currentPerspective().originalRangeX[1] 
+                            ? mouseX + zoomedRightPortion 
+                            : this.mainGraphState.currentPerspective().originalRangeX[1];
 
         const [newTopY, newBottomY] = this.findYExtrema(newLeftX, newRightX);
 
@@ -1017,6 +1098,7 @@ export default class CongestionGraphD3Renderer {
     }
 
     private onPan() {
+        // tslint:disable-next-line:no-bitwise
         if (d3.event.buttons & 1) { // Primary button pressed and moving
             // Transform mouse coordinates to graph coordinates
             const graphX = this.mainGraphState.currentPerspective().xScale!.invert(d3.mouse(d3.event.currentTarget)[0]);
@@ -1026,14 +1108,15 @@ export default class CongestionGraphD3Renderer {
             if (this.previousMouseX === null || this.previousMouseY === null) {
                 this.previousMouseX = graphX;
                 this.previousMouseY = graphY;
+
                 return;
             }
 
             const panAmountX = (this.mainGraphState.currentPerspective().rangeX[1] - this.mainGraphState.currentPerspective().rangeX[0]) / this.mainGraphState.innerWidth;
             const panAmountY = (this.mainGraphState.currentPerspective().rangeY[1] - this.mainGraphState.currentPerspective().rangeY[0]) / this.mainGraphState.innerHeight;
 
-            let deltaX = d3.event.movementX * panAmountX * -1;// graphX - previousX;
-            let deltaY = d3.event.movementY * panAmountY;// graphY - previousY;
+            const deltaX = d3.event.movementX * panAmountX * -1;// graphX - previousX;
+            const deltaY = d3.event.movementY * panAmountY;// graphY - previousY;
 
             this.panCanvas(deltaX, deltaY);
 
@@ -1052,6 +1135,9 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.packetInformationDiv!.select("#ackedTo").text("");
     }
 
+    
+
+    
     // Hovering over a packet gives a tooltip displaying information about the packet
     // Hovering over an ACK packet also draws an indicator towards the corresponding packets it has ACKed
     // Picking is done based on y coordinate of the cursor and the color of the pixel the mouse hovers over
@@ -1099,6 +1185,7 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedPacketTime);
                     this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedPacketData.header.packet_number);
                     this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedPacketData.header.packet_size);
+
                     return;
                 } else if (pixelColor[0] === 107 && pixelColor[1] === 142 && pixelColor[2] === 35 ) {
                     // Packet was of type 'ack' => extract the ack packet from the 'packet_sent/packet_received'-packet (stored in var packet/parsedPacket)
@@ -1144,13 +1231,17 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.relativeTime);
                         this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedLostPacket.data.header.packet_number);
                         this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.header.packet_size);
+                        
                         return;
                 }
             }
         }
     }
 
-    private panCanvas(deltaX: number, deltaY: number){
+    private panCanvas(deltaXin: number, deltaYin: number){
+        let deltaX = deltaXin;
+        let deltaY = deltaYin;
+
         // Check if pan stays within boundaries
         // If not, set the delta to snap to boundary instead of passing it
         if (this.mainGraphState.currentPerspective().rangeX[0] + deltaX < 0) {
@@ -1171,63 +1262,6 @@ export default class CongestionGraphD3Renderer {
         const newBottomY =  this.mainGraphState.currentPerspective().rangeY[1] + deltaY;
 
         this.redrawCanvas(newLeftX, newRightX, newTopY, newBottomY);
-    }
-
-    public useBrushX(){
-        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 1);
-        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
-    }
-
-    public useBrush2d(){
-        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 1);
-        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
-    }
-
-    public usePanning(){
-        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 1);
-        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
-    }
-
-    public useSelection(){
-        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 1);
-        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
-    }
-
-    public usePicker(){
-        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
-        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 1);
-    }
-
-    public toggleCongestionGraph(){
-        this.mainGraphState.congestionGraphEnabled = this.mainGraphState.congestionGraphEnabled ? false : true;
-
-        this.redrawCanvas(this.mainGraphState.currentPerspective().rangeX[0], this.mainGraphState.currentPerspective().rangeX[1], this.mainGraphState.currentPerspective().rangeY[0], this.mainGraphState.currentPerspective().rangeY[1]);
-    }
-
-    public togglePerspective(){
-        this.setPerspective(this.mainGraphState.useSentPerspective ? false : true, true);
-    }
-
-    public resetZoom(){
-        this.mainGraphState.currentPerspective().rangeX = this.mainGraphState.currentPerspective().originalRangeX;
-        this.mainGraphState.currentPerspective().rangeY = this.mainGraphState.currentPerspective().originalRangeY;
-
-        this.redrawCanvas(this.mainGraphState.currentPerspective().rangeX[0], this.mainGraphState.currentPerspective().rangeX[1], this.mainGraphState.currentPerspective().rangeY[0], this.mainGraphState.currentPerspective().rangeY[1]);
     }
 
     private onBrushXEnd(){
@@ -1374,13 +1408,13 @@ export default class CongestionGraphD3Renderer {
     private fixMetricUpdates(originalUpdates: Array<[number, number]>) {
         const output: Array<[number, number]> = [];
 
-        if( originalUpdates.length == 0 ) {
+        if ( originalUpdates.length === 0 ) {
             return output;
         }
 
         let lastValue = 0;
-        for( let point of originalUpdates ){
-            if( originalUpdates.length > 0 ) {
+        for ( const point of originalUpdates ){
+            if ( originalUpdates.length > 0 ) {
                 output.push( [point[0], lastValue] );
             }
 
@@ -1389,7 +1423,7 @@ export default class CongestionGraphD3Renderer {
         }
         // the final point should go all the way to the right
         output.push( [ this.mainGraphState.currentPerspective().originalRangeX[1] + 1,  output[ output.length - 1 ][1] ] );
-        //output[0][0] = 0; // let's it start at the 0-point of the x-axis
+        // output[0][0] = 0; // let's it start at the 0-point of the x-axis
 
         return output;
     }
