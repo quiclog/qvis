@@ -59,6 +59,11 @@ export class MainGraphState {
         lastRTT: Array<[number, number]>,
     };
 
+    public flowControlLines!: {
+        application: Array<[number, number]>,
+        stream: Array<[number, number]>,
+    }
+
     /* Methods */
     public constructor() {
         this.innerWidth = this.outerWidth - this.margins.left - this.margins.right;
@@ -108,6 +113,10 @@ export class MainGraphState {
             smoothedRTT: new Array<[number, number]>(),
             lastRTT: new Array<[number, number]>(),
         };
+        this.flowControlLines = {
+            application: new Array<[number, number]>(),
+            stream: new Array<[number, number]>(),
+        }
     }
 };
 

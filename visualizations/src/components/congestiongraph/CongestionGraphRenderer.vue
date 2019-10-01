@@ -5,17 +5,26 @@
                     
                 <p style="padding: 0; margin: 10px 0;"> 
                     <span style="width: 12px; height: 8px; background-color: blue; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
-                    : PACKET_SENT
+                    : Data sent (includes retransmits)
                 </p>
                 <p style="padding: 0; margin: 10px 0;"> 
                     <span style="width: 12px; height: 8px; background-color: #6B8E23; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
-                    : PACKET_ACKED
+                    : Data acknowledged
                 </p>
                 <p style="padding: 0; margin: 10px 0;"> 
                     <span style="width: 12px; height: 8px; background-color: red; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
-                    : PACKET_LOST
+                    : Data lost
                 </p>
 
+                <p style="padding: 0; margin: 10px 0;"> 
+                    <span style="width: 12px; height: 8px; background-color: #a80f3a; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+                    : Connection flow control limit
+                </p>
+
+                <p style="padding: 0; margin: 10px 0;"> 
+                    <span style="width: 12px; height: 8px; background-color: #ff69b4; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+                    : Sum of stream flow control limits
+                </p>
             </div>
 
             <div id="legendMetrics" style="padding: 5px; border: 1px solid black; background-color: white; position: absolute; top: 440px; right: 50px; z-index: 100;" @mouseenter="hideLegend" @mouseleave="showLegend">

@@ -651,6 +651,15 @@ export default class CongestionGraphD3Renderer {
                 this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.cwnd.map((point) => {
                     return [ this.mainGraphState.sent.xScale!(point[0]), this.mainGraphState.sent.yCongestionScale!(point[1]) ];
                 }), "#8A2BE2", this.drawCross);
+
+
+                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.flowControlLines.application.map((point) => {
+                    return [ this.mainGraphState.sent.xScale!(point[0]), this.mainGraphState.sent.yScale!(point[1]) ];
+                }), "#a80f3a", this.drawCross);
+
+                this.drawLines(this.mainGraphState.canvasContext!, this.mainGraphState.flowControlLines.stream.map((point) => {
+                    return [ this.mainGraphState.sent.xScale!(point[0]), this.mainGraphState.sent.yScale!(point[1]) ];
+                }), "#ff69b4", this.drawCross);
             }
 
             // RTT
@@ -785,12 +794,32 @@ export default class CongestionGraphD3Renderer {
         const packetsReceived = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.packet_received);
         const packetsLost = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.packet_lost);
         const metricUpdates = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update);
+        const transportParams = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.transport_parameters_update);
 
         const packetSentList = [];
         const packetReceivedList = [];
 
         let totalSentByteCount = 0;
         let totalReceivedByteCount = 0;
+
+        for (const params of transportParams ) {
+            const parsedPacket = this.config.connection!.parseEvent(params);
+            const data = parsedPacket.data;
+
+            // TODO: use proper type definitions for these events!
+            if ( data.owner && data.owner === "remote" ) {
+                if ( data.parameters ){
+                    for (const param of data.parameters ){
+                        if ( param.name && param.name === "initial_max_data" ) {
+                            this.mainGraphState.flowControlLines.application.push([parsedPacket.relativeTime, parseFloat(param.value)]);
+                        }
+                        else if ( param.name && param.name === "initial_max_stream_data_bidi_remote" ) {
+                            this.mainGraphState.flowControlLines.stream.push([parsedPacket.relativeTime, parseFloat(param.value)]);
+                        }
+                    }
+                }
+            }
+        }
 
         let DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsSent) {
@@ -826,6 +855,7 @@ export default class CongestionGraphD3Renderer {
             console.error("CongestionGraphD3Renderer:parseQlog : There were " + DEBUG_packetsWithInvalidSize + " sent packets with invalid size! They were not used!");
         }
 
+        const streamFCMap:Map<string, number> = new Map<string, number>();
         DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsReceived) {
             const parsedPacket = this.config.connection!.parseEvent(packet)
@@ -865,6 +895,30 @@ export default class CongestionGraphD3Renderer {
             for (const frame of data.frames) {
                 if (frame.frame_type === qlog.QUICFrameTypeName.ack) {
                     ackFrames.push(frame);
+                }
+                else if ( frame.frame_type === qlog.QUICFrameTypeName.max_data ) {
+                    if ( (frame as qlog.IMaxDataFrame).maximum !== undefined ){
+                        // TODO: make sure the axis limits accomodate this? However, if someone sends massively huge FC, this will mess with normal rendering
+                        // for now: only render FC updates that are within range of the total sent data (otherwhise, they're not useful either way)
+                        this.mainGraphState.flowControlLines.application.push([parsedPacket.relativeTime, parseFloat(frame.maximum)]);
+                    }
+                }
+                else if ( frame.frame_type === qlog.QUICFrameTypeName.max_stream_data ) {
+                    if ( (frame as qlog.IMaxStreamDataFrame).maximum !== undefined ){
+                        // we cannot keep a rolling sum, as the changes are not cumulative but absolute
+                        // so keep track of each absolute value per-stream and sum them up each time something changes
+                        const streamID = (frame as qlog.IMaxStreamDataFrame).id;
+                        streamFCMap.set( streamID, parseFloat(frame.maximum) );
+                        
+                        let streamFCSum = 0;
+                        for ( const val of streamFCMap.values() ){
+                            streamFCSum += val;
+                        }
+                        
+                        // TODO: make sure the axis limits accomodate this? However, if someone sends massively huge FC, this will mess with normal rendering
+                        // for now: only render FC updates that are within range of the total sent data (otherwhise, they're not useful either way)
+                        this.mainGraphState.flowControlLines.stream.push([parsedPacket.relativeTime, streamFCSum]);
+                    }
                 }
             }
 
@@ -1049,11 +1103,14 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.received.originalRangeY = [0, received.yMax];
 
         // Store the lines so they can easily be drawn later
-        this.mainGraphState.metricUpdateLines.bytes = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.bytes);
-        this.mainGraphState.metricUpdateLines.cwnd = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.cwnd);
-        this.mainGraphState.metricUpdateLines.minRTT = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.minRTT);
-        this.mainGraphState.metricUpdateLines.smoothedRTT = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.smoothedRTT);
-        this.mainGraphState.metricUpdateLines.lastRTT = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.lastRTT);
+        this.mainGraphState.metricUpdateLines.bytes         = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.bytes);
+        this.mainGraphState.metricUpdateLines.cwnd          = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.cwnd);
+        this.mainGraphState.metricUpdateLines.minRTT        = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.minRTT);
+        this.mainGraphState.metricUpdateLines.smoothedRTT   = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.smoothedRTT);
+        this.mainGraphState.metricUpdateLines.lastRTT       = this.fixMetricUpdates(this.mainGraphState.metricUpdateLines.lastRTT);
+
+        this.mainGraphState.flowControlLines.application    = this.fixMetricUpdates(this.mainGraphState.flowControlLines.application); 
+        this.mainGraphState.flowControlLines.stream         = this.fixMetricUpdates(this.mainGraphState.flowControlLines.stream); 
     }
 
     /* Zooming is based on x position of the cursor
@@ -1231,7 +1288,7 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedLostPacket.relativeTime);
                         this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedLostPacket.data.header.packet_number);
                         this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.header.packet_size);
-                        
+
                         return;
                 }
             }
