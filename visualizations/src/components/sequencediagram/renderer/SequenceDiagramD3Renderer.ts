@@ -2,7 +2,7 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import SequenceDiagramConfig, { SequenceDiagramConnection } from '../data/SequenceDiagramConfig';
-import { VantagePointType } from '@quictools/qlog-schema';
+import { VantagePointType, IEventConnectionStateUpdated } from '@quictools/qlog-schema';
 import { IQlogRawEvent, IQlogEventParser } from '@/data/QlogEventParser';
 
 interface VerticalRange {
@@ -524,9 +524,9 @@ export default class SequenceDiagramD3Renderer {
         // However, some implementations might also log metric_update events, containing the rtt! so first look for those!
         let latencyOneWay = Number.MIN_SAFE_INTEGER;
 
-        const clientMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
+        const clientMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
         for ( const evt of clientMetricUpdates ){
-            const update = clientConnection.connection.parseEvent(evt).data as qlog.IEventMetricUpdate;
+            const update = clientConnection.connection.parseEvent(evt).data as qlog.IEventMetricsUpdated;
             if ( update.latest_rtt ){
                 latencyOneWay = update.latest_rtt / 2;
             }
@@ -542,9 +542,9 @@ export default class SequenceDiagramD3Renderer {
 
         if ( latencyOneWay === Number.MIN_SAFE_INTEGER ){
 
-            const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update );
+            const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
             for ( const evt of serverMetricUpdates ){ 
-                const update = serverConnection.connection.parseEvent(evt).data as qlog.IEventMetricUpdate;
+                const update = serverConnection.connection.parseEvent(evt).data as qlog.IEventMetricsUpdated;
                 if ( update.latest_rtt ){
                     latencyOneWay = update.latest_rtt / 2;
                 }
@@ -882,7 +882,7 @@ export default class SequenceDiagramD3Renderer {
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
                 if ( evt.header!.packet_number === undefined ){
-                    if ( evt.packet_type !== qlog.PacketType.version_negotation && evt.packet_type !== qlog.PacketType.retry ){
+                    if ( evt.packet_type !== qlog.PacketType.version_negotiation && evt.packet_type !== qlog.PacketType.retry ){
                         console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
                     }
                     continue;
@@ -1420,7 +1420,7 @@ export default class SequenceDiagramD3Renderer {
                 break;
 
             case qlog.QUICFrameTypeName.stream:
-                return frame.frame_type + " " + frame.id + ((frame.fin) ? " FIN" : "");
+                return frame.frame_type + " " + frame.stream_id + ((frame.fin) ? " FIN" : "");
                 break;
 
 
@@ -1444,44 +1444,134 @@ export default class SequenceDiagramD3Renderer {
 
     protected eventTypeToColor( evt:IQlogEventParser ) : Array<string> {
 
-        if ( evt.name === qlog.ConnectivityEventType.connection_id_update ){
+        if ( evt.name === qlog.ConnectivityEventType.connection_id_updated ){
             return this.frameTypeToColor( qlog.QUICFrameTypeName.new_connection_id );
         }
-        else if ( evt.name === qlog.ConnectivityEventType.spin_bit_update ){
+        else if ( evt.name === qlog.ConnectivityEventType.spin_bit_updated ){
             return this.frameTypeToColor( qlog.QUICFrameTypeName.ping );
         }
-        else if ( evt.name === qlog.ConnectivityEventType.connection_close ){
-            return this.frameTypeToColor( qlog.QUICFrameTypeName.connection_close );
+        else if ( evt.name === qlog.ConnectivityEventType.connection_state_updated ){
+            const csuEvent = evt.data as IEventConnectionStateUpdated;
+
+            if ( csuEvent.new === qlog.ConnectionState.closed || csuEvent.new === qlog.ConnectionState.draining ) {
+                return this.frameTypeToColor( qlog.QUICFrameTypeName.connection_close );
+            }
         }
-        else if ( evt.name === qlog.RecoveryEventType.metric_update ){
+        else if ( evt.name === qlog.RecoveryEventType.metrics_updated ||
+                  evt.name === qlog.TransportEventType.parameters_set ||
+                  evt.name === qlog.RecoveryEventType.parameters_set ||
+                  evt.name === qlog.HTTP3EventType.parameters_set ){
             return this.frameTypeToColor( qlog.QUICFrameTypeName.max_data );
         }
-        else {
-            return ["#FF0000", "#FFFFFF"];
+        else if ( evt.name === qlog.HTTP3EventType.frame_created ||
+                  evt.name === qlog.HTTP3EventType.frame_parsed ){
+            return this.frameTypeToColor( qlog.QUICFrameTypeName.stream );
         }
+        else if ( evt.name === qlog.TransportEventType.datagrams_sent ||
+                  evt.name === qlog.TransportEventType.datagrams_received ){
+            return ["#FFFFFF", "#000000"];
+        }
+        
+        return ["#FF0000", "#FFFFFF"];
     }
 
     protected eventToShortString( evt:IQlogEventParser ) : string {
         
+        let output = "";
+
         switch ( evt.name ){
 
-            case qlog.ConnectivityEventType.spin_bit_update:
-                return "Spin " + ((evt.data as qlog.IEventSpinBitUpdate).state ? "ON" : "OFF");
+            case qlog.ConnectivityEventType.spin_bit_updated:
+                return "Spin " + ((evt.data as qlog.IEventSpinBitUpdated).state ? "ON" : "OFF");
                 break;
 
-            case qlog.RecoveryEventType.metric_update:
-                let output = "";
+            case qlog.RecoveryEventType.metrics_updated:
                 const metricNames = Object.keys(evt.data);
-                for ( let i = 0; i < metricNames.length; ++i  ) {
-                    output += "" + metricNames[i] + ": " + evt.data[metricNames[i]];
-                    if (i !== metricNames.length - 1 ) {
+
+                // TODO: when we add filters, allow users to set the parameters to show themselves
+                let count = 0;
+                if ( metricNames.indexOf("cwnd") >= 0 ) {
+                    output += "cwnd: " + evt.data.cwnd;
+                    count += 1;
+                }
+                if ( metricNames.indexOf("smoothed_rtt") >= 0 ) {
+                    if ( count > 0 ){
                         output += ", ";
                     }
+                    output += "srtt: " + evt.data.smoothed_rtt;
+                    count += 1;
                 }
+                if ( metricNames.indexOf("bytes_in_flight") >= 0 ) {
+                    if ( count > 0 ){
+                        output += ", ";
+                    }
+                    output += "in flight: " + evt.data.bytes_in_flight;
+                    count += 1;
+                }
+                if ( metricNames.indexOf("ssthresh") >= 0 ) {
+                    if ( count > 0 ){
+                        output += ", ";
+                    }
+                    output += "ssthresh: " + evt.data.ssthresh;
+                    count += 1;
+                }
+
+                const amountLeftOver = metricNames.length - count;
+                if ( count > 0 && amountLeftOver > 0 ) {
+                    output += ", ...";
+                }
+                else if ( count === 0) {
+                    for ( let i = 0; i < metricNames.length; ++i  ) {
+                        output += "" + metricNames[i] + ": " + evt.data[metricNames[i]];
+                        if (i !== metricNames.length - 1 ) {
+                            output += ", ";
+                        }
+                    } 
+                }
+                // }
+                // else {
+                //     for ( let i = 0; i < metricNames.length; ++i  ) {
+                //         output += "" + metricNames[i] + ": " + evt.data[metricNames[i]];
+                //         if (i !== metricNames.length - 1 ) {
+                //             output += ", ";
+                //         }
+                //     }  
+                // }
 
                 return "" + output;
                 break;
 
+            case qlog.RecoveryEventType.parameters_set:
+                if ( evt.category === qlog.EventCategory.recovery ) {
+                    return "" + Object.keys(evt.data).length + " recovery parameters set";
+                }
+                else if ( evt.category === qlog.EventCategory.transport ) {
+                    return "" + Object.keys(evt.data).length + " transport parameters set";
+                }
+                else if ( evt.category === qlog.EventCategory.http ) {
+                    return "" + Object.keys(evt.data).length + " HTTP/3 parameters set";
+                }
+                else {
+                    console.error("SequenceDiagramD3Renderer:eventToShortString : unknown category for 'parameters_set' event...", evt.category);
+                    
+                    return "" + Object.keys(evt.data).length + " UNKNOWN parameters set";
+                }
+                break;
+
+                // const paramNames = Object.keys(evt.data);
+                // for ( let i = 0; i < paramNames.length; ++i  ) {
+                //     output += "" + paramNames[i] + ": " + evt.data[paramNames[i]];
+                //     if (i !== paramNames.length - 1 ) {
+                //         output += ", ";
+                //     }
+                // }
+
+                // return "" + output;
+                // break;
+
+            case qlog.ConnectivityEventType.connection_state_updated:
+                return "Connection state: " + evt.data.new; 
+                break;
             default:
                 return evt.name;
                 break;
@@ -1502,7 +1592,7 @@ export default class SequenceDiagramD3Renderer {
                 return "0RTT";
                 break;
 
-            case qlog.PacketType.version_negotation:
+            case qlog.PacketType.version_negotiation:
                 return "VNEG";
                 break;
 

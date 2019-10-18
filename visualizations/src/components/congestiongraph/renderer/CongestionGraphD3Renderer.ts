@@ -5,6 +5,7 @@ import CongestionGraphConfig from '../data/CongestionGraphConfig';
 import { MainGraphState } from './MainGraphState';
 import { RecoveryGraphState } from './RecoveryGraphState';
 import { Selection } from 'd3';
+import { IEventTransportParametersSet } from '@quictools/qlog-schema/draft-01/QLog';
 
 export default class CongestionGraphD3Renderer {
 
@@ -809,8 +810,8 @@ export default class CongestionGraphD3Renderer {
         const packetsSent = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.packet_sent);
         const packetsReceived = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.packet_received);
         const packetsLost = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.packet_lost);
-        const metricUpdates = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.metric_update);
-        const transportParams = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.transport_parameters_update);
+        const metricUpdates = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated);
+        const transportParams = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.parameters_set);
 
         const packetSentList = [];
         const packetReceivedList = [];
@@ -820,20 +821,15 @@ export default class CongestionGraphD3Renderer {
 
         for (const params of transportParams ) {
             const parsedPacket = this.config.connection!.parseEvent(params);
-            const data = parsedPacket.data;
+            const data = parsedPacket.data as IEventTransportParametersSet;
             const timestamp = this.transformTime( parsedPacket.relativeTime );
 
-            // TODO: use proper type definitions for these events!
             if ( data.owner && data.owner === "remote" ) {
-                if ( data.parameters ){
-                    for (const param of data.parameters ){
-                        if ( param.name && param.name === "initial_max_data" ) {
-                            this.mainGraphState.flowControlLines.application.push([timestamp, parseFloat(param.value)]);
-                        }
-                        else if ( param.name && param.name === "initial_max_stream_data_bidi_remote" ) {
-                            this.mainGraphState.flowControlLines.stream.push([timestamp, parseFloat(param.value)]);
-                        }
-                    }
+                if ( data.initial_max_data ) {
+                    this.mainGraphState.flowControlLines.application.push([timestamp, parseFloat(data.initial_max_data)]);
+                }
+                if ( data.initial_max_stream_data_bidi_remote ) {
+                    this.mainGraphState.flowControlLines.stream.push([timestamp, parseFloat(data.initial_max_stream_data_bidi_remote)]);
                 }
             }
         }
@@ -926,7 +922,7 @@ export default class CongestionGraphD3Renderer {
                     if ( (frame as qlog.IMaxStreamDataFrame).maximum !== undefined ){
                         // we cannot keep a rolling sum, as the changes are not cumulative but absolute
                         // so keep track of each absolute value per-stream and sum them up each time something changes
-                        const streamID = (frame as qlog.IMaxStreamDataFrame).id;
+                        const streamID = (frame as qlog.IMaxStreamDataFrame).stream_id;
                         streamFCMap.set( streamID, parseFloat(frame.maximum) );
                         
                         let streamFCSum = 0;

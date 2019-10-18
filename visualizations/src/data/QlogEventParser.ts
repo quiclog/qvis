@@ -6,7 +6,6 @@ export interface IQlogEventParser {
     readonly absoluteTime:number;
     readonly category:string;
              name:string; // name is not a readonly since we want to be able to change it when cloning traces (e.g., in sequenceDiagram)
-    readonly trigger:string;
     readonly data:any|undefined;
 
     readonly timeOffset:number;

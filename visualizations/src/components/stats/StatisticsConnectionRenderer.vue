@@ -172,8 +172,8 @@
             this.connection.setupLookupTable();
 
             // TODO: FIXME: add proper qlog type definitions for h3 events
-            const frameCreatedEvents = this.connection.lookup( "http", "frame_created" ); // sent
-            const frameParsedEvents = this.connection.lookup( "http", "frame_parsed" ); // received
+            const frameCreatedEvents = this.connection.lookup( qlog.EventCategory.http, qlog.HTTP3EventType.frame_created ); // sent
+            const frameParsedEvents  = this.connection.lookup( qlog.EventCategory.http, qlog.HTTP3EventType.frame_parsed ); // received
 
             let userAgent = undefined;
             let server = undefined;
@@ -183,16 +183,20 @@
             for ( const rawevt of frameEvents ){
                 const evt = this.connection.parseEvent( rawevt ).data;
 
-                if (evt.frame && evt.frame.fields ) {
-                    for ( const field of evt.frame.fields ){
-                        if (field.name === "server"){
-                            server = field.value;
+                if ( !evt.frame ){
+                    continue;
+                }
+
+                if ( evt.frame.headers !== undefined ) {
+                    for ( const header of (evt.frame as qlog.IHeadersFrame).headers ){
+                        if (header.name === "server"){
+                            server = header.value;
                         }
-                        else if (field.name === "user-agent"){
-                            userAgent = field.value;
+                        else if (header.name === "user-agent"){
+                            userAgent = header.value;
                         }
-                        else if (field.name === ":authority"){
-                            authority = field.value;
+                        else if (header.name === ":authority"){
+                            authority = header.value;
                         }
                     }
                 }

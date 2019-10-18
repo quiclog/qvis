@@ -114,20 +114,164 @@ export class QlogLoader {
 
                 connection.setEventParser( new EventFieldsParser() );
 
+
+                let needsUpgrade = false;
                 for ( const evt of connection.getEvents() ){
-                    const data = connection.parseEvent(evt).data;
+                    const parsedEvt = connection.parseEvent(evt);
+                    const data = parsedEvt.data;
                     
                     if ( data && data.type ){
+                        needsUpgrade = true;
                         data.packet_type = data.type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
                     else if ( data && data.packet_type ){
                         data.type = data.packet_type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
                 }
+
+                // we had a version in between draft-00 and draft-01 that was also using the "draft-01" version...
+                // it looks a lot like draft-01, but still requires some changes
+                // we use some heuristics to see if it's the in-between version (semi-01) or not
+                if ( !needsUpgrade ) {
+                    for ( const evt of connection.getEvents() ){
+                        const parsedEvt = connection.parseEvent(evt);
+
+                        if ( parsedEvt.name === "metric_update" || // old name for metrics_updated, indicates semi-01
+                             parsedEvt.name === "connection_new" || 
+                             parsedEvt.name === "connection_close" || 
+                             parsedEvt.name === "alpn_update" ||
+                             parsedEvt.name === "version_update" ||
+                             parsedEvt.name === "connection_id_update" ){
+                            needsUpgrade = true;
+                            break;
+                        }
+                        else if ( parsedEvt.name === "parameters_set" ){ // there was no parameters_set in semi-01
+                            needsUpgrade = false;
+                            break;
+                        }
+                        else if ( parsedEvt.data.id !== undefined ) { // in -01, each id field is push_id or stream_id
+                            needsUpgrade = true;
+                            break;
+                        }
+                        else if ( parsedEvt.data.frames !== undefined ) {
+                            for ( const frame of parsedEvt.data.frames ){
+                                if ( frame.id ){ // in -01, each id field is push_id or stream_id
+                                    needsUpgrade = true;
+                                    break;
+                                }
+                            }
+                            if ( needsUpgrade ){
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if ( needsUpgrade ){
+                    QlogLoader.fixPreviousInto01( connection );
+                }
             }
         }
 
         return group;
+    }
+
+    protected static fixPreviousInto01( connection:QlogConnection ){
+        console.log("QlogLoader:fixPreviousInto01 : ", connection);
+
+        for ( const evt of connection.getEvents() ){
+            const parsedEvt = connection.parseEvent(evt);
+
+            if ( parsedEvt.name === "connection_new" ) {
+                parsedEvt.name = qlog01.ConnectivityEventType.connection_started;
+            }
+            else if ( parsedEvt.name === "connection_id_update" ) {
+                parsedEvt.name = qlog01.ConnectivityEventType.connection_id_updated;
+            }
+            else if ( parsedEvt.name === "key_update" ) {
+                parsedEvt.name = qlog01.SecurityEventType.key_updated;
+            }
+            else if ( parsedEvt.name === "key_retire" ) {
+                parsedEvt.name = qlog01.SecurityEventType.key_retired;
+            }
+            else if ( parsedEvt.name === "stream_state_update" ) {
+                parsedEvt.name = qlog01.TransportEventType.stream_state_updated;
+            }
+            else if ( parsedEvt.name === "cc_state_update" ) {
+                parsedEvt.name = qlog01.RecoveryEventType.congestion_state_updated;
+            }
+            else if ( parsedEvt.name === "loss_alarm_set" ) {
+                parsedEvt.name = qlog01.RecoveryEventType.loss_timer_set;
+            }
+            else if ( parsedEvt.name === "loss_alarm_fired" ) {
+                parsedEvt.name = qlog01.RecoveryEventType.loss_timer_triggered;
+            }
+            else if ( parsedEvt.name === "connection_close" ) {
+                parsedEvt.name = qlog01.ConnectivityEventType.connection_state_updated;
+                parsedEvt.data.new = qlog01.ConnectionState.closed;
+                if ( parsedEvt.data.src_id ){
+                    parsedEvt.data.src_id = "removed when converting to draft-01";
+                }
+            }
+            else if ( parsedEvt.name === "cipher_update" ){
+                parsedEvt.name = qlog01.TransportEventType.parameters_set;
+                parsedEvt.data.tls_cipher = parsedEvt.data.new || "was set";
+                if ( parsedEvt.data.new ) {
+                    parsedEvt.data.new = "removed when converting to draft-01";
+                }
+            } 
+            else if ( parsedEvt.name === "version_update" ){
+                parsedEvt.name = qlog01.TransportEventType.parameters_set;
+                parsedEvt.data.quic_version = parsedEvt.data.new || "was set";
+                if ( parsedEvt.data.new ) {
+                    parsedEvt.data.new = "removed when converting to draft-01";
+                }
+            } 
+            else if ( parsedEvt.name === "alpn_update" ){
+                parsedEvt.name = qlog01.TransportEventType.parameters_set;
+                parsedEvt.data.alpn = parsedEvt.data.new || "was set";
+                if ( parsedEvt.data.new ) {
+                    parsedEvt.data.new = "removed when converting to draft-01";
+                }
+            }
+            // semi-01
+            else if ( parsedEvt.name === "metric_update" ){ // old name for metrics_updated, indicates semi-01
+                parsedEvt.name = qlog01.RecoveryEventType.metrics_updated;
+            }
+            else if ( parsedEvt.name === "datagram_sent" ){
+                parsedEvt.name = qlog01.TransportEventType.datagrams_sent;
+            }
+            else if ( parsedEvt.name === "datagram_received" ){
+                parsedEvt.name = qlog01.TransportEventType.datagrams_received;
+            }
+            else if ( parsedEvt.name === "spin_bit_update" ){
+                parsedEvt.name = qlog01.ConnectivityEventType.spin_bit_updated;
+            }
+            else if ( parsedEvt.data.frames !== undefined ){
+                for ( const frame of parsedEvt.data.frames ){
+                    if ( frame.id !== undefined ){
+                        if ( frame.frame_type.indexOf("push") >= 0  ){
+                            frame.push_id = frame.id;
+                        }
+                        else {
+                            frame.stream_id = frame.id;
+                        }
+                    }
+                    if ( frame.fields !== undefined ){
+                        frame.headers = frame.fields;
+                    }
+                }
+            }
+            else if ( parsedEvt.name === "transport_parameters_update" ){
+                parsedEvt.name = qlog01.TransportEventType.parameters_set;
+
+                for ( const param of parsedEvt.data.parameters ) {
+                    parsedEvt.data[ param.name ] = param.value;
+                }
+
+                parsedEvt.data.parameters = [];
+            }
+        }
     }
 
     protected static fromDraft00(json:any) : QlogConnectionGroup {
@@ -230,6 +374,8 @@ export class QlogLoader {
                         data.header.packet_number = "" + data.header.packet_number;
                     }
                 }
+
+                QlogLoader.fixPreviousInto01( connection );
             }
         }
 
@@ -313,12 +459,10 @@ export class EventFieldsParser implements IQlogEventParser {
     private timeIndex:number = 0;
     private categoryIndex:number = 1;
     private nameIndex:number = 2;
-    private triggerIndex:number = 3;
-    private dataIndex:number = 4;
+    private dataIndex:number = 3;
 
     private categoryCommon:string = "unknown";
     private nameCommon:string = "unknown";
-    private triggerCommon:string = "unknown";
 
 
     private currentEvent:IQlogRawEvent|undefined;
@@ -383,13 +527,6 @@ export class EventFieldsParser implements IQlogEventParser {
 
         (this.currentEvent as IQlogRawEvent)[this.nameIndex] = val;
     }
-    public get trigger():string {
-        if ( this.triggerIndex === -1 ) {
-            return this.triggerCommon;
-        }
-
-        return (this.currentEvent as IQlogRawEvent)[this.triggerIndex].toLowerCase();
-    }
     public get data():any|undefined {
         if ( this.dataIndex === -1 ) {
             return {};
@@ -414,10 +551,6 @@ export class EventFieldsParser implements IQlogEventParser {
                 this.nameCommon = trace.commonFields.event || trace.commonFields.EVENT_TYPE;
                 this.nameCommon = this.nameCommon.toLowerCase();
             }
-            if ( trace.commonFields.trigger || trace.commonFields.TRIGGER ) {
-                this.triggerCommon = trace.commonFields.trigger || trace.commonFields.TRIGGER;
-                this.triggerCommon = this.triggerCommon.toLowerCase();
-            }
         }
 
         // events are a flat array of values
@@ -431,7 +564,6 @@ export class EventFieldsParser implements IQlogEventParser {
         if ( this.nameIndex === -1 ) {
             this.nameIndex      = eventFieldNames.indexOf( "event" ); // 00 is event_type, 01 is event
         }
-        this.triggerIndex   = eventFieldNames.indexOf( "trigger" );
         this.dataIndex      = eventFieldNames.indexOf( "data" );
 
 
