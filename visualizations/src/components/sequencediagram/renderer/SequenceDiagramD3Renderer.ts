@@ -60,6 +60,8 @@ export default class SequenceDiagramD3Renderer {
 
     private onEventClicked: (event: any) => void;
 
+    private ignoreEventName = "ignoreseq"; // needs to be lowercase!!
+
     constructor(containerID:string, svgID:string, onEventClicked: (packet: any) => void) {
         this.containerID = containerID;
         this.svgID = svgID;
@@ -438,15 +440,18 @@ export default class SequenceDiagramD3Renderer {
         }
 
         for ( const event of newTrace.getEvents() ){
-            const type = newTrace.parseEvent(event).name;
+            const parsedEvt = newTrace.parseEvent(event);
+            const type = parsedEvt.name;
             if ( type === qlog.TransportEventType.packet_sent ){
-                newTrace.parseEvent(event).name = qlog.TransportEventType.packet_received;
+                parsedEvt.name = qlog.TransportEventType.packet_received;
             }
-            if ( type === qlog.TransportEventType.packet_received ){
-                newTrace.parseEvent(event).name = qlog.TransportEventType.packet_sent;
+            else if ( type === qlog.TransportEventType.packet_received ){
+                parsedEvt.name = qlog.TransportEventType.packet_sent;
+            } 
+            else {
+                // we cannot observe anything from the "other" side besides what we received, so dismantle all of those events
+                parsedEvt.name = this.ignoreEventName;
             }
-
-            // TODO: are there other events that should be changed? probably some that should be filtered out? e.g., all non transport/H3-related things? 
         }
 
         this.createPrivateNamespace(originalTrace);
@@ -1107,6 +1112,10 @@ export default class SequenceDiagramD3Renderer {
                         break;
                     }
 
+                    if ( evt.name === this.ignoreEventName ){
+                        continue;
+                    }
+
                     // rect for each event on the vertical timelines
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                     const rectSize = pixelsPerMillisecond * 0.6;
@@ -1553,7 +1562,7 @@ export default class SequenceDiagramD3Renderer {
                 }
                 else {
                     console.error("SequenceDiagramD3Renderer:eventToShortString : unknown category for 'parameters_set' event...", evt.category);
-                    
+
                     return "" + Object.keys(evt.data).length + " UNKNOWN parameters set";
                 }
                 break;
