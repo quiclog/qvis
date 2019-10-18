@@ -1413,11 +1413,17 @@ export default class SequenceDiagramD3Renderer {
                 if ( frame.acked_ranges ){
                     const ranges = frame.acked_ranges;
                     for ( let r = 0; r < ranges.length; ++r  ){
-                        if ( ranges[r][0] !== ranges[r][1] ){
-                            output += ranges[r][0] + "-" + ranges[r][1];
+
+                        const range = ranges[r];
+
+                        if ( (range as any).length === 1 ) {
+                            output += range[0];
+                        }
+                        else if ( range[0] !== range[1] ){
+                            output += range[0] + "-" + range[1];
                         }
                         else{
-                            output += ranges[r][0];
+                            output += range[0];
                         }
                         if ( r < ranges.length - 1 ){
                             output += ","

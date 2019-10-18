@@ -948,8 +948,17 @@ export default class CongestionGraphD3Renderer {
                     continue;
                 }
                 for (const range of frame.acked_ranges) {
-                    const from = parseInt(range[0], 10);
-                    const to = parseInt(range[1], 10); // up to and including
+
+                    let from = -1;
+                    let to = -1;
+                    if ( range.length === 2 ){
+                        from = parseInt(range[0], 10);
+                        to = parseInt(range[1], 10); // up to and including
+                    }
+                    else { // just logs a single packet number, not a full range
+                        from = parseInt(range[0], 10);
+                        to = from;
+                    }
 
                     // ackedNr will be the ACKed packet number of one of our SENT packets here
                     for (let ackedNr = from; ackedNr <= to; ++ackedNr) {
@@ -1012,8 +1021,16 @@ export default class CongestionGraphD3Renderer {
                     continue;
                 }
                 for (const range of frame.acked_ranges) {
-                    const from = parseInt(range[0], 10);
-                    const to = parseInt(range[1], 10); // up to and including
+                    let from = -1;
+                    let to = -1;
+                    if ( range.length === 2 ){
+                        from = parseInt(range[0], 10);
+                        to = parseInt(range[1], 10); // up to and including
+                    }
+                    else { // just logs a single packet number, not a full range
+                        from = parseInt(range[0], 10);
+                        to = from;
+                    }
 
                     // ackedNr will be the ACKed packet number of one of our RECEIVED packets here
                     for (let ackedNr = from; ackedNr <= to; ++ackedNr) {
