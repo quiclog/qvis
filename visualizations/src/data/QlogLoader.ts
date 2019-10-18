@@ -70,6 +70,11 @@ export class QlogLoader {
 
                 for ( const event of jsonconnection.events ) {
 
+                    // allow an empy last element to get around trailing comma restrictions in JSON
+                    if ( event.length === 0 || Object.keys(event).length === 0 ) {
+                        continue;
+                    }
+
                     let groupID = event[ groupIDIndex ];
                     if ( typeof groupID !== "string" ) {
                         groupID = JSON.stringify(groupID);
@@ -92,6 +97,13 @@ export class QlogLoader {
                 const conn = new QlogConnection(group);
                 qlogconnections.push( conn );
                 conn.setEvents( jsonconnection.events as any );
+
+
+                // allow an empy last element to get around trailing comma restrictions in JSON
+                const lastEvent = jsonconnection.events[ jsonconnection.events.length - 1 ];
+                if ( lastEvent.length === 0 || Object.keys(lastEvent).length === 0 ) {
+                    conn.getEvents().splice( jsonconnection.events.length - 1, 1 );
+                }
             }
 
             // component traces share most properties of the overlapping parent trace (e.g., vantage point etc.)
@@ -296,6 +308,11 @@ export class QlogLoader {
                 const groupLUT:Map<string, QlogConnection> = new Map<string, QlogConnection>();
 
                 for ( const event of jsonconnection.events ) {
+                    // allow an empy last element to get around trailing comma restrictions in JSON
+                    if ( event.length === 0 || Object.keys(event).length === 0 ) {
+                        continue;
+                    }
+
                     let groupID = event[ groupIDIndex ];
                     if ( typeof groupID !== "string" ) {
                         groupID = JSON.stringify(groupID);
@@ -318,6 +335,12 @@ export class QlogLoader {
                 const conn = new QlogConnection(group);
                 qlogconnections.push( conn );
                 conn.setEvents( jsonconnection.events as any );
+
+                // allow an empy last element to get around trailing comma restrictions in JSON
+                const lastEvent = jsonconnection.events[ jsonconnection.events.length - 1 ];
+                if ( lastEvent.length === 0 || Object.keys(lastEvent).length === 0 ) {
+                    conn.getEvents().splice( jsonconnection.events.length - 1, 1 );
+                }
             }
 
             // component traces share most properties of the overlapping parent trace (e.g., vantage point etc.)
