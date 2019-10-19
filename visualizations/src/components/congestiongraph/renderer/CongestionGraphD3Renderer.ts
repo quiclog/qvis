@@ -1097,6 +1097,12 @@ export default class CongestionGraphD3Renderer {
                 sent.maxCongestionY = sent.maxCongestionY < y ? y : sent.maxCongestionY;
                 this.mainGraphState.metricUpdateLines.cwnd.push([timestamp, y]);
             }
+            else if (data.congestion_window) {
+                const y = data.congestion_window;
+                sent.minCongestionY = sent.minCongestionY > y ? y : sent.minCongestionY;
+                sent.maxCongestionY = sent.maxCongestionY < y ? y : sent.maxCongestionY;
+                this.mainGraphState.metricUpdateLines.cwnd.push([timestamp, y]);
+            }
             if (data.min_rtt) {
                 // Time can be in microseconds so make sure to convert it to ms
                 const y = parsedUpdate.timeToMilliseconds(data.min_rtt);
@@ -1463,6 +1469,11 @@ export default class CongestionGraphD3Renderer {
             }
             if (data.cwnd && minX <= timestamp && timestamp <= maxX) {
                 const y = data.cwnd;
+                minCongestionY = minCongestionY > y ? y : minCongestionY;
+                maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
+            }
+            else if (data.congestion_window && minX <= timestamp && timestamp <= maxX) {
+                const y = data.congestion_window;
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }
