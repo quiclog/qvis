@@ -863,6 +863,9 @@ export default class CongestionGraphD3Renderer {
             sent.xMax = sent.xMax < timestamp ? timestamp : sent.xMax;
             sent.yMin = sent.yMin > packetOffsetStart ? packetOffsetStart : sent.yMin;
             sent.yMax = sent.yMax < totalSentByteCount ? totalSentByteCount : sent.yMax;
+
+            received.xMin = received.xMin > timestamp ? timestamp : received.xMin;
+            received.xMax = received.xMax < timestamp ? timestamp : received.xMax;
         }
 
         if ( DEBUG_packetsWithInvalidSize > 0 ){
@@ -894,6 +897,10 @@ export default class CongestionGraphD3Renderer {
                 received.xMax = received.xMax < timestamp ? timestamp : received.xMax;
                 received.yMin = received.yMin > packetOffsetStart ? packetOffsetStart : received.yMin;
                 received.yMax = received.yMax < totalReceivedByteCount ? totalReceivedByteCount : received.yMax;
+
+                sent.xMin = sent.xMin > timestamp ? timestamp : sent.xMin;
+                sent.xMax = sent.xMax < timestamp ? timestamp : sent.xMax;
+
             } else {
                 ++DEBUG_packetsWithInvalidSize;
             }
