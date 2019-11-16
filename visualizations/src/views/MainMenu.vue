@@ -32,6 +32,9 @@
                     <b-nav-item to="/congestion" class="congestion-link" :active="$route.fullPath.indexOf('/congestion') >= 0">
                         Congestion
                     </b-nav-item>
+                    <b-nav-item to="/streams" class="streams-link" :active="$route.fullPath.indexOf('/streams') >= 0">
+                        Streams
+                    </b-nav-item>
                     <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath.indexOf('/stats') >= 0">
                         qlog stats
                     </b-nav-item>
@@ -93,6 +96,13 @@
         font-weight: bold;
         background-color: #d4edda;
         border-bottom-color: #d4edda;
+    }
+
+    #MainMenu li.streams-link a.active {
+        color: black;
+        font-weight: bold;
+        background-color: #d1ecf1;
+        border-bottom-color: #d1ecf1;
     }
 
     #MainMenu li.stats-link a.active {

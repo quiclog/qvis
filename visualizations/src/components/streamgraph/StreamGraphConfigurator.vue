@@ -1,16 +1,17 @@
 <template>
-    <div style="background-color: #fff3cd; padding: 0px 10px;" >
+    <div style="background-color: #d1ecf1; padding: 0px 10px;" >
 
         <b-container fluid>
             <b-row align-h="center">
-                <p style="margin-top: 10px;">Select a file via the dropdown(s) below to view its statistics</p>
+                <p  style="margin-top: 10px;">Select a trace via the dropdown(s) below to visualize it in the stream graph</p>
             </b-row>
             <b-row align-h="center">
-                <ConnectionConfigurator v-if="config.group !== undefined" :allGroups="store.groups" :group="config.group" :canBeRemoved="false" :allowGroupSelection="true" :allowConnectionSelection="false" :onGroupSelected="onGroupSelected" />
+                <ConnectionConfigurator v-if="config.connections.length > 0" :allGroups="store.groups" :connection="config.connections[0]" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />
             </b-row>
 
             <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
             <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
+
         </b-container>
 
     </div>
@@ -29,48 +30,48 @@
 <script lang="ts">
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue, Prop } from "vue-property-decorator";
-    import StatisticsConfig from "./data/StatisticsConfig";
+    import StreamGraphConfig from "./data/StreamGraphConfig";
     import * as qlog from '@quictools/qlog-schema';
 
     import ConnectionConfigurator from "@/components/shared/ConnectionConfigurator.vue";
     import ConnectionStore from "@/store/ConnectionStore";
     import ConnectionGroup from "@/data/ConnectionGroup";
     import Connection from "@/data/Connection";
+    import QlogConnection from '@/data/Connection';
 
     @Component({
         components: {
             ConnectionConfigurator,
         },
     })
-    export default class StatisticsConfigurator extends Vue {
+    export default class StreamGraphConfigurator extends Vue {
         @Prop()
-        public config!: StatisticsConfig;
+        public config!: StreamGraphConfig;
 
         public store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
-        public onGroupSelected(group:ConnectionGroup) {
-            console.log("StatisticsConfigurator:onGroupSelected : ", this.config, group);
+        public onConnectionSelected(connection:Connection) {
+            console.log("StreamGraphConfigurator:onConnectionSelected : ", this.config, connection);
 
-            this.config.group = group;
+            this.config.connections = [ connection ];
         }
 
         public mounted(){
-            if ( this.config.group === undefined && this.store.groups.length > 0 ){
+            if ( this.config.connections.length === 0 && this.store.groups.length > 0 ){
                 this.selectDefault();
             }
         }
 
         public updated(){
-            if ( this.config.group === undefined && this.store.groups.length > 0 ){
+            if ( this.config.connections.length === 0 && this.store.groups.length > 0 ){
                 this.selectDefault();
             }
         }
 
         protected selectDefault(){
-            console.log("selectDefault: adding new default connection configurator", this.store.groups);
-            this.config.group = ( this.store.groups[0] );
+            console.log("StreamGraphConfigurator:selectDefault: adding new default connection configurator", this.store.groups);
+            this.config.connections = [ this.store.groups[0].getConnections()[0] ];
         }
-
     }
 
 </script>

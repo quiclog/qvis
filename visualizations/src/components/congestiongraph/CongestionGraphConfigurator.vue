@@ -16,7 +16,7 @@
                 <b-button @click="togglePerspective()" v-if="isClientSideTrace"  v-b-tooltip.hover title="You have selected a trace from a client-side perspective, while this tool works best for server-side. Press this button to simulate a server-side view (by swapping packet_sent and packet_received)" variant="danger">Toggle perspective</b-button>
             </b-row>
 
-            <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">You have to load trace files first before you can visualize them</b-alert>
+            <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
             <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
 
         </b-container>

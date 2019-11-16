@@ -5,6 +5,7 @@ import VUEDebug from "./views/VUEDebug.vue";
 import FileManager from "./views/FileManager.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
 import CongestionGraph from "./views/CongestionGraph.vue";
+import StreamGraph from "./views/StreamGraph.vue";
 import Statistics from "./views/Statistics.vue";
 
 Vue.use(Router);
@@ -52,6 +53,14 @@ const router = new Router({
             // component: () => import(/* webpackChunkName: "about" */ './views/About.vue'),
             components: {
                 default: CongestionGraph,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/streams",
+            name: "streams",
+            components: {
+                default: StreamGraph,
                 menu: MainMenu,
             },
         },

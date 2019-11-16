@@ -34,7 +34,7 @@
         <b-button @click="selectDefault()">Add trace</b-button><!-- &#43; PLUS + -->
         <b-alert v-if="connectionIsUnknownPerspective" show variant="danger">The selected trace has an unknown vantage point. We guessed it based on heuristics, but this could be wrong!</b-alert>
 
-        <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">You have to load trace files first before you can visualize them</b-alert>
+        <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
         <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
     </div>
 </template>
