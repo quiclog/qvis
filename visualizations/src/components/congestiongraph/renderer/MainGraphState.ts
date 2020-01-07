@@ -28,6 +28,7 @@ export class MainGraphState {
     public mouseHandlerBrush2dSvg: Selection<BaseType, unknown, HTMLElement, any> | null = null;
     public mouseHandlerSelectionSvg: Selection<BaseType, unknown, HTMLElement, any> | null = null;
     public mouseHandlerPickSvg: Selection<BaseType, unknown, HTMLElement, any> | null = null;
+    public mouseHandlerRulerSvg: Selection<BaseType, unknown, HTMLElement, any> | null = null;
     public brushX: BrushBehavior<unknown> | null = null;
     public brushXElement: Selection<SVGGElement, unknown, HTMLElement, any> | null = null;
     public brush2d: BrushBehavior<unknown> | null = null;
