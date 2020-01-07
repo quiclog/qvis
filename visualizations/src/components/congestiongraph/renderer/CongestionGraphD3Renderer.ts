@@ -43,6 +43,7 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 0);
     }
 
     public useBrush2d(){
@@ -51,6 +52,7 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 0);
     }
 
     public usePanning(){
@@ -59,6 +61,7 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 1);
         this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 0);
     }
 
     public useSelection(){
@@ -67,6 +70,7 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 1);
         this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 0);
     }
 
     public usePicker(){
@@ -75,6 +79,203 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
         this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 1);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 0);
+    }
+
+    public useRuler() {
+        this.mainGraphState.mouseHandlerBrush2dSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerBrushXSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPanningSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerSelectionSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerPickSvg!.style('z-index', 0);
+        this.mainGraphState.mouseHandlerRulerSvg!.style('z-index', 1);
+
+        document.body.style.cursor = "pointer";
+
+        const linePoints:any = {};
+        let line:any = undefined;
+        let lineHorizontal:any = undefined;
+        let lineVertical:any = undefined;
+        let textTime:any = undefined;
+        let textBytes:any = undefined;
+        let textRate:any = undefined;
+
+        const evtEmitter = (this.mainGraphState.mouseHandlerRulerSvg!.node()! as Element);
+        const startDrawing = (evt:any) => {
+
+            linePoints.x1 = evt.offsetX;
+            linePoints.y1 = evt.offsetY;
+            linePoints.x2 = evt.offsetX;
+            linePoints.y2 = evt.offsetY;
+
+            // the main (typically diagonal) line
+            line = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("line")
+                .attr("stroke", "pink")
+                .attr("stroke-width", 10)
+                .attr("x1", "" + linePoints.x1 )
+                .attr("y1", "" + linePoints.y1 )
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y2 )
+                .style("opacity", "0.7")
+                .attr("class", "ruler");
+
+            
+            lineHorizontal = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("line")
+                .attr("stroke", "black")
+                .attr("stroke-width", 2)
+                .attr("x1", "" + linePoints.x1 )
+                .attr("y1", "" + linePoints.y1 )
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y2 );
+            
+            lineVertical = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("line")
+                .attr("stroke", "black")
+                .attr("stroke-width", 2)
+                .attr("x1", "" + linePoints.x1 )
+                .attr("y1", "" + linePoints.y1 )
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y2 );
+
+            // text for the horizontal line
+            textTime = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("text")
+                .attr("dominant-baseline", "hanging")
+                .style("text-anchor", "middle")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                .style("font-style", "italic")
+                .style("stroke", "white")
+                .style("stroke-width", 5)
+                .style("paint-order", "stroke")
+                .attr("fill", "#000000")
+                .text("" + "time");
+
+            // text for the vertical line
+            textBytes = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("text")
+                .attr("dominant-baseline", "central")
+                .style("text-anchor", "start")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                .style("font-style", "italic")
+                .style("stroke", "white")
+                .style("stroke-width", 5)
+                .style("paint-order", "stroke")
+                .attr("fill", "#000000")
+                .text("" + "bytes");
+
+            // text for the diagonal line
+            textRate = this.mainGraphState.mouseHandlerRulerSvg!
+                .append("text")
+                .attr("dominant-baseline", "hanging")
+                .style("text-anchor", "middle")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                .style("font-style", "italic")
+                .style("stroke", "white")
+                .style("stroke-width", 5)
+                .style("paint-order", "stroke")
+                .attr("fill", "#000000")
+                .text("" + "rate");
+
+            evtEmitter.addEventListener("mousemove", handleDrawing);
+        };
+
+        const handleDrawing = (evt:any) => {
+
+            linePoints.x2 = evt.offsetX;
+            linePoints.y2 = evt.offsetY;
+
+            line
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y2 );
+
+            lineHorizontal
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y1 );
+
+            lineVertical
+                .attr("x1", "" + linePoints.x2 )
+                .attr("x2", "" + linePoints.x2 )
+                .attr("y2", "" + linePoints.y2 );
+
+            const startTime = Math.round(this.mainGraphState.sent.xScale!.invert(linePoints.x1));
+            const endTime   = Math.round(this.mainGraphState.sent.xScale!.invert(linePoints.x2));
+            const timeDifference = (endTime - startTime);
+
+            const startBytes = Math.round(this.mainGraphState.sent.yScale!.invert(linePoints.y1));
+            const endBytes   = Math.round(this.mainGraphState.sent.yScale!.invert(linePoints.y2));
+            const bytesDifference = endBytes - startBytes;
+
+
+            let timeText =  timeDifference + " ms";
+            if ( timeDifference > 10000 ){
+                timeText = (timeDifference / 1000).toFixed(2) + "s";
+            }
+
+            let bytesText = bytesDifference + " bytes";
+            if ( bytesDifference > 2000000 ) { // larger than 2MB
+                bytesText = (bytesDifference / 1000000).toFixed(2) + " MB";
+            }
+            else if ( bytesDifference  > 10000 ) { // larger than 10 KB
+                bytesText = Math.round(bytesDifference / 1000) + " KB";
+            }
+
+            const bits = (endBytes - startBytes) * 8;
+            let rate = (bits / 1000) / ((endTime - startTime) / 1000); // have bits per millisecond, want Kilobits per second
+
+            let rateText = Math.round(rate) + " Kbps";
+
+            if ( rate > 1000 ) { // 1 Mbps
+                rate = ( bits / 1000000 ) / ((endTime - startTime) / 1000);
+                rateText = (rate).toFixed(2) + " Mbps";
+            }
+
+            const timeCenter  = Math.min( linePoints.x1, linePoints.x2 ) + Math.abs( linePoints.x1 - linePoints.x2 ) / 2;
+            const bytesCenter = Math.min( linePoints.y1, linePoints.y2 ) + Math.abs( linePoints.y1 - linePoints.y2 ) / 2;
+
+            const rateCenterX = (linePoints.x1 + linePoints.x2) / 2;
+            const rateCenterY = (linePoints.y1 + linePoints.y2) / 2;
+
+            textTime
+                .attr("x", timeCenter)
+                // .attr("y", Math.max( linePoints.y1, linePoints.y2 ) + 12)
+                .attr("y", linePoints.y1 + ( linePoints.y1 > linePoints.y2 ? 12 : -20 ))
+                .text( timeText )
+                
+            textBytes
+                .attr("x", Math.max( linePoints.x1, linePoints.x2 ) + 12)
+                .attr("y", bytesCenter)
+                .text( bytesText )
+                
+            textRate
+                // .attr("x", timeCenter)
+                // .attr("y", Math.max( linePoints.y1, linePoints.y2 ) - 50)
+                .attr("x", rateCenterX)
+                .attr("y", rateCenterY + ( linePoints.y1 > linePoints.y2 ? -30 : 20 ))
+                .text("" + rateText);
+        };
+
+        evtEmitter.addEventListener("mousedown", startDrawing, {once:true});
+
+        evtEmitter.addEventListener("mouseup", (evt) => {
+            document.body.style.cursor = "default";
+
+            evtEmitter.removeEventListener( "mousemove", handleDrawing );
+
+            line.remove();
+            lineHorizontal.remove();
+            lineVertical.remove();
+            textTime.remove();
+            textBytes.remove();
+            textRate.remove();
+
+            this.usePanning();
+
+        }, {once: true});
     }
 
     public toggleCongestionGraph(){
@@ -221,6 +422,15 @@ export default class CongestionGraphD3Renderer {
             .style('position', "absolute");
 
         this.mainGraphState.mouseHandlerPickSvg = this.mainGraphContainer
+            .append('svg:svg')
+            .attr('width', this.mainGraphState.innerWidth)
+            .attr('height', this.mainGraphState.innerHeight)
+            .style('margin-left', this.mainGraphState.margins.left + "px")
+            .style('margin-top', this.mainGraphState.margins.top + "px")
+            .style('z-index', 0) // Disabled by default
+            .style('position', "absolute");
+
+        this.mainGraphState.mouseHandlerRulerSvg = this.mainGraphContainer
             .append('svg:svg')
             .attr('width', this.mainGraphState.innerWidth)
             .attr('height', this.mainGraphState.innerHeight)
@@ -950,6 +1160,8 @@ export default class CongestionGraphD3Renderer {
 
             // now we have the ACK frames. These are composed of ACK blocks, each ACKing a range of packet numbers
             // we go over them all, look them up individually, and add them to packetAckedList
+            let DEBUG_packetsNotSent:number = 0;
+
             for (const frame of ackFrames) {
                 if ( !frame.acked_ranges ) {
                     continue;
@@ -972,7 +1184,8 @@ export default class CongestionGraphD3Renderer {
                         // find the originally sent packet
                         const sentPacket = packetSentList[ ackedNr ];
                         if (!sentPacket){
-                            console.error("Packet was ACKed that we didn't send... ignoring", ackedNr, frame, packet);
+                            // console.error("Packet was ACKed that we didn't send... ignoring", ackedNr, frame, packet);
+                            ++DEBUG_packetsNotSent;
                             continue;
                         }
 
@@ -988,6 +1201,12 @@ export default class CongestionGraphD3Renderer {
                             extraData.correspondingPackets.push(sentPacket); // Array of corresponding packets as ACKs can refer to multiple packets
                         }
                     }
+                }
+            }
+
+            if ( DEBUG_packetsNotSent > 0 ){
+                if ( this.config.connection!.commonFields && this.config.connection!.commonFields.protocol_type !== "TCP" ){
+                    console.error("CongestionGraphD3Renderer:parseQlog : There were " + DEBUG_packetsNotSent + " packets acked that we didn't send. If this is a TCP trace with SACKs, that is expected for now.");
                 }
             }
         }
@@ -1287,7 +1506,52 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedPacketTime);
                     this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedPacketData.header.packet_number);
-                    this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedPacketData.header.packet_size);
+                    // this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedPacketData.header.packet_size);
+                    
+                    let packetText = "PacketSize: " + parsedPacketData.header.packet_size;
+
+                    for ( let i = 0; i < this.mainGraphState.metricUpdateLines.cwnd.length - 2; ++i ){
+                        const a = this.mainGraphState.metricUpdateLines.cwnd[i];
+                        const b = this.mainGraphState.metricUpdateLines.cwnd[i + 1];
+                        // [0] is timestamp, [1] is value
+                        if ( a[0] <= parsedPacketTime && b[0] > parsedPacketTime ) {
+                            packetText += "<br/>";
+                            packetText += "CWND: " + a[1] + " bytes";
+                        }
+                    }
+
+                    for ( let i = 0; i < this.mainGraphState.metricUpdateLines.bytes.length - 2; ++i ){
+                        const a = this.mainGraphState.metricUpdateLines.bytes[i];
+                        const b = this.mainGraphState.metricUpdateLines.bytes[i + 1];
+                        // [0] is timestamp, [1] is value
+                        if ( a[0] <= parsedPacketTime && b[0] > parsedPacketTime ) {
+                            packetText += "<br/>";
+                            packetText += "In flight: " + a[1] + " bytes";
+                        }
+                    }
+
+                    for ( let i = 0; i < this.mainGraphState.metricUpdateLines.lastRTT.length - 2; ++i ){
+                        const a = this.mainGraphState.metricUpdateLines.lastRTT[i];
+                        const b = this.mainGraphState.metricUpdateLines.lastRTT[i + 1];
+                        // [0] is timestamp, [1] is value
+                        if ( a[0] <= parsedPacketTime && b[0] > parsedPacketTime ) {
+                            packetText += "<br/>";
+                            packetText += "RTT: " + a[1] + " ms";
+                        }
+                    }
+
+                    for ( let i = 0; i < this.mainGraphState.metricUpdateLines.smoothedRTT.length - 2; ++i ){
+                        const a = this.mainGraphState.metricUpdateLines.smoothedRTT[i];
+                        const b = this.mainGraphState.metricUpdateLines.smoothedRTT[i + 1];
+                        // [0] is timestamp, [1] is value
+                        if ( a[0] <= parsedPacketTime && b[0] > parsedPacketTime ) {
+                            packetText += "<br/>";
+                            packetText += "sRTT: " + a[1] + " ms";
+                        }
+                    }
+
+
+                    this.mainGraphState.packetInformationDiv!.select("#packetSize").html(packetText);
 
                     return;
                 } else if (pixelColor[0] === 107 && pixelColor[1] === 142 && pixelColor[2] === 35 ) {
@@ -1470,17 +1734,17 @@ export default class CongestionGraphD3Renderer {
             const timestamp = this.transformTime( parsedUpdate.relativeTime );
 
             if (data.bytes_in_flight && minX <= timestamp && timestamp <= maxX) {
-                const y = data.bytes_in_flight;
+                const y = parseInt(data.bytes_in_flight, 10);
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }
             if (data.cwnd && minX <= timestamp && timestamp <= maxX) {
-                const y = data.cwnd;
+                const y = parseInt(data.cwnd, 10);
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }
             else if (data.congestion_window && minX <= timestamp && timestamp <= maxX) {
-                const y = data.congestion_window;
+                const y = parseInt(data.congestion_window, 10);
                 minCongestionY = minCongestionY > y ? y : minCongestionY;
                 maxCongestionY = maxCongestionY < y ? y : maxCongestionY;
             }

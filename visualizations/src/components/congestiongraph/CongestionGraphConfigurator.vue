@@ -12,8 +12,9 @@
                 <b-button @click="resetZoom()">Reset zoom</b-button>
                 <b-button @click="useBrushX()" v-b-tooltip.hover title="Click this button, then drag and drop a horizontal time range to zoom in on.">Zoom timerange</b-button>
                 <b-button @click="useBrush2d()" v-b-tooltip.hover title="Click this button, then drag and drop a rectangular area to zoom in on.">Zoom area</b-button>
+                <b-button @click="useRuler()" v-b-tooltip.hover title="Click this button or press R, then drag and drop a line to see the time and byte ranges it spans">Ruler (press R)</b-button>
                 <b-button @click="toggleCongestionGraph()">Toggle congestion info</b-button>
-                <b-button @click="togglePerspective()" v-if="isClientSideTrace"  v-b-tooltip.hover title="You have selected a trace from a client-side perspective, while this tool works best for server-side. Press this button to simulate a server-side view (by swapping packet_sent and packet_received)" variant="danger">Toggle perspective</b-button>
+                <!--<b-button @click="togglePerspective()" v-if="isClientSideTrace"  v-b-tooltip.hover title="You have selected a trace from a client-side perspective, while this tool works best for server-side. Press this button to simulate a server-side view (by swapping packet_sent and packet_received)" variant="danger">Toggle perspective</b-button>-->
             </b-row>
 
             <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
@@ -77,6 +78,19 @@
             this.config.renderer.useBrush2d();
         }
 
+        public useRuler(evt:any = undefined) {
+            if ( evt ){
+                // console.error( " KEYUP ", evt );
+                if ( evt.code !== "KeyR" ){
+                    return;
+                }
+            }
+
+            console.log("CongestionGraphConfigurator: Using ruler");
+
+            this.config.renderer.useRuler();
+        }
+
         public toggleCongestionGraph(){
             // TODO hook up properly
             this.config.renderer.toggleCongestionGraph();
@@ -98,6 +112,12 @@
             if ( this.config.connection === undefined && this.store.groups.length > 0 ){
                 this.selectDefault();
             }
+
+            document.addEventListener('keyup', this.useRuler);
+        }
+
+        public beforeDestroy() {
+            document.removeEventListener("keyup", this.useRuler);
         }
 
         public updated(){
