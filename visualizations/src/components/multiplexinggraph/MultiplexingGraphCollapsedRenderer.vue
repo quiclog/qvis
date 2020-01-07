@@ -3,7 +3,7 @@
         {{(connection !== undefined) ? connection.getLongName() : ""}}
         <b-row style="height: 70px; border: 1px solid red;" align-v="center">
             <b-col cols="1">
-                Request send order
+                Simulated FIFO order
             </b-col>
             <b-col cols="11">
                 <div :id="id_requests" style="width: 100%;">

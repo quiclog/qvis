@@ -106,6 +106,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         console.log("DEBUG MS range for this trace: ", xMSRange);
 
         let frameCount = 1;
+        let packetIndex = 0;
 
 
         let eventType = qlog.TransportEventType.packet_received;
@@ -128,8 +129,9 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                     }
 
                     if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
-                        dataSent.push( {streamID: frame.stream_id, size: frame.length, countStart: frameCount, countEnd: frameCount + 1 } );
+                        dataSent.push( {streamID: frame.stream_id, size: frame.length, index: packetIndex, countStart: frameCount, countEnd: frameCount + 1 } );
                         ++frameCount;
+                        ++packetIndex;
                     }
                 }
             }
@@ -185,7 +187,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + 0.3)
-                .attr("height", this.barHeight);
+                .attr("height", (d:any) => this.barHeight * (d.index % 2 === 0 ? 1 : 0.95));
 
         const updateChart = () => {
 
@@ -201,7 +203,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 xAxis.call(d3.axisBottom(newX));
             }
 
-            // update circle position
+            // update position
             rects
                 .selectAll(".packet")
                 // .transition().duration(200)

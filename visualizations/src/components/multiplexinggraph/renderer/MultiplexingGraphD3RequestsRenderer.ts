@@ -173,7 +173,7 @@ export default class MultiplexingGraphRequestsRenderer {
             .append("rect")
                 .attr("x", (d:any) => { return xDomain(d.count) - 0.15; } )
                 .attr("y", (d:any) => { return 0; } )
-                //.attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
+                // .attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
                 .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor(d.streamID)[0]; } )
                 .style("opacity", 1)
                 .attr("class", "packet")
@@ -214,43 +214,43 @@ export default class MultiplexingGraphRequestsRenderer {
                 .text( (d:any) => { return d.text; } );
 
 
-        const updateChart = () => {
+        // const updateChart = () => {
 
-            // recover the new scale
-            const newX = d3.event.transform.rescaleX(xDomain);
+        //     // recover the new scale
+        //     const newX = d3.event.transform.rescaleX(xDomain);
 
-            // update axes with these new boundaries
-            // xAxis./*transition().duration(200).*/call(d3.axisBottom(newX));
-            // if ( this.axisLocation === "top" ){
-            //     xAxis.call(d3.axisTop(newX));
-            // }
-            // else {
-            //     xAxis.call(d3.axisBottom(newX));
-            // }
+        //     // update axes with these new boundaries
+        //     // xAxis./*transition().duration(200).*/call(d3.axisBottom(newX));
+        //     // if ( this.axisLocation === "top" ){
+        //     //     xAxis.call(d3.axisTop(newX));
+        //     // }
+        //     // else {
+        //     //     xAxis.call(d3.axisBottom(newX));
+        //     // }
 
-            // update circle position
-            rects
-                .selectAll(".packet")
-                // .transition().duration(200)
-                .attr("x", (d:any) => { return newX(d.count) - 0.15; } )
-                // .attr("y", (d:any) => { return 50; } )
-                .attr("width", (d:any) => { return xDomain(1) + 0.3; })
-        };
+        //     // update circle position
+        //     rects
+        //         .selectAll(".packet")
+        //         // .transition().duration(200)
+        //         .attr("x", (d:any) => { return newX(d.count) - 0.15; } )
+        //         // .attr("y", (d:any) => { return 50; } )
+        //         .attr("width", (d:any) => { return xDomain(1) + 0.3; })
+        // };
 
-        const zoom = d3.zoom()
-            .scaleExtent([1, 20])  // This control how much you can unzoom (x0.5) and zoom (x20)
-            .translateExtent([[0, 0], [this.dimensions.width, this.dimensions.height]])
-            .extent([[0, 0], [this.dimensions.width, this.dimensions.height]])
-            .on("zoom", updateChart);
+        // const zoom = d3.zoom()
+        //     .scaleExtent([1, 20])  // This control how much you can unzoom (x0.5) and zoom (x20)
+        //     .translateExtent([[0, 0], [this.dimensions.width, this.dimensions.height]])
+        //     .extent([[0, 0], [this.dimensions.width, this.dimensions.height]])
+        //     .on("zoom", updateChart);
 
-        // This add an invisible rect on top of the chart area. This rect can recover pointer events: necessary to understand when the user zoom
-        this.svg.append("rect")
-            .attr("width", this.dimensions.width)
-            .attr("height", this.dimensions.height)
-            .style("fill", "none")
-            .style("pointer-events", "all")
-            // .attr('transform', 'translate(' + 0 + ',' + this.dimensions.margin.top + ')')
-            .call(zoom);
+        // // This add an invisible rect on top of the chart area. This rect can recover pointer events: necessary to understand when the user zoom
+        // this.svg.append("rect")
+        //     .attr("width", this.dimensions.width)
+        //     .attr("height", this.dimensions.height)
+        //     .style("fill", "none")
+        //     .style("pointer-events", "all")
+        //     // .attr('transform', 'translate(' + 0 + ',' + this.dimensions.margin.top + ')')
+        //     .call(zoom);
     }
 
 }
