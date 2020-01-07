@@ -9,6 +9,16 @@
                 <ConnectionConfigurator v-if="config.connections.length > 0" :allGroups="store.groups" :connection="config.connections[0]" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />
             </b-row>
 
+            <!-- <b-row align-h="center">
+                <b-form-checkbox
+                    id="collapsed-checkbox"
+                    v-model="config.collapsed"
+                    name="collapsed-checkbox"
+                >
+                    Collapse timeline
+                </b-form-checkbox>
+            </b-row> -->
+
             <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
             <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
 
@@ -30,7 +40,7 @@
 <script lang="ts">
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue, Prop } from "vue-property-decorator";
-    import StreamGraphConfig from "./data/StreamGraphConfig";
+    import MultiplexingGraphConfig from "./data/MultiplexingGraphConfig";
     import * as qlog from '@quictools/qlog-schema';
 
     import ConnectionConfigurator from "@/components/shared/ConnectionConfigurator.vue";
@@ -44,14 +54,14 @@
             ConnectionConfigurator,
         },
     })
-    export default class StreamGraphConfigurator extends Vue {
+    export default class MultiplexingGraphConfigurator extends Vue {
         @Prop()
-        public config!: StreamGraphConfig;
+        public config!: MultiplexingGraphConfig;
 
         public store:ConnectionStore = getModule(ConnectionStore, this.$store);
 
         public onConnectionSelected(connection:Connection) {
-            console.log("StreamGraphConfigurator:onConnectionSelected : ", this.config, connection);
+            console.log("MultiplexingGraphConfigurator:onConnectionSelected : ", this.config, connection);
 
             this.config.connections = [ connection ];
         }
@@ -69,7 +79,7 @@
         }
 
         protected selectDefault(){
-            console.log("StreamGraphConfigurator:selectDefault: adding new default connection configurator", this.store.groups);
+            console.log("MultiplexingGraphConfigurator:selectDefault: adding new default connection configurator", this.store.groups);
             this.config.connections = [ this.store.groups[0].getConnections()[0] ];
         }
     }

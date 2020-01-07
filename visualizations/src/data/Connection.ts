@@ -159,4 +159,29 @@ export default class QlogConnection {
             return [];
         }
     }
+
+    public getLongName(){
+        let connectionName = "";
+        if ( this.vantagePoint ){
+            if (this.vantagePoint.name){
+                connectionName += this.vantagePoint.name + " : ";
+            }
+            if (this.vantagePoint.type){
+                connectionName += this.vantagePoint.type;
+            }
+            else {
+                connectionName += "UNKNOWN";
+            }
+
+            connectionName += (this.vantagePoint && this.vantagePoint.flow) ? " (flow = " + this.vantagePoint.flow + ") : " : " : ";
+        }
+        if ( this.title ) {
+            connectionName += this.title;
+        }
+        if (this.description) {
+            connectionName +=  " : " + this.description;
+        }
+
+        return connectionName;
+    }
 }

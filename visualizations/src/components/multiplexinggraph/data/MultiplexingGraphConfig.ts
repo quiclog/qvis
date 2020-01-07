@@ -1,6 +1,7 @@
 import Connection from "@/data/Connection";
 
-export default class StreamGraphConfig {
+export default class MultiplexingGraphConfig {
 
+    public collapsed:boolean = true;
     public connections:Array<Connection> = new Array<Connection>();
 }

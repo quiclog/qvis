@@ -26,6 +26,7 @@
     "semicolon": false,
     "no-import-side-effect": false,
     "no-parameter-reassignment": true,
+    "arrow-return-shorthand": false,
     "prefer-for-of": true,
     "await-promise": true,
     "curly": true,
