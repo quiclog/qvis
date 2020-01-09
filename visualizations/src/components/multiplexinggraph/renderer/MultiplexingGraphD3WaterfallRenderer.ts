@@ -306,7 +306,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .style("font-family", "Trebuchet MS")
                 // .style("font-weight", "bold")
                 .attr("fill", "#000000")
-                .text( "Filled between first and last packet" );
+                .text( "Colored while stream is \"active\" (between first and last STREAM frame " + directionText + ")");
 
 
 
