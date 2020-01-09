@@ -4,7 +4,7 @@ import * as qlog from '@quictools/qlog-schema';
 import StreamGraphDataHelper from './MultiplexingGraphDataHelper';
 
 
-export default class MultiplexingGraphRequestsRenderer {
+export default class MultiplexingGraphD3SimulationRenderer {
 
     public containerID:string;
 
@@ -26,7 +26,7 @@ export default class MultiplexingGraphRequestsRenderer {
             return false;
         }
 
-        console.log("MultiplexingGraphRequestsRenderer:render", connection);
+        console.log("MultiplexingGraphD3SimulationRenderer:render", connection);
 
         this.rendering = true;
 

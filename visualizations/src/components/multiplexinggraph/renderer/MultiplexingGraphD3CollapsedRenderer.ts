@@ -52,12 +52,12 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 0, right: Math.round(container.clientWidth * 0.05), bottom: 0, left: 5};
+        this.dimensions.margin = {top: 0, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
         if ( this.axisLocation === "top" ){
             this.dimensions.margin.top = 20;
         }
         else {
-            this.dimensions.margin.bottom = 20;
+            this.dimensions.margin.bottom = 40;
         }
 
         // width and height are the INTERNAL widths (so without the margins)
@@ -107,11 +107,15 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
         let frameCount = 1;
         let packetIndex = 0;
+        let streamIDs:Set<number> = new Set<number>();
 
 
+        // clients receive data, servers send it
         let eventType = qlog.TransportEventType.packet_received;
+        let directionText = "received";
         if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server ){
             eventType = qlog.TransportEventType.packet_sent;
+            directionText = "sent";
         }
 
         const packets = this.connection.lookup( qlog.EventCategory.transport, eventType );
@@ -129,13 +133,57 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                     }
 
                     if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
-                        dataSent.push( {streamID: frame.stream_id, size: frame.length, index: packetIndex, countStart: frameCount, countEnd: frameCount + 1 } );
+                        dataSent.push( {streamID: frame.stream_id, index: packetIndex, size: frame.length, countStart: frameCount, countEnd: frameCount + 1 } );
                         ++frameCount;
                         ++packetIndex;
+                        streamIDs.add( frame.stream_id );
                     }
                 }
             }
         }
+
+
+        console.log("DEBUG: dataSent", dataSent);
+
+        // const colorDomain = d3.scaleOrdinal() 
+        // .domain(["1", "2", "3", "5", "6", "7",                                                                    "0",   "4",     "8",    "12",   "16",     "20",     "24",     "28",    "32",   "36",    "40",  "44"])
+        // .range([ "lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush", "red", "green", "blue", "pink", "purple", "yellow", "indigo", "black", "grey", "brown", "cyan", "orange"]);
+
+
+
+        // console.log("IDs present ", dataSent.map( (d) => d.streamID).filter((item, i, ar) => ar.indexOf(item) === i));
+
+        const clip = this.svg.append("defs").append("SVG:clipPath")
+            .attr("id", "clip")
+            .append("SVG:rect")
+            .attr("width", this.dimensions.width )
+            .attr("height", this.dimensions.height )
+            .attr("x", 0 )
+            .attr("y", 0);
+
+        const rects = this.svg.append('g')
+            .attr("clip-path", "url(#clip)");
+
+        if ( streamIDs.size <= 1 || frameCount < 5 ){
+            rects
+            // text
+            .append("text")
+                .attr("x", 200 )
+                .attr("y", 30 ) // + 1 is eyeballed magic number
+                .attr("dominant-baseline", "baseline")
+                .style("text-anchor", "start")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                // .style("font-weight", "bold")
+                .attr("fill", "#000000")
+                .text( "This trace doesn't contain multiple independent streams (or has less than 5 STREAM frames), which is needed for this visualization." );
+
+            return;
+        }
+
+
+
+        const packetSidePadding = 0.3;
 
         const xDomain = d3.scaleLinear()
             .domain([1, frameCount])
@@ -155,39 +203,31 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         }
 
 
-        console.log("DEBUG: dataSent", dataSent);
-
-        const colorDomain = d3.scaleOrdinal() 
-            .domain(["1", "2", "3", "5", "6", "7",                                                                    "0",   "4",     "8",    "12",   "16",     "20",     "24",     "28",    "32",   "36",    "40",  "44"])
-            .range([ "lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush", "red", "green", "blue", "pink", "purple", "yellow", "indigo", "black", "grey", "brown", "cyan", "orange"]);
-
-
-
-        // console.log("IDs present ", dataSent.map( (d) => d.streamID).filter((item, i, ar) => ar.indexOf(item) === i));
-
-        const clip = this.svg.append("defs").append("SVG:clipPath")
-            .attr("id", "clip")
-            .append("SVG:rect")
-            .attr("width", this.dimensions.width )
-            .attr("height", this.dimensions.height )
-            .attr("x", 0)
-            .attr("y", 0);
-
-        const rects = this.svg.append('g')
-            .attr("clip-path", "url(#clip)");
-
         rects
             .selectAll("rect")
             .data(dataSent)
             .enter()
             .append("rect")
-                .attr("x", (d:any) => xDomain(d.countStart) - 0.15 )
-                .attr("y", (d:any) => 0 )
-                .attr("fill", (d:any) => "" + colorDomain( "" + d.streamID ) )
+                .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
+                .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : this.barHeight * 0.05) )
+                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
                 .style("opacity", 1)
                 .attr("class", "packet")
-                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + 0.3)
-                .attr("height", (d:any) => this.barHeight * (d.index % 2 === 0 ? 1 : 0.95));
+                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
+                .attr("height", (d:any) => this.barHeight * (d.index % 2 === 0 ? 1 : 0.90));
+
+        this.svg.append('g')
+            // text
+            .append("text")
+                .attr("x", xDomain(frameCount / 2) )
+                .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 ) // + 1 is eyeballed magic number
+                .attr("dominant-baseline", "baseline")
+                .style("text-anchor", "middle")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                // .style("font-weight", "bold")
+                .attr("fill", "#000000")
+                .text( "Count of STREAM frames " + directionText + " (regardless of size, includes retransmits)" ); 
 
         const updateChart = () => {
 
@@ -207,9 +247,9 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             rects
                 .selectAll(".packet")
                 // .transition().duration(200)
-                .attr("x", (d:any) => newX(d.countStart) - 0.15 )
+                .attr("x", (d:any) => newX(d.countStart) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )
-                .attr("width", (d:any) => newX(d.countEnd) - newX(d.countStart) + 0.3)
+                .attr("width", (d:any) => newX(d.countEnd) - newX(d.countStart) + packetSidePadding * 2)
         };
 
         const zoom = d3.zoom()

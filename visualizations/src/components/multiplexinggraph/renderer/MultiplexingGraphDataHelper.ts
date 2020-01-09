@@ -8,20 +8,24 @@ export default class MultiplexingGraphDataHelper {
     public static streamIDToColor(streamID:string):Array<string> {
         const lut = MultiplexingGraphDataHelper.streamIDColorLUT;
 
+        // colors inspired by http://artshacker.com/wp-content/uploads/2014/12/Kellys-22-colour-chart.jpg
+
         if ( lut.size === 0 ){
 
-            lut.set( "0",  "red" );
-            lut.set( "4",  "green" );
-            lut.set( "8",  "blue" );
-            lut.set( "12", "pink" );
-            lut.set( "16", "purple" );
-            lut.set( "20", "yellow" );
-            lut.set( "24", "indigo" );
-            lut.set( "28", "black" );
-            lut.set( "32", "grey" );
-            lut.set( "36", "brown" );
-            lut.set( "40", "cyan" );
-            lut.set( "44", "orange" );
+            lut.set( "0",  "#E1DA4C" ); // yellow
+            lut.set( "4",  "#6B067F" ); // purple
+            lut.set( "8",  "#E17426" ); // orange
+            lut.set( "12", "#914ca8" ); // purple
+            lut.set( "16", "#99CBDF" ); // light blue
+            lut.set( "20", "#C72737" ); // red
+            lut.set( "24", "#BBC585" ); // buff
+            lut.set( "28", "#7D787A" ); // grey
+            lut.set( "32", "#6CAD58" ); // green
+            lut.set( "36", "#D580AA" ); // pink
+            lut.set( "40", "#4C61B9" ); // blue
+            lut.set( "44", "#D38E75" ); // yellowish pink
+            lut.set( "48", "#46198C" ); // violet
+            lut.set( "52", "#C8A454" ); // oker
         }
         
         if ( lut.has(streamID) ) {

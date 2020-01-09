@@ -32,9 +32,9 @@
                     <b-nav-item to="/congestion" class="congestion-link" :active="$route.fullPath.indexOf('/congestion') >= 0">
                         Congestion
                     </b-nav-item>
-                    <!-- <b-nav-item to="/multiplexing" class="multiplexing-link" :active="$route.fullPath.indexOf('/multiplexing') >= 0">
+                    <b-nav-item to="/multiplexing" class="multiplexing-link" :active="$route.fullPath.indexOf('/multiplexing') >= 0">
                         Multiplexing
-                    </b-nav-item> -->
+                    </b-nav-item>
                     <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath.indexOf('/stats') >= 0">
                         qlog stats
                     </b-nav-item>
