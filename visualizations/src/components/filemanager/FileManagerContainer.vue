@@ -42,11 +42,13 @@
                             <b-col>
                                 <b-form-file
                                     id="fileUpload"
-                                    v-model="fileToUpload"
-                                    :state="Boolean(fileToUpload)"
-                                    placeholder="Choose a file or drop it here..."
-                                    drop-placeholder="Drop file here..."
+                                    multiple
+                                    v-model="filesToUpload"
+                                    :state="Boolean(filesToUpload.length > 0)"
+                                    placeholder="Choose files or drop them here..."
+                                    drop-placeholder="Drop files here..."
                                     accept=".qlog"
+                                    class="text-nowrap text-truncate"
                                     ></b-form-file>
 
                                     <p v-if="uploadIsPcap" style="margin-top: 10px;">For .pcap files, you also need to upload a .keys file so it can be decrypted. We currently do not yet support decrypted pcaps or pcapng files with embedded keys.</p>
@@ -62,7 +64,7 @@
                                     ></b-form-file>
                             </b-col>
                             <b-col cols="1" md="auto"> 
-                                <b-button @click="uploadFile()" :disabled="fileToUpload === null" variant="primary">Upload</b-button>
+                                <b-button @click="uploadFile()" :disabled="filesToUpload.length === 0" variant="primary">Upload</b-button>
                             </b-col>
                         </b-row>
                     </form>
@@ -181,7 +183,7 @@
         protected urlToLoad:string = "";
         protected secretsToLoad:string = "";
 
-        protected fileToUpload:File|null = null;
+        protected filesToUpload:Array<File> = new Array<File>();
         protected secretsToUpload:File|null = null;
 
         public loadURL(){
@@ -227,53 +229,59 @@
                 return;
             }
 
-            if ( this.fileToUpload === null || !this.fileToUpload.name.endsWith(".qlog") ){
-                Vue.notify({
-                    group: "default",
-                    title: "Provide .qlog file",
-                    type: "error",
-                    duration: 6000,
-                    text: "We currently only support uploading .qlog files.",
-                });
+            for ( const file of this.filesToUpload ){
 
-                return;
-            }
-
-            const uploadFileName = this.fileToUpload.name;
-            Vue.notify({
-                group: "default",
-                title: "Loading uploaded file",
-                text: "Loading uploaded file " + uploadFileName + ".<br/>The file is not sent to a server.",
-            });
-
-            const reader = new FileReader();
-
-            reader.onload = (evt) => {
-                try{
-                    const contentsJSON = JSON.parse( (evt!.target as any).result );
-                    this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
-
+                if ( file === null || !file.name.endsWith(".qlog") ){
                     Vue.notify({
                         group: "default",
-                        title: "Uploaded file",
-                        type: "success",
-                        text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
-                    });
-                }
-                catch (e){
-                    
-                    console.error("FileManagerContainer:uploadFile : ", e);
-                    Vue.notify({
-                        group: "default",
-                        title: "Error uploading file",
+                        title: "Provide .qlog file",
                         type: "error",
                         duration: 6000,
-                        text: "Something went wrong. For more information, view the devtools console.",
+                        text: "We currently only support uploading .qlog files. " + file.name,
                     });
+
+                    return;
                 }
-            };
-            
-            reader.readAsText(this.fileToUpload);
+            }
+
+            for ( const file of this.filesToUpload ){
+
+                const uploadFileName = file.name;
+                Vue.notify({
+                    group: "default",
+                    title: "Loading uploaded file",
+                    text: "Loading uploaded file " + uploadFileName + ".<br/>The file is not sent to a server.",
+                });
+
+                const reader = new FileReader();
+
+                reader.onload = (evt) => {
+                    try{
+                        const contentsJSON = JSON.parse( (evt!.target as any).result );
+                        this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
+
+                        Vue.notify({
+                            group: "default",
+                            title: "Uploaded file",
+                            type: "success",
+                            text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
+                        });
+                    }
+                    catch (e){
+                        
+                        console.error("FileManagerContainer:uploadFile : ", e);
+                        Vue.notify({
+                            group: "default",
+                            title: "Error uploading file",
+                            type: "error",
+                            duration: 6000,
+                            text: "Something went wrong. " + uploadFileName + ". For more information, view the devtools console.",
+                        });
+                    }
+                };
+                
+                reader.readAsText(file);
+            }
 
 
             // // https://serversideup.net/uploading-files-vuejs-axios/
