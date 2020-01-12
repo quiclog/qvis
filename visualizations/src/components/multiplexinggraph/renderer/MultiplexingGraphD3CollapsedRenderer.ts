@@ -2,13 +2,15 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import StreamGraphDataHelper from './MultiplexingGraphDataHelper';
+import MultiplexingGraphD3ByterangesRenderer from './MultiplexingGraphD3ByterangesRenderer';
 
 
 export default class MultiplexingGraphD3CollapsedRenderer {
 
     public containerID:string;
-    public byteRangeContainerID:string;
     public axisLocation:"top"|"bottom" = "bottom";
+
+    public byteRangeRenderer!:MultiplexingGraphD3ByterangesRenderer;
 
     // public svgID:string;
     public rendering:boolean = false;
@@ -23,7 +25,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
     constructor(containerID:string, byteRangeContainerID:string) {
         this.containerID = containerID;
-        this.byteRangeContainerID = byteRangeContainerID;
+
+        this.byteRangeRenderer = new MultiplexingGraphD3ByterangesRenderer(byteRangeContainerID);
     }
    
     public async render(connection:QlogConnection):Promise<boolean> {
@@ -105,7 +108,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
     }
 
     protected async renderLive() {
-        console.log("Rendering streamgraph");
+        console.log("Rendering multiplexinggraph");
 
         const parser = this.connection.getEventParser();
 
@@ -162,7 +165,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
         interface ArrivalInfo {
             type: FrameArrivalType,
-            timeDifference: number
+            timeDifference: number,
+            createdHole:Array<number>|undefined
         }
 
         // we want to keep track of the filled ranges but also the holes and then especially: when those holes become filled! 
@@ -182,6 +186,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
             let outputType = FrameArrivalType.UNKNOWN;
             let outputTimestampDifference = 0;
+            let outputHole:Range|undefined = undefined;
 
             // 1.
             let foundHole:Range|undefined = undefined;
@@ -201,10 +206,12 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                     // alert("DUPLICATE FOUND!" + from + "->" + to); // never happened in our tests
                     console.error("calculateFrameArrivalType : duplicate data found! Not really an error, but means spurious retransmissions.", range.currentHead, from, to, timestamp);
 
-                    return { type: FrameArrivalType.Duplicate, timeDifference: 0 };
+                    return { type: FrameArrivalType.Duplicate, timeDifference: 0, createdHole: undefined };
                 }
                 else if ( from > range.highestReceived + 1 ) { // creates a hole
                     outputType = FrameArrivalType.Future;
+
+                    outputHole = { time: timestamp, from: range.highestReceived + 1, to: from };
                 }
                 else if ( from === range.highestReceived + 1 ){ // normal, everything arrives in-order without gaps
                     outputType = FrameArrivalType.Normal;
@@ -362,10 +369,10 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             // console.log("Ended arrival algorithm ", FrameArrivalType[outputType], outputTimestampDifference, range.currentHead, range.highestReceived, range.holes, range.filled );
             // console.log("--------------------------------------");
 
-            return { type: outputType, timeDifference: outputTimestampDifference };
+            return { type: outputType, timeDifference: outputTimestampDifference, createdHole: ((outputHole !== undefined) ? [outputHole.from, outputHole.to] : undefined) };
         };
 
-        const dataSent = [];
+        const dataSent:Array<any> = [];
         for ( const eventRaw of this.connection.getEvents() ) {
 
             const event = this.connection.parseEvent( eventRaw );
@@ -395,6 +402,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
                             dataSent.push( {
                                 streamID: frame.stream_id, 
+                                packetNumber: data.header.packet_number,
                                 index: packetIndex, 
                                 size: frame.length, 
                                 countStart: frameCount, 
@@ -402,6 +410,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
                                 arrivalType: arrivalInfo.type, 
                                 arrivalTimeDifference: arrivalInfo.timeDifference,
+                                arrivalCreatedHole: arrivalInfo.createdHole,
 
                                 offset: parseInt(frame.offset, 10),
                                 length: parseInt(frame.length, 10),
@@ -414,6 +423,50 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                         }
                     }
                 }
+            }
+            else if ( event.name === qlog.HTTP3EventType.data_moved ) {
+                // console.log("Data was moved!", data);
+
+                if ( !StreamGraphDataHelper.isDataStream( data.stream_id )){
+                    continue;
+                }
+
+                if ( dataSent.length === 0 ) {
+                    console.error("data moved but no stream frames seen yet... shouldn't happen!", data);
+                    continue;
+                }
+
+                // would like to simply say that the last element in dataSent led to this, but sadly that's not true if there were coalesced frames in 1 packet... darnit
+                // so... need to search backwards to see if we can find something
+                let firstCandidate = undefined;
+                let foundFrame = undefined;
+                for ( let i = dataSent.length - 1; i >= 0; --i ) {
+                    if ( dataSent[i].streamID === "" + data.stream_id ) {
+
+                        // deal with frames containing two frames of the same stream... then it's not just the last one of that strea, DERP
+                        // there are stacks that for example encode the headers in a separate frame and the body too (e.g., picoquic)
+                        if ( firstCandidate === undefined ){
+                            firstCandidate = dataSent[i];
+                        }
+
+                        if ( dataSent[i].offset === parseInt(data.offset, 10) ) {
+                            foundFrame = dataSent[i];
+                            break;
+                        }
+                    }
+                }
+
+                if ( firstCandidate === undefined ) {
+                    console.error("Data moved but no triggering stream frame found, impossible!!!", dataSent, event.relativeTime, data);
+                    continue;
+                }
+
+                if ( !foundFrame ) {
+                    console.error("Data moved but didn't start at previous stream's offset, impossible!!!", foundFrame, event.relativeTime, data);
+                    continue;
+                }
+
+                foundFrame.dataMoved = data.length;
             }
         }
 
@@ -483,11 +536,15 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .style("opacity", .95);
 
             let text = "";
-            text += data.time + "ms : stream " + data.streamID + "<br/>";
+            text += data.time + "ms : stream " + data.streamID + " : packet number " + data.packetNumber + "<br/>";
             text += "[" + data.offset + ", " + (data.offset + data.length - 1) + "] (size: " + data.length + ")";
             if ( data.arrivalType === FrameArrivalType.Retransmit || data.arrivalType === FrameArrivalType.Reordered ) {
                 text += "<br/>";
                 text += "Fills gap that was created " + data.arrivalTimeDifference + "ms ago";
+            }
+            else if ( data.arrivalCreatedHole !== undefined ){
+                text += "<br/>";
+                text += "Creates gap from " + data.arrivalCreatedHole[0] + " to " + data.arrivalCreatedHole[1] + " (size: " + (data.arrivalCreatedHole[1] - data.arrivalCreatedHole[0]) + ")";
             }
 
             this.tooltip
@@ -521,7 +578,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .attr("height", (d:any) => packetHeight * (d.index % 2 === 0 ? 1 : 0.90))
                 .style("pointer-events", "all")
                 .on("mouseover", packetMouseOver)
-                .on("mouseout", packetMouseOut);
+                .on("mouseout", packetMouseOut)
+                .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, d.streamID); });
 
         rects
             .selectAll("rect.retransmitPacket")
@@ -612,6 +670,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .attr("x", (d:any) => newX(d.countStart) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )
                 .attr("width", (d:any) => newX(d.countEnd) - newX(d.countStart) + packetSidePadding * 2)
+
+            this.byteRangeRenderer.zoom( newX );
         };
         
         const zoom = d3.zoom()
@@ -621,6 +681,10 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             .on("zoom", updateChart);
         
         this.svg.call(zoom);
+
+        if ( dataSent.length > 0 ) {
+            this.byteRangeRenderer.render( dataSent, 0 );
+        }
     }
 
 }

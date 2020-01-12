@@ -32,9 +32,10 @@
                 </div>
             </b-col>
         </b-row>
-        <b-row v-if="showbyteranges" style="height: 100px;" align-v="center">
+        <b-row v-if="showbyteranges" style="height: 520px;" align-v="center">
+        <!-- <b-row v-if="showbyteranges" style="height: 10020px;" align-v="center"> -->
             <b-col cols="1">
-                Byteranges per packet
+                Byterange per STREAM frame
             </b-col>
             <b-col cols="11">
                 <div :id="id_byterange" style="width: 100%;">

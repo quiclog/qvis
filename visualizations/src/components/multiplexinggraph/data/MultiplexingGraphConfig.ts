@@ -4,6 +4,6 @@ export default class MultiplexingGraphConfig {
 
     public collapsed:boolean = true;
     public showwaterfall:boolean = true;
-    public showbyteranges:boolean = false;
+    public showbyteranges:boolean = true;
     public connections:Array<Connection> = new Array<Connection>();
 }
