@@ -7,20 +7,23 @@ import StreamGraphDataHelper from './MultiplexingGraphDataHelper';
 export default class MultiplexingGraphD3CollapsedRenderer {
 
     public containerID:string;
+    public byteRangeContainerID:string;
     public axisLocation:"top"|"bottom" = "bottom";
 
     // public svgID:string;
     public rendering:boolean = false;
 
     protected svg!:any;
+    protected tooltip!:any;
     protected connection!:QlogConnection;
 
-    protected barHeight = 50;
+    protected barHeight = 70;
 
     private dimensions:any = {};
 
-    constructor(containerID:string) {
+    constructor(containerID:string, byteRangeContainerID:string) {
         this.containerID = containerID;
+        this.byteRangeContainerID = byteRangeContainerID;
     }
    
     public async render(connection:QlogConnection):Promise<boolean> {
@@ -80,6 +83,13 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .attr("transform",
                     "translate(" + this.dimensions.margin.left + "," + this.dimensions.margin.top + ")");
 
+        this.tooltip = d3.select("#multiplexing-packet-tooltip")
+            .style("opacity", 0)
+            .style("position", "absolute")
+            .style("padding", "5px")
+            .style("pointer-events", "none") // crucial! 
+            .style("background", "lightsteelblue");
+
         // this.svg.append("text")
         //     .attr("x", 0)
         //     .attr("y", (this.barHeight / 2))
@@ -107,7 +117,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
         let frameCount = 1;
         let packetIndex = 0;
-        let streamIDs:Set<number> = new Set<number>();
+        const streamIDs:Set<number> = new Set<number>();
 
 
         // clients receive data, servers send it
@@ -118,38 +128,301 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             directionText = "sent";
         }
 
-        const packets = this.connection.lookup( qlog.EventCategory.transport, eventType );
+        // const packets = this.connection.lookup( qlog.EventCategory.transport, eventType );
 
-        const dataSent = [];
-        for ( const packetRaw of packets ) {
-            const packet = this.connection.parseEvent( packetRaw );
-            const data = packet.data;
-            if ( data.frames && data.frames.length > 0 ){
-                for ( const frame of data.frames ) {
+        interface Range {
+            time: number,
+            from: number,
+            to: number
+        }
 
-                    if ( !frame.stream_id || !StreamGraphDataHelper.isDataStream( frame.stream_id )){
-                        // skip control streams like QPACK
-                        continue;
+        //         filled[0]                holes[0] filled[1] holes[1]   filled[2]
+        // .../////////////////////////////| _____ |/////////| _______ |/////////////|
+        //                                 ^                                         ^
+        //                           currentHead                               highestReceived
+
+        interface StreamRange {
+            currentHead:number, // up to and including where the stream has been moved to the HTTP layer
+            highestReceived:number, // up to where the stream has been received (with holes between currentHead and this if they're not equal)
+            holes:Array<Range>,
+            filled:Array<Range>,
+
+            cumulativeTimeDifference:number,
+            timeDifferenceSampleCount:number
+        }
+
+        enum FrameArrivalType {
+            Normal,
+            Future,
+            Duplicate,
+            Retransmit,
+            Reordered,
+            UNKNOWN,
+        }
+
+        interface ArrivalInfo {
+            type: FrameArrivalType,
+            timeDifference: number
+        }
+
+        // we want to keep track of the filled ranges but also the holes and then especially: when those holes become filled! 
+        // if it takes a long time for a hole to become filled, it indicates a retransmit. A short time indicates a re-order. 
+        const streamRanges:Map<number, StreamRange> = new Map<number, StreamRange>();
+
+        // approach: only tracking holes gives a difficult algorithm in practice (I tried...)
+        // so, we do it differently: we keep track of the filled ranges and generate the holes from that on each step
+        // we track the timestamps between the new holes and the old holes
+        const calculateFrameArrivalType = (range:StreamRange, timestamp:number, from:number, to:number):ArrivalInfo => {
+
+            // console.log("TIMESTAMP: ", timestamp, from, to, range.currentHead, range.highestReceived);
+
+            // step 1: find hole where this new frame fits (if none found: this is a new packet: either Normal or Future!)
+            // step 2: add frame to filled list
+            // step 3: generate holes from filled list, backfilling the timestamps from the old holes
+
+            let outputType = FrameArrivalType.UNKNOWN;
+            let outputTimestampDifference = 0;
+
+            // 1.
+            let foundHole:Range|undefined = undefined;
+            for ( const hole of range.holes ) {
+                // ignore if we overlap 2 holes for now
+                if ( (from >= hole.from && from <= hole.to) || 
+                     (to   >= hole.from && to   <= hole.to) ) {
+
+                    foundHole = hole;
+                    break;
+                }
+            }
+
+            if ( !foundHole ) {
+                if ( to < range.currentHead ) {
+                    // total duplicate, no need to update state
+                    // alert("DUPLICATE FOUND!" + from + "->" + to); // never happened in our tests
+                    console.error("calculateFrameArrivalType : duplicate data found! Not really an error, but means spurious retransmissions.", range.currentHead, from, to, timestamp);
+
+                    return { type: FrameArrivalType.Duplicate, timeDifference: 0 };
+                }
+                else if ( from > range.highestReceived + 1 ) { // creates a hole
+                    outputType = FrameArrivalType.Future;
+                }
+                else if ( from === range.highestReceived + 1 ){ // normal, everything arrives in-order without gaps
+                    outputType = FrameArrivalType.Normal;
+                }
+                else if ( to > range.highestReceived + 1 ) {
+                    // partial overlap at the end: from is < highestReceived, to is > : mark this as "normal" for now
+                    outputType = FrameArrivalType.Normal;
+                }
+                else {
+                    // 2 options: 
+                    //  a) range "spans" a hole (starts overlapping with 1 filled, then covers hole, then ends in another filled)
+                    //  b) unknown situation we haven't seen before
+
+                    // a)
+                    // filled is sorted by .from, lowest to highest
+                    let spanning = false;
+                    for ( let i = 0; i < range.filled.length - 1; ++i ){
+                        const filled1 = range.filled[i];
+                        const filled2 = range.filled[i + 1];
+
+                        if ( from >= filled1.from && to > filled1.to &&
+                             to <= filled2.to ) {
+                                spanning = true;
+                             }
                     }
 
-                    if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
-                        dataSent.push( {streamID: frame.stream_id, index: packetIndex, size: frame.length, countStart: frameCount, countEnd: frameCount + 1 } );
-                        ++frameCount;
-                        ++packetIndex;
-                        streamIDs.add( frame.stream_id );
+                    if ( spanning ){
+                        foundHole = undefined;
+                        for ( const hole of range.holes ) {
+                            // look for the hole we're spanning
+                            if ( (from < hole.from && to > hole.to) ) {
+                                foundHole = hole;
+                                break;
+                            }
+                        }
+
+                        if ( foundHole ){
+                            console.error("Found spanning frame, shouldn't happen in practice, only when debugging", foundHole, from, to, range);
+                            outputTimestampDifference = timestamp - foundHole.time;
+                            outputType = FrameArrivalType.Retransmit;
+                        }
+                        else {
+                            console.error("calculateFrameArrivalType: Spanning frame, but not hole found... very weird", from, to, range);
+                            outputType = FrameArrivalType.UNKNOWN;
+                        }
+                    }
+                    else {
+                        console.error("calculateFrameArrivalType: no hole found for frame, but also nowhere else we would expect it...", from, to, range);
+                        outputType = FrameArrivalType.UNKNOWN;
+                    }
+                }
+            }
+            else {
+                outputTimestampDifference = timestamp - foundHole.time;
+                outputType = FrameArrivalType.Retransmit;
+            }
+
+            if ( outputType === FrameArrivalType.Retransmit ){
+                // TODO: maybe only decide it's a re-order if it fits perfectly in a hole? 
+                ++range.timeDifferenceSampleCount;
+                range.cumulativeTimeDifference += outputTimestampDifference;
+
+                const avg = range.cumulativeTimeDifference / range.timeDifferenceSampleCount;
+                if ( outputTimestampDifference < avg * 0.3 ) { // within 30% of the current RTT estimate is -probably- reorder
+                    outputType = FrameArrivalType.Reordered;
+
+                    // console.log("REORDERED PACKET FOUND", foundHole, from, to, outputTimestampDifference, avg);
+                }
+                // else {
+                //     console.log("RETRANSMITTED PACKET FOUND", foundHole, from, to, outputTimestampDifference, avg);
+                // }
+            }
+
+            if ( to > range.highestReceived ) {
+                range.highestReceived = to;
+            }
+
+            // 2.
+            // https://www.geeksforgeeks.org/merging-intervals/
+            // https://algorithmsandme.com/arrays-merge-overlapping-intervals/
+            range.filled.push ( {from: from, to: to, time: timestamp} );
+            range.filled.sort( (a:Range, b:Range):number => {
+                return a.from - b.from;
+            }); // ascending order, just the way we like it
+
+            const stack = new Array<Range>();
+            stack.push( range.filled[0] );
+
+            for ( let i = 1; i < range.filled.length; ++i ){
+
+                const previousInterval = stack.pop();
+                const currentInterval = range.filled[i];
+
+
+                // If current interval's start time is less than end time of
+                // previous interval, find max of end times of two intervals
+                // and push new interval on to stack.
+                if ( previousInterval!.to + 1 >= currentInterval.from ) {
+                    const endTime = Math.max( previousInterval!.to, currentInterval.to );
+                    stack.push ( { from: previousInterval!.from, to : endTime, time: timestamp } );
+                }
+                else {
+                    stack.push ( previousInterval! );
+                    stack.push ( currentInterval );
+                }
+            }
+
+            range.filled = stack; // should also be sorted now!
+
+            // console.log( "filled ranges are now ", JSON.stringify(range.filled) );
+
+
+            // 3.
+            const newHoles:Array<Range> = new Array<Range>();
+
+            for ( let i = 0; i < range.filled.length - 1; ++i ) {
+                const filled1 = range.filled[i];
+                const filled2 = range.filled[i + 1];
+
+                const newHole = { from: filled1.to + 1, to: filled2.from - 1, time: -666 };
+
+                let foundHole2:Range|undefined = undefined;
+
+                for ( const hole of range.holes ) {
+                    // ignore if we overlap 2 holes for now
+                    if ( (from >= hole.from && from <= hole.to) || 
+                         (to   >= hole.from && to   <= hole.to) ) {
+                            
+                        foundHole2 = hole;
+                        break;
+                    }
+                }
+
+                if ( foundHole2 ){
+                    newHole.time = foundHole2.time;
+                }
+                else {
+                    newHole.time = timestamp; // new hole due to a future frame
+                }
+                
+                newHoles.push ( newHole );
+            }
+
+            range.holes = newHoles;
+
+            if ( range.holes.length > 0 ) {
+                range.currentHead = range.holes[0].from - 1;
+            }
+            else {
+                range.currentHead = range.filled[ range.filled.length - 1 ].to;
+            }
+
+            // console.log( "Holes are now ", JSON.stringify(range.holes) );
+
+            // console.log("Ended arrival algorithm ", FrameArrivalType[outputType], outputTimestampDifference, range.currentHead, range.highestReceived, range.holes, range.filled );
+            // console.log("--------------------------------------");
+
+            return { type: outputType, timeDifference: outputTimestampDifference };
+        };
+
+        const dataSent = [];
+        for ( const eventRaw of this.connection.getEvents() ) {
+
+            const event = this.connection.parseEvent( eventRaw );
+            const data = event.data;
+
+            if ( event.name === eventType ){ // packet_sent or _received, the ones we want to plot
+
+                if ( data.frames && data.frames.length > 0 ){
+                    for ( const frame of data.frames ) {
+
+                        if ( !frame.stream_id || !StreamGraphDataHelper.isDataStream( frame.stream_id )){
+                            // skip control streams like QPACK
+                            continue;
+                        }
+
+                        if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
+
+                            let ranges = streamRanges.get( frame.stream_id );
+                            if ( !ranges ){
+                                ranges = {currentHead:-1, highestReceived: -1, holes: new Array<Range>(), filled:new Array<Range>(), cumulativeTimeDifference: 0, timeDifferenceSampleCount: 0 };
+                                streamRanges.set( frame.stream_id, ranges );
+                            }
+
+                            const arrivalInfo:ArrivalInfo = 
+                                calculateFrameArrivalType( ranges, event.absoluteTime, parseInt(frame.offset, 10), parseInt(frame.offset, 10) + parseInt(frame.length, 10) - 1 );
+
+
+                            dataSent.push( {
+                                streamID: frame.stream_id, 
+                                index: packetIndex, 
+                                size: frame.length, 
+                                countStart: frameCount, 
+                                countEnd: frameCount + 1,
+
+                                arrivalType: arrivalInfo.type, 
+                                arrivalTimeDifference: arrivalInfo.timeDifference,
+
+                                offset: parseInt(frame.offset, 10),
+                                length: parseInt(frame.length, 10),
+                                time: event.relativeTime,
+                            });
+
+                            ++frameCount;
+                            ++packetIndex;
+                            streamIDs.add( frame.stream_id );
+                        }
                     }
                 }
             }
         }
 
-
-        console.log("DEBUG: dataSent", dataSent);
-
-        // const colorDomain = d3.scaleOrdinal() 
-        // .domain(["1", "2", "3", "5", "6", "7",                                                                    "0",   "4",     "8",    "12",   "16",     "20",     "24",     "28",    "32",   "36",    "40",  "44"])
-        // .range([ "lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush","lavenderblush", "red", "green", "blue", "pink", "purple", "yellow", "indigo", "black", "grey", "brown", "cyan", "orange"]);
-
-
+        for ( const [stream_id, range] of streamRanges ) {
+            if ( range.holes && range.holes.length !== 0 ) {
+                alert("Stream still had holes after done! Shouldn't happen! " + stream_id + " has " + range.holes.length );
+                console.error("MultiplexingGraphD3CollapsedRenderer : stream has holes, didn't finish completely!", stream_id, range.holes);
+            }
+        }
 
         // console.log("IDs present ", dataSent.map( (d) => d.streamID).filter((item, i, ar) => ar.indexOf(item) === i));
 
@@ -164,22 +437,22 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         const rects = this.svg.append('g')
             .attr("clip-path", "url(#clip)");
 
-        if ( streamIDs.size <= 1 || frameCount < 5 ){
-            rects
-            // text
-            .append("text")
-                .attr("x", 200 )
-                .attr("y", 30 ) // + 1 is eyeballed magic number
-                .attr("dominant-baseline", "baseline")
-                .style("text-anchor", "start")
-                .style("font-size", "14")
-                .style("font-family", "Trebuchet MS")
-                // .style("font-weight", "bold")
-                .attr("fill", "#000000")
-                .text( "This trace doesn't contain multiple independent streams (or has less than 5 STREAM frames), which is needed for this visualization." );
+        // if ( streamIDs.size <= 1 || frameCount < 5 ){
+        //     rects
+        //     // text
+        //     .append("text")
+        //         .attr("x", 200 )
+        //         .attr("y", 30 ) // + 1 is eyeballed magic number
+        //         .attr("dominant-baseline", "baseline")
+        //         .style("text-anchor", "start")
+        //         .style("font-size", "14")
+        //         .style("font-family", "Trebuchet MS")
+        //         // .style("font-weight", "bold")
+        //         .attr("fill", "#000000")
+        //         .text( "This trace doesn't contain multiple independent streams (or has less than 5 STREAM frames), which is needed for this visualization." );
 
-            return;
-        }
+        //     return;
+        // }
 
 
 
@@ -202,20 +475,109 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .call(d3.axisBottom(xDomain));
         }
 
+        // https://bl.ocks.org/d3noob/a22c42db65eb00d4e369
+        const packetMouseOver = (data:any, index:number) => {
+
+            this.tooltip.transition()
+                .duration(100)
+                .style("opacity", .95);
+
+            let text = "";
+            text += data.time + "ms : stream " + data.streamID + "<br/>";
+            text += "[" + data.offset + ", " + (data.offset + data.length - 1) + "] (size: " + data.length + ")";
+            if ( data.arrivalType === FrameArrivalType.Retransmit || data.arrivalType === FrameArrivalType.Reordered ) {
+                text += "<br/>";
+                text += "Fills gap that was created " + data.arrivalTimeDifference + "ms ago";
+            }
+
+            this.tooltip
+                .html( text )
+                .style("left", (d3.event.pageX + 15) + "px")
+                .style("top", (d3.event.pageY - 75) + "px");
+        };
+
+        const packetMouseOut = (data:any, index:number) => {
+
+            this.tooltip.transition()		
+                .duration(200)		
+                .style("opacity", 0);	
+        };
+
+        const packetHeight = this.barHeight * 0.65;
+        const typeGap = this.barHeight * 0.05;
+        const typeHeight = this.barHeight * 0.275;
 
         rects
-            .selectAll("rect")
+            .selectAll("rect.packet")
             .data(dataSent)
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
-                .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : this.barHeight * 0.05) )
+                .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
                 .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
-                .attr("height", (d:any) => this.barHeight * (d.index % 2 === 0 ? 1 : 0.90));
+                .attr("height", (d:any) => packetHeight * (d.index % 2 === 0 ? 1 : 0.90))
+                .style("pointer-events", "all")
+                .on("mouseover", packetMouseOver)
+                .on("mouseout", packetMouseOut);
 
+        rects
+            .selectAll("rect.retransmitPacket")
+            .data( dataSent.filter( (d:any) => { return d.arrivalType === FrameArrivalType.Retransmit; } ) )
+            .enter()
+            .append("rect")
+                .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
+                .attr("y", (d:any) => packetHeight + typeGap )
+                .attr("fill", (d:any) => "black" )
+                .style("opacity", 1)
+                .attr("class", "retransmitPacket")
+                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
+                .attr("height", (d:any) => typeHeight);
+
+        
+        rects
+            .selectAll("rect.reorderPacket")
+            .data( dataSent.filter( (d:any) => { return d.arrivalType === FrameArrivalType.Reordered; } ) )
+            .enter()
+            .append("rect")
+                .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
+                .attr("y", (d:any) => packetHeight + typeGap )
+                .attr("fill", (d:any) => "blue" )
+                .style("opacity", 1)
+                .attr("class", "reorderPacket")
+                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
+                .attr("height", (d:any) => typeHeight);
+
+        rects
+            .selectAll("rect.duplicatePacket")
+            .data( dataSent.filter( (d:any) => { return d.arrivalType === FrameArrivalType.Duplicate; } ) )
+            .enter()
+            .append("rect")
+                .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
+                .attr("y", (d:any) => packetHeight + typeGap )
+                .attr("fill", (d:any) => "red" )
+                .style("opacity", 1)
+                .attr("class", "duplicatePacket")
+                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
+                .attr("height", (d:any) => typeHeight);
+
+
+        rects
+            .selectAll("rect.futurePacket")
+            .data( dataSent.filter( (d:any) => { return d.arrivalType === FrameArrivalType.Future; } ) )
+            .enter()
+            .append("rect")
+                .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
+                .attr("y", (d:any) => packetHeight + typeGap )
+                .attr("fill", (d:any) => "purple" )
+                .style("opacity", 1)
+                .attr("class", "futurePacket")
+                .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)
+                .attr("height", (d:any) => typeHeight);
+
+        // legend
         this.svg.append('g')
             // text
             .append("text")
@@ -245,27 +607,20 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
             // update position
             rects
-                .selectAll(".packet")
+                .selectAll(".packet,.retransmitPacket,.reorderPacket,.duplicatePacket,.futurePacket")
                 // .transition().duration(200)
                 .attr("x", (d:any) => newX(d.countStart) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )
                 .attr("width", (d:any) => newX(d.countEnd) - newX(d.countStart) + packetSidePadding * 2)
         };
-
+        
         const zoom = d3.zoom()
-            .scaleExtent([1, 20])  // This control how much you can unzoom (x0.5) and zoom (x20)
+            .scaleExtent([1, 30])  // This control how much you can unzoom (x0.5) and zoom (x20)
             .translateExtent([[0, 0], [this.dimensions.width, this.dimensions.height]])
             .extent([[0, 0], [this.dimensions.width, this.dimensions.height]])
             .on("zoom", updateChart);
-
-        // This add an invisible rect on top of the chart area. This rect can recover pointer events: necessary to understand when the user zoom
-        this.svg.append("rect")
-            .attr("width", this.dimensions.width)
-            .attr("height", this.dimensions.height)
-            .style("fill", "none")
-            .style("pointer-events", "all")
-            // .attr('transform', 'translate(' + 0 + ',' + this.dimensions.margin.top + ')')
-            .call(zoom);
+        
+        this.svg.call(zoom);
     }
 
 }

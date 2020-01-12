@@ -9,15 +9,26 @@
                 <ConnectionConfigurator v-if="config.connections.length > 0" :allGroups="store.groups" :connection="config.connections[0]" :canBeRemoved="false" :onConnectionSelected="onConnectionSelected" />
             </b-row>
 
-            <!-- <b-row align-h="center">
+            <b-row align-h="center">
                 <b-form-checkbox
-                    id="collapsed-checkbox"
-                    v-model="config.collapsed"
-                    name="collapsed-checkbox"
+                    id="waterfall-checkbox"
+                    v-model="config.showwaterfall"
+                    name="waterfall-checkbox"
+                    class="mr-3"
                 >
-                    Collapse timeline
+                    Show waterfall
                 </b-form-checkbox>
-            </b-row> -->
+
+                <b-form-checkbox
+                    id="byteranges-checkbox"
+                    v-model="config.showbyteranges"
+                    name="byteranges-checkbox"
+                >
+                    Show byte ranges
+                </b-form-checkbox>
+
+                <b-button class="ml-3" v-if="allowSelectAll" @click="selectAllConnections()" :disabled="config.connections.length === 0" variant="primary">Load all connections at once</b-button>
+            </b-row>
 
             <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>
             <b-alert v-else-if="this.store.groups.length === 0" show variant="warning">Loading files...</b-alert>
@@ -64,6 +75,22 @@
             console.log("MultiplexingGraphConfigurator:onConnectionSelected : ", this.config, connection);
 
             this.config.connections = [ connection ];
+        }
+
+        public get allowSelectAll() : boolean {
+            return (window.location.toString().indexOf(":8080") >= 0 ); // only for local testing for now! // TODO: CLEAN UP
+        }
+
+        public selectAllConnections() {
+            const conns = [];
+            for ( const group of this.store.groups ){
+                if ( group.filename.indexOf("DEMO") < 0 ){
+                    conns.push( ...group.getConnections() );
+                }
+            }
+
+            this.config.showwaterfall = false;
+            this.config.connections = conns;
         }
 
         public mounted(){

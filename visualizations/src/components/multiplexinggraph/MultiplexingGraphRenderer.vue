@@ -1,9 +1,22 @@
 <template>
     <div>
-        <MultiplexingGraphCollapsedRenderer 
+        <!-- <MultiplexingGraphCollapsedRenderer 
             style="width: 100%; border:5px solid #d1ecf1;"
             :connection="connection"
-        />
+        /> -->
+
+        <template v-for="(connection2,index) in this.config.connections">
+            <MultiplexingGraphCollapsedRenderer 
+                style="width: 100%; border:5px solid #d1ecf1;"
+                :key="index"
+                :connection="connection2"
+                :showwaterfall="config.showwaterfall"
+                :showbyteranges="config.showbyteranges"
+            />
+        </template>
+
+        <div id="multiplexing-packet-tooltip"></div>
+
     </div>
 </template>
 

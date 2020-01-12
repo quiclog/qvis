@@ -125,6 +125,12 @@ export default class ConnectionStore extends VuexModule {
             urlToLoad = queryParameters.file1 + " etc.";
         }
 
+        if ( urlToLoad === "" ){
+            console.log("ConnectionSTore:LoadFilesFromServer : no file-loading URL query parameters present, doing nothing. ", queryParameters);
+            
+            return;
+        }
+
         Vue.notify({
             group: "default",
             title: "Loading file(s) via URL",

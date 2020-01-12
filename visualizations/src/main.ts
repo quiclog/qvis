@@ -66,7 +66,8 @@ import ConnectionStore from "@/store/ConnectionStore";
 
 
 // TODO: REMOVE: only for local testing!
-if (window.location.toString().indexOf(":8080") >= 0 ){ 
+if (window.location.toString().indexOf(":8080") >= 0 && window.location.toString().indexOf("nodemo") < 0 ){
+    console.log("Autoloading demo files");
     setTimeout( () => {
         getModule(ConnectionStore, store).loadExamplesForDemo();
     }, 500);

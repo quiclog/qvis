@@ -196,7 +196,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
         // }
 
 
-        console.log("DEBUG: streamsFound", streams);
+        // console.log("DEBUG: streamsFound", streams);
 
         // let colorDomain = d3.scaleOrdinal() 
         //     .domain(["0",   "4",     "8",    "12",   "16",     "20",     "24",     "28",    "32",   "36",    "40",  "44"])
@@ -215,18 +215,18 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
         if ( streams.size <= 1 || dataFrameCount < 5 ){
             // error message is already shown in the CollapsedRenderer
-            // rects
-            // // text
-            // .append("text")
-            //     .attr("x", 200 )
-            //     .attr("y", 100 ) // + 1 is eyeballed magic number
-            //     .attr("dominant-baseline", "baseline")
-            //     .style("text-anchor", "start")
-            //     .style("font-size", "14")
-            //     .style("font-family", "Trebuchet MS")
-            //     // .style("font-weight", "bold")
-            //     .attr("fill", "#000000")
-            //     .text( "This trace doesn't contain multiple independent streams (or has less than 5 STREAM frames), which is needed for this visualization." );
+            rects
+            // text
+            .append("text")
+                .attr("x", 200 )
+                .attr("y", 100 ) // + 1 is eyeballed magic number
+                .attr("dominant-baseline", "baseline")
+                .style("text-anchor", "start")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                // .style("font-weight", "bold")
+                .attr("fill", "#000000")
+                .text( "This trace doesn't contain multiple independent streams (or has less than 5 STREAM frames), which is needed for the waterfall." );
 
             return;
         }
