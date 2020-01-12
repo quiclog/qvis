@@ -337,8 +337,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
                 for ( const hole of range.holes ) {
                     // ignore if we overlap 2 holes for now
-                    if ( (from >= hole.from && from <= hole.to) || 
-                         (to   >= hole.from && to   <= hole.to) ) {
+                    if ( (newHole.from >= hole.from && newHole.from <= hole.to) || 
+                         (newHole.to   >= hole.from && newHole.to   <= hole.to) ) {
                             
                         foundHole2 = hole;
                         break;
@@ -363,8 +363,6 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             else {
                 range.currentHead = range.filled[ range.filled.length - 1 ].to;
             }
-
-            // console.log( "Holes are now ", JSON.stringify(range.holes) );
 
             // console.log("Ended arrival algorithm ", FrameArrivalType[outputType], outputTimestampDifference, range.currentHead, range.highestReceived, range.holes, range.filled );
             // console.log("--------------------------------------");
@@ -397,7 +395,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                             }
 
                             const arrivalInfo:ArrivalInfo = 
-                                calculateFrameArrivalType( ranges, event.absoluteTime, parseInt(frame.offset, 10), parseInt(frame.offset, 10) + parseInt(frame.length, 10) - 1 );
+                                calculateFrameArrivalType(ranges, event.relativeTime, parseInt(frame.offset, 10), parseInt(frame.offset, 10) + parseInt(frame.length, 10) - 1 );
 
 
                             dataSent.push( {
