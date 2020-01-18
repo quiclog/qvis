@@ -82,6 +82,10 @@
         }
 
         public selectAllConnections() {
+
+            // TODO: just for paper results, remove!
+            (window as any).holblockinfo = new Array<any>();
+
             const conns = [];
             for ( const group of this.store.groups ){
                 if ( group.filename.indexOf("DEMO") < 0 ){

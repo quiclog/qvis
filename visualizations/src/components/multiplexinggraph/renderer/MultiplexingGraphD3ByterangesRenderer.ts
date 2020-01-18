@@ -163,12 +163,12 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .data( streamFrames.filter( (d:any) => d.dataMoved !== undefined ) )
             .enter()
             .append("rect")
-                .attr("x", (d:any) => xDomain(d.countStart + 5) )
+                .attr("x", (d:any) => xDomain(d.countStart + 2) )
                 .attr("y", (d:any) => yDomain(d.offset) )
                 .attr("fill", "black" )
                 .style("opacity", 1)
                 .attr("class", "dataMoved")
-                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * 2 )
+                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) )
                 .attr("height", (d:any) => yDomain( d.offset + d.dataMoved - 1) - yDomain(d.offset) );
 
         this.updateZoom = (newXDomain:any) => {
@@ -184,7 +184,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 console.error("Something went wrong transforming Y domain byterangeszoom", endIndex, allFrames.length );
             }
 
-            console.log("Looking for Y values between", startIndex, endIndex);
+            // console.log("Looking for Y values between", startIndex, endIndex);
 
             let startY = Number.MAX_VALUE;
             let endY = 0;
@@ -215,7 +215,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 }
             }
 
-            console.log("Y new domain", startY, endY);
+            // console.log("Y new domain", startY, endY);
             if ( startY > endY ) {
                 console.error("Something went terribly wrong", startY, endY);
             }
@@ -245,8 +245,8 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
             rects
                 .selectAll(".dataMoved")
-                    .attr("x",      (d:any) => newX(d.countStart + 5) )
-                    .attr("width",  (d:any) => Math.max(1, newX(d.countEnd) - newX(d.countStart)) * 2 )
+                    .attr("x",      (d:any) => newX(d.countStart + 2) )
+                    .attr("width",  (d:any) => Math.max(1, newX(d.countEnd) - newX(d.countStart)) )
                     .attr("y",      (d:any) => newY( d.offset ) )
                     .attr("height", (d:any) => { return newY( d.offset + d.dataMoved - 1) - newY(d.offset); } )
         };
