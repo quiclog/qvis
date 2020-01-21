@@ -14,6 +14,8 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
     protected height = 500;
 
+    protected DEBUG_printready = true;
+
     private dimensions:any = {};
 
     private updateZoom:any;
@@ -54,6 +56,10 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
         this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
+
+        if ( this.DEBUG_printready ){
+            this.dimensions.margin.top = 10;
+        }
 
         // width and height are the INTERNAL widths (so without the margins)
         this.dimensions.width = container.clientWidth - this.dimensions.margin.left - this.dimensions.margin.right;
@@ -98,8 +104,12 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .domain([1, allFrames[ allFrames.length - 1 ].countEnd ])
             .range([ 0, this.dimensions.width ]);
 
+
         const xAxis = this.svg.append("g");
-        xAxis.call(d3.axisTop(xDomain));
+        
+        if ( !this.DEBUG_printready ){
+            xAxis.call(d3.axisTop(xDomain));
+        }
 
         const yDomain = d3.scaleLinear()
             .domain([0, maxBytes ])
@@ -108,9 +118,25 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .range([0, this.dimensions.height]);
 
         const yAxis = this.svg.append("g")
-            .attr("transform", "translate(50, 0)");
+            .attr("transform", "translate(0, 0)");
 
-        yAxis.call(d3.axisLeft(yDomain));
+        yAxis.call(d3.axisRight(yDomain));
+
+        if ( this.DEBUG_printready ){
+            yAxis
+            .selectAll("text")
+            .style("font-family", "Trebuchet MS")
+            .style("font-size", "20");
+
+            yAxis.selectAll("path")
+                .style("stroke", "black")
+                .style("stroke-width", "2");
+            yAxis.selectAll(".tick line")
+                .style("stroke", "black")
+                .style("stroke-width", "2");
+
+            
+        }
 
 
 
@@ -130,6 +156,13 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
         console.log("Rendering ", streamFrames );
 
+        let widthModifier = 1;
+        let heightModifier = 1;
+        if ( this.DEBUG_printready ){
+            heightModifier = 2;
+            widthModifier = 4;
+        }
+
         rects
             .selectAll("rect.packet")
             .data( streamFrames )
@@ -140,9 +173,13 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] )
                 .style("opacity", 1)
                 .attr("class", "packet")
-                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)))
-                .attr("height", (d:any) => Math.max(1, yDomain( d.length - 1)) )
+                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
+                .attr("height", (d:any) => Math.max(1, yDomain( d.length - 1)) * heightModifier)
 
+        let opacity = 0.2;
+        if ( this.DEBUG_printready ) {
+            opacity = 0.5;
+        }
         
         rects
             .selectAll("rect.pingback")
@@ -152,24 +189,29 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 .attr("x", (d:any) => xDomain(1) )
                 .attr("y", (d:any) => yDomain(d.offset) )
                 .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] )
-                .style("opacity", 0.2)
+                .style("opacity", opacity)
                 .attr("class", "pingback")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(1)))
-                .attr("height", (d:any) => yDomain( d.length - 1) )
+                .attr("height", (d:any) => yDomain( d.length - 1))
             // .style("pointer-events", "all")
+
+        let movedOffset = 2;
+        if ( this.DEBUG_printready ){
+            movedOffset = 30;
+        }
 
         rects
             .selectAll("rect.dataMoved")
             .data( streamFrames.filter( (d:any) => d.dataMoved !== undefined ) )
             .enter()
             .append("rect")
-                .attr("x", (d:any) => xDomain(d.countStart + 2) )
+                .attr("x", (d:any) => xDomain(d.countStart + movedOffset) )
                 .attr("y", (d:any) => yDomain(d.offset) )
                 .attr("fill", "black" )
                 .style("opacity", 1)
                 .attr("class", "dataMoved")
-                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) )
-                .attr("height", (d:any) => yDomain( d.offset + d.dataMoved - 1) - yDomain(d.offset) );
+                .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
+                .attr("height", (d:any) => yDomain( d.offset + d.dataMoved - 1) - yDomain(d.offset));
 
         this.updateZoom = (newXDomain:any) => {
 

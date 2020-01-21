@@ -125,6 +125,12 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             this.dimensions.margin.bottom = 40;
         }
 
+        
+        if ( this.DEBUG_printready ) {
+            this.dimensions.margin.top += this.dimensions.margin.bottom;
+            this.dimensions.margin.bottom = 0;
+        }
+
         // width and height are the INTERNAL widths (so without the margins)
         this.dimensions.width = container.clientWidth - this.dimensions.margin.left - this.dimensions.margin.right;
         this.dimensions.height = this.barHeight;
