@@ -32,7 +32,7 @@
                 </div>
             </b-col>
         </b-row>
-        <b-row v-if="showbyteranges" style="height: 520px;" align-v="center">
+        <b-row v-if="showbyteranges" style="height: 520px; margin-bottom: 10px;" align-v="center">
         <!-- <b-row v-if="showbyteranges" style="height: 10020px;" align-v="center"> -->
             <b-col cols="1">
                 Byterange per STREAM frame

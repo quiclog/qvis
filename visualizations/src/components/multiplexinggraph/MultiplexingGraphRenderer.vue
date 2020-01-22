@@ -5,6 +5,21 @@
             :connection="connection"
         /> -->
 
+        <b-container fluid>
+            <b-row align-v="center">
+                <b-col cols="6">
+                    <div id="multiplexing-stats" style="width: 100%;">
+
+                    </div>
+                </b-col>
+                <b-col cols="6">
+                    <div id="multiplexing-stats-streams" style="width: 100%;">
+
+                    </div>
+                </b-col>
+            </b-row>
+        </b-container>
+
         <template v-for="(connection2,index) in this.config.connections">
             <MultiplexingGraphCollapsedRenderer 
                 style="width: 100%; border:5px solid #d1ecf1;"
