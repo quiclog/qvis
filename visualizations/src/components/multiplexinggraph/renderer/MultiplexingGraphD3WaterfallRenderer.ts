@@ -250,7 +250,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
                 .attr("height", (this.barHeight / streams.size) - 1);
 
-        const circleWidth = ((this.barHeight / streams.size) - 1) / 1.2;
+        const circleWidth = Math.min(15 ,((this.barHeight / streams.size) - 1) / 1.2);
 
         rects2
             .append("circle")
@@ -261,23 +261,26 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
                 .attr("r", circleWidth / 2 );
 
-        const legendY = ((-2) * (this.barHeight / streams.size)) + (circleWidth / 1.6); // 1.6 should be 2, but 1.6 somehow looks better...
+        // const legendY = ((-2) * (this.barHeight / streams.size)) + (circleWidth / 1.6); // 1.6 should be 2, but 1.6 somehow looks better...
+
+        const legendY = -this.dimensions.margin.top / 2;
+        const legendIconWidth = 13;
 
         rects
             .append("circle")
-                .attr("cx", xDomain(0) + circleWidth / 2 )
-                .attr("cy", legendY - 3 ) 
+                .attr("cx", xDomain(0) + legendIconWidth / 2 )
+                .attr("cy", legendY ) 
                 .attr("fill", (d:any) => { return "white" } )
                 .attr("stroke", (d:any) => { return "black"; } )
-                .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
-                .attr("r", circleWidth / 2 );
+                .attr("stroke-width", (d:any) => { return legendIconWidth / 5; } )
+                .attr("r", legendIconWidth / 2 );
 
         rects
             // text
             .append("text")
-                .attr("x", xDomain(0) + circleWidth / 2 + 10 )
+                .attr("x", xDomain(0) + legendIconWidth / 2 + 20 )
                 .attr("y", legendY + 1 ) // + 1 is eyeballed magic number
-                .attr("dominant-baseline", "baseline")
+                .attr("dominant-baseline", "middle")
                 .style("text-anchor", "start")
                 .style("font-size", "14")
                 .style("font-family", "Trebuchet MS")
@@ -287,58 +290,26 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
         rects
             .append("rect")
-                .attr("x", xDomain(0) + circleWidth / 2 + 150 )
-                .attr("y", (-2) * (this.barHeight / streams.size) - 1.6 ) 
+                .attr("x", xDomain(0) + legendIconWidth / 2 + 150 )
+                .attr("y", legendY - legendIconWidth / 2 ) 
                 .attr("fill", (d:any) => { return "white" } )
                 .attr("stroke", (d:any) => { return "black"; } )
-                .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
+                .attr("stroke-width", (d:any) => { return legendIconWidth / 5; } )
                 .attr("width", 20 )
-                .attr("height", circleWidth );
+                .attr("height", legendIconWidth );
 
         rects
             // text
             .append("text")
-                .attr("x", xDomain(0) + circleWidth / 2 + 180 )
-                .attr("y", legendY + 1 ) // + 1 is eyeballed magic number
-                .attr("dominant-baseline", "baseline")
+                .attr("x", xDomain(0) + legendIconWidth / 2 + 180 )
+                .attr("y", legendY ) // + 1 is eyeballed magic number
+                .attr("dominant-baseline", "middle")
                 .style("text-anchor", "start")
                 .style("font-size", "14")
                 .style("font-family", "Trebuchet MS")
                 // .style("font-weight", "bold")
                 .attr("fill", "#000000")
                 .text( "Colored while stream is \"active\" (between first and last STREAM frame " + directionText + ")");
-
-
-
-            // .insert("rect")
-            //     .attr("x", (d:any) => { return xDomain(d.count) + 15; } )
-            //     .attr("y", (d:any) => { return 15; } )
-            //     .attr("fill", "#FFFFFF" )
-            //     .style("opacity", 0.75)
-            //     .attr("width", (d:any) => { return xDomain(d.count + 1) - xDomain(d.count) - 15; })
-            //     .attr("height", this.barHeight * 0.2 );
-
-        // rects2
-        //     .append("rect")
-        //         .attr("x", (d:any) => { return xDomain(d.count) + 15; } )
-        //         .attr("y", (d:any) => { return 15; } )
-        //         .attr("fill", "#FFFFFF" )
-        //         .style("opacity", 0.75)
-        //         .attr("width", (d:any) => { return xDomain(d.count + 1) - xDomain(d.count) - 30; })
-        //         .attr("height", this.barHeight * 0.4 );
-
-        // rects2
-        //     // text
-        //     .append("text")
-        //         .attr("x", (d:any) => { return xDomain(d.count) + 15 + 2; } )
-        //         .attr("y", (d:any) => { return 15 + ((this.barHeight * 0.4) / 2); } )
-        //         .attr("dominant-baseline", "middle")
-        //         .style("text-anchor", "start")
-        //         .style("font-size", "14")
-        //         .style("font-family", "Trebuchet MS")
-        //         .style("font-weight", "bold")
-        //         .attr("fill", "#000000")
-        //         .text( (d:any) => { return d.text; } );
     }
 
 }

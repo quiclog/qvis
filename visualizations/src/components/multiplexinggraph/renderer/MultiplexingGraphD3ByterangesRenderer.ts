@@ -14,8 +14,6 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
     protected height = 500;
 
-    protected DEBUG_printready = true;
-
     private dimensions:any = {};
 
     private updateZoom:any;
@@ -29,7 +27,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             return false;
         }
 
-        console.log("MultiplexingGraphD3ByterangesRenderer:render", allFrames, streamID);
+        console.log("MultiplexingGraphD3ByterangesRenderer:render", streamID);
 
         this.rendering = true;
 
@@ -56,10 +54,6 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
         this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
-
-        if ( this.DEBUG_printready ){
-            this.dimensions.margin.top = 10;
-        }
 
         // width and height are the INTERNAL widths (so without the margins)
         this.dimensions.width = container.clientWidth - this.dimensions.margin.left - this.dimensions.margin.right;
@@ -106,10 +100,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
 
         const xAxis = this.svg.append("g");
-        
-        if ( !this.DEBUG_printready ){
-            xAxis.call(d3.axisTop(xDomain));
-        }
+        xAxis.call(d3.axisTop(xDomain));
 
         const yDomain = d3.scaleLinear()
             .domain([0, maxBytes ])
@@ -121,24 +112,6 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .attr("transform", "translate(0, 0)");
 
         yAxis.call(d3.axisRight(yDomain));
-
-        if ( this.DEBUG_printready ){
-            yAxis
-            .selectAll("text")
-            .style("font-family", "Trebuchet MS")
-            .style("font-size", "20");
-
-            yAxis.selectAll("path")
-                .style("stroke", "black")
-                .style("stroke-width", "2");
-            yAxis.selectAll(".tick line")
-                .style("stroke", "black")
-                .style("stroke-width", "2");
-
-            
-        }
-
-
 
         const clip = this.svg.append("defs").append("SVG:clipPath")
             .attr("id", "byterange-clip")
@@ -154,14 +127,8 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         const rects = this.svg.append('g')
             .attr("clip-path", "url(#byterange-clip)");
 
-        console.log("Rendering ", streamFrames );
-
-        let widthModifier = 1;
-        let heightModifier = 1;
-        if ( this.DEBUG_printready ){
-            heightModifier = 2;
-            widthModifier = 4;
-        }
+        const widthModifier = 1;
+        const heightModifier = 1;
 
         rects
             .selectAll("rect.packet")
@@ -176,11 +143,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
                 .attr("height", (d:any) => Math.max(1, yDomain( d.length - 1)) * heightModifier)
 
-        let opacity = 0.2;
-        if ( this.DEBUG_printready ) {
-            opacity = 0.5;
-        }
-        
+        const opacity = 0.2;
         rects
             .selectAll("rect.pingback")
             .data( streamFrames )
@@ -195,11 +158,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 .attr("height", (d:any) => yDomain( d.length - 1))
             // .style("pointer-events", "all")
 
-        let movedOffset = 2;
-        if ( this.DEBUG_printready ){
-            movedOffset = 30;
-        }
-
+        const movedOffset = 2;
         rects
             .selectAll("rect.dataMoved")
             .data( streamFrames.filter( (d:any) => d.dataMoved !== undefined ) )

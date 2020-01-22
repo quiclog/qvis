@@ -1,6 +1,10 @@
 <template>
     <b-container fluid>
-        {{(connection !== undefined) ? connection.parent.filename + " : " + connection.getLongName() : ""}}
+        <b-row align-v="center" style="text-align: center;">
+            <b-col cols="12">
+                <h4>{{(connection !== undefined) ? connection.parent.filename + " : " + connection.getLongName() : ""}}</h4>
+            </b-col>
+        </b-row>
         <b-row v-if="showwaterfall" style="height: 165px;" align-v="center">
             <b-col cols="1">
                 Waterfall
