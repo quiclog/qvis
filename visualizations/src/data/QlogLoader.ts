@@ -23,8 +23,11 @@ export class QlogLoader {
             else if ( version === "draft-01" ){
                 return QlogLoader.fromDraft01(json);
             }
+            else if ( version === "draft-02-wip" ){
+                return QlogLoader.fromDraft02(json);
+            }
             else {
-                console.error("QlogLoader: Unknown qlog version! Only draft-00 and draft-01 are supported!", version, json);
+                console.error("QlogLoader: Unknown qlog version! Only draft-00, draft-01 and draft-02-wip are supported!", version, json);
                 
                 return undefined;
             }
@@ -35,6 +38,100 @@ export class QlogLoader {
             return undefined;
         }
 
+    }
+
+    protected static fromDraft02(json:any) : QlogConnectionGroup {
+
+        const fileContents:qlog01.IQLog = json as qlog01.IQLog;
+
+        console.log("QlogLoader:fromDraft02-wip : ", fileContents, fileContents.traces);
+
+        const group = new QlogConnectionGroup();
+        group.version = fileContents.qlog_version;
+        group.title = fileContents.title || "";
+        group.description = fileContents.description || "";
+
+        for ( let jsonconnection of fileContents.traces ){
+
+            // a single trace can contain multiple component "traces" if group_id is used and we need to split them out first
+            const qlogconnections:Array<QlogConnection> = new Array<QlogConnection>();
+
+            if ( (jsonconnection as qlog01.ITraceError).error_description !== undefined ) {
+                jsonconnection = jsonconnection as qlog01.ITraceError;
+
+                const conn = new QlogConnection(group);
+                conn.title = "ERROR";
+                conn.description = jsonconnection.uri + " : " + jsonconnection.error_description;
+                continue;
+            }
+
+            jsonconnection = jsonconnection as qlog01.ITrace;
+
+            const groupIDIndex:number = jsonconnection.event_fields.indexOf("group_id");
+            if ( jsonconnection.event_fields && groupIDIndex >= 0 ) {
+                const groupLUT:Map<string, QlogConnection> = new Map<string, QlogConnection>();
+
+                for ( const event of jsonconnection.events ) {
+
+                    // allow an empy last element to get around trailing comma restrictions in JSON
+                    if ( event.length === 0 || Object.keys(event).length === 0 ) {
+                        continue;
+                    }
+
+                    let groupID = event[ groupIDIndex ];
+                    if ( typeof groupID !== "string" ) {
+                        groupID = JSON.stringify(groupID);
+                    }
+
+                    let conn = groupLUT.get(groupID as string);
+                    if ( !conn ){
+                        conn = new QlogConnection(group);
+                        conn.title = "Group " + groupID + " : ";
+                        groupLUT.set( groupID as string, conn );
+
+                        qlogconnections.push( conn );
+                    }
+
+                    conn.getEvents().push( event );
+                }
+            }
+            else {
+                // just one component trace, easy mode
+                const conn = new QlogConnection(group);
+                qlogconnections.push( conn );
+                conn.setEvents( jsonconnection.events as any );
+
+
+                // allow an empy last element to get around trailing comma restrictions in JSON
+                const lastEvent = jsonconnection.events[ jsonconnection.events.length - 1 ];
+                if ( lastEvent.length === 0 || Object.keys(lastEvent).length === 0 ) {
+                    conn.getEvents().splice( jsonconnection.events.length - 1, 1 );
+                }
+            }
+
+            // component traces share most properties of the overlapping parent trace (e.g., vantage point etc.)
+            for ( const connection of qlogconnections ){
+
+                connection.title += jsonconnection.title ? jsonconnection.title : "";
+                connection.description += jsonconnection.description ? jsonconnection.description : "";
+                
+                connection.vantagePoint = jsonconnection.vantage_point || {} as qlog01.IVantagePoint;
+
+                if ( !connection.vantagePoint.type ){
+                    connection.vantagePoint.type = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.name = "No VantagePoint set";
+                }
+
+                connection.eventFieldNames = jsonconnection.event_fields;
+                connection.commonFields = jsonconnection.common_fields!;
+                connection.configuration = jsonconnection.configuration || {};
+
+                connection.setEventParser( new EventFieldsParser() );
+            }
+        }
+
+        return group;
     }
 
     protected static fromDraft01(json:any) : QlogConnectionGroup {
