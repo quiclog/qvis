@@ -52,6 +52,8 @@ export default class SequenceDiagramD3Renderer {
     private rangeHeight!:number;
     private shortenedIntervals:Array<Interval> = new Array<Interval>();
 
+    private timeResolution = 1;
+
     private dimensions:any = {};
     
     private bandWidth:number = 0; // width of an individual vertical trace timeline on screen
@@ -68,13 +70,14 @@ export default class SequenceDiagramD3Renderer {
         this.onEventClicked = onEventClicked;
     }
    
-    public async render(traces:Array<SequenceDiagramConnection>):Promise<boolean> {
+    public async render(traces:Array<SequenceDiagramConnection>, timeResolution:number):Promise<boolean> {
         if ( this.rendering ) {
             return false;
         }
 
         console.log("SequenceDiagramD3Renderer:render", traces.length, traces);
 
+        this.timeResolution = timeResolution;
         this.selectedTraces = traces;
         this.rendering = true;
 
@@ -238,7 +241,7 @@ export default class SequenceDiagramD3Renderer {
                     text.setAttribute('x', "" + (currentX + (this.dimensions.pixelsPerMillisecond) ));
                     text.setAttribute('y', "" + (interval.yMin + (interval.yMax - interval.yMin) / 2));
                     text.setAttribute('dominant-baseline', "middle");
-                    text.textContent = `${interval.timeSkipped}ms of inactivity`;
+                    text.textContent = `${(interval.timeSkipped / this.timeResolution).toFixed(2)}ms of inactivity`;
                     (this.svg.node()! as HTMLElement).appendChild( text );   
                 }                                     
 
@@ -688,6 +691,9 @@ export default class SequenceDiagramD3Renderer {
         let inOverlapPreventionMode:boolean = false;
         let previousMinimumTrace:number = 0; // only needed for overlap prevention
 
+        // normally, we do per 1 ms. If we have sub-ms latencies, need more resolution, so up this value. 1000 means microseconds, 1 means milliseconds (default)
+        const timeResolution = this.timeResolution;
+        this.absoluteAggregatedStartTime *= timeResolution;
 
         this.shortenedIntervals = new Array<Interval>();
 
@@ -705,8 +711,10 @@ export default class SequenceDiagramD3Renderer {
                 const timeOffset = traces[t].timeOffset;
 
                 const evt = trace.getEvents()[ heads[t] ];
-                const time = trace.parseEvent(evt).absoluteTime - this.absoluteAggregatedStartTime + timeOffset; // timeWithCustomOffset(timeOffset);
-                
+                const time = (trace.parseEvent(evt).absoluteTime * timeResolution) - this.absoluteAggregatedStartTime + (timeOffset * timeResolution); // timeWithCustomOffset(timeOffset);
+
+                (evt as any).timeText = "" + time.toFixed(2);
+
                 // < instead of <= so we always favor rendering a single trace as long as possible before switching to the next. 
                 // Important for overlap prevention.
                 if ( time < currentMinimumTime ){ 
@@ -1128,8 +1136,15 @@ export default class SequenceDiagramD3Renderer {
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
-                    let timeText:any = evt.absoluteTime - this.absoluteAggregatedStartTime + trace.timeOffset;
-                    timeText = timeText.toFixed(2);
+                    let timeText:any = "";
+                    if ( (rawEvt as any).timeText !== undefined ){
+                        timeText = (rawEvt as any).timeText;
+                    }
+                    else {
+                        timeText = evt.absoluteTime - this.absoluteAggregatedStartTime + trace.timeOffset;
+                        timeText = timeText.toFixed(2);
+                    }
+
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.setAttribute('class', "timestamp");
                     text.setAttribute('x', "" + (currentX - (pixelsPerMillisecond / 2) + ((i === 0) ? -pixelsPerMillisecond * 2 : pixelsPerMillisecond * 2)));

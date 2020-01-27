@@ -31,7 +31,16 @@
         </div>
     -->
 
-        <b-button @click="selectDefault()">Add trace</b-button><!-- &#43; PLUS + -->
+        <b-container fluid> 
+            <b-row>
+                <b-col> 
+                    <b-button @click="selectDefault()">Add trace</b-button><!-- &#43; PLUS + -->
+                </b-col>
+                <b-col cols="1" align-self="center"> <div class="text-right" v-b-tooltip.hover title="Increase if you have sub-millisecond latencies or want more space between events. 1 = ms level, 1000 = us level. Typically 10 or 100 is enough.">Time multiplier: </div></b-col>
+                <b-col cols="1"> <b-input type="number" v-model="config.timeResolution"/></b-col>
+            </b-row>
+        </b-container>
+
         <b-alert v-if="connectionIsUnknownPerspective" show variant="danger">The selected trace has an unknown vantage point. We guessed it based on heuristics, but this could be wrong!</b-alert>
 
         <b-alert v-if="this.store.outstandingRequestCount === 0 && this.store.groups.length === 0" show variant="danger">Please load a trace file to visualize it</b-alert>

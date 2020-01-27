@@ -48,7 +48,7 @@
         public mounted(){
             // mainly for when we switch away, and then back to the sequenceDiagram
             if ( this.config && this.renderer && this.config.connections.length > 0 ) {
-                this.renderer.render( this.config.connections );
+                this.renderer.render( this.config.connections, this.config.timeResolution );
             }
         }
 
@@ -86,7 +86,7 @@
                         await new Promise( (resolve) => setTimeout(resolve, 200));
                     }
 
-                    this.renderer.render( newConfig.connections ).then( (rendered) => {
+                    this.renderer.render( newConfig.connections, newConfig.timeResolution ).then( (rendered) => {
 
                         if ( !rendered ) {
                             Vue.notify({

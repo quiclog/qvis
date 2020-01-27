@@ -26,4 +26,6 @@ export default class SequenceDiagramConfig {
     // the connections to be shown in the SequenceDiagram
     // index 0 = left, index 1 = next one to the right, ... , length - 1 = rightmost one
     public connections:Array<SequenceDiagramConnection> = new Array<SequenceDiagramConnection>();
+
+    public timeResolution:number = 1; // for dealing with traces with sub-millisecond latencies (as the sequence diagram groups per millisecond)
 }

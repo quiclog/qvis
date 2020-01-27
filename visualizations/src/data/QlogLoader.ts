@@ -128,6 +128,29 @@ export class QlogLoader {
                 connection.configuration = jsonconnection.configuration || {};
 
                 connection.setEventParser( new EventFieldsParser() );
+
+                // TODO: remove! Slows down normal traces!
+                let misOrdered = false;
+                let minimumTime = -1;
+                for ( const evt of connection.getEvents() ){
+                    const parsedEvt = connection.parseEvent(evt);
+                    
+                    if ( parsedEvt.absoluteTime >= minimumTime ){
+                        minimumTime = parsedEvt.absoluteTime;
+                    }
+                    else {
+                        misOrdered = true;
+                        console.error("QlogLoader:draft02 : timestamps were not in the correct order!", parsedEvt.absoluteTime, " < ", minimumTime, parsedEvt);
+                    }
+                }
+
+                if ( misOrdered ){
+                    connection.getEvents().sort( (a, b) => { return connection.parseEvent(a).absoluteTime - connection.parseEvent(b).absoluteTime });
+                    console.error("QlogLoader:draft02 : manually sorted trace on timestamps!", connection.getEvents());
+                    connection.setEventParser( new EventFieldsParser() ); // because startTime etc. could have changes because of the re-ordering
+
+                    alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
+                }
             }
         }
 
