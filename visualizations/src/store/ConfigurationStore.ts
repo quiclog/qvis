@@ -3,6 +3,7 @@ import SequenceDiagramConfig from "@/components/sequencediagram/data/SequenceDia
 import CongestionGraphConfig from '@/components/congestiongraph/data/CongestionGraphConfig';
 import StatisticsConfig from '@/components/stats/data/StatisticsConfig';
 import MultiplexingGraphConfig from '@/components/multiplexinggraph/data/MultiplexingGraphConfig';
+import PacketizationDiagramConfig from '@/components/packetizationdiagram/data/PacketizationDiagramConfig';
 
 @Module({name: 'configurations'})
 export default class ConfigurationStore extends VuexModule {
@@ -11,4 +12,5 @@ export default class ConfigurationStore extends VuexModule {
     public sequenceDiagramConfig:   SequenceDiagramConfig   = new SequenceDiagramConfig();
     public statisticsConfig:        StatisticsConfig        = new StatisticsConfig();
     public multiplexingGraphConfig: MultiplexingGraphConfig = new MultiplexingGraphConfig();
+    public packetizationDiagramConfig: PacketizationDiagramConfig = new PacketizationDiagramConfig();
 }

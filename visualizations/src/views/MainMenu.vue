@@ -35,6 +35,9 @@
                     <b-nav-item to="/multiplexing" class="multiplexing-link" :active="$route.fullPath.indexOf('/multiplexing') >= 0">
                         Multiplexing
                     </b-nav-item>
+                    <b-nav-item to="/packetization" class="packetization-link" :active="$route.fullPath.indexOf('/packetization') >= 0">
+                        Packetization
+                    </b-nav-item>
                     <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath.indexOf('/stats') >= 0">
                         qlog stats
                     </b-nav-item>
@@ -104,6 +107,14 @@
         background-color: #d1ecf1;
         border-bottom-color: #d1ecf1;
     }
+
+    #MainMenu li.packetization-link a.active {
+        color: black;
+        font-weight: bold;
+        background-color: #f8d7da;
+        border-bottom-color: #f8d7da;
+    }
+    
 
     #MainMenu li.stats-link a.active {
         color: black;

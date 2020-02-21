@@ -6,6 +6,7 @@ import QlogConnection from '@/data/Connection';
 import { QlogLoader, PreSpecEventParser } from '@/data/QlogLoader';
 import { IQlogRawEvent } from '@/data/QlogEventParser';
 import Vue from 'vue';
+import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -215,11 +216,16 @@ export default class ConnectionStore extends VuexModule {
         // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/5stream_from_chrome.qlog", filename: "DEMO_5streams.qlog"} );
         // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/10paralllel_aioquic.qlog", filename: "DEMO_10stream_aioquic.qlog"} );
         // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/10paralllel_litespeed.qlog", filename: "DEMO_10stream_multiplexing.qlog (14.6MB)"} );
-        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/new_cid.qlog", filename: "DEMO_new_cid.qlog (<1MB)"} );
-        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/spin_bit.qlog", filename: "DEMO_spin_bit.qlog (<1MB)"} );
-        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/parallel_10_50KB_f5.qlog", filename: "DEMO_10_parallel_streams.qlog (<1MB)"} );
-        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/doublevantage_100ms.qlog", filename: "DEMO_double_vantagepoint.qlog (3.1MB)"} );
-        this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/quictrace_example_github.qlog", filename: "DEMO_quictrace_example.qlog (3.7MB)"} );
+
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/new_cid.qlog", filename: "DEMO_new_cid.qlog (<1MB)"} );
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/spin_bit.qlog", filename: "DEMO_spin_bit.qlog (<1MB)"} );
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/parallel_10_50KB_f5.qlog", filename: "DEMO_10_parallel_streams.qlog (<1MB)"} );
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-01/doublevantage_100ms.qlog", filename: "DEMO_double_vantagepoint.qlog (3.1MB)"} );
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/quictrace_example_github.qlog", filename: "DEMO_quictrace_example.qlog (3.7MB)"} );
+
+        // this.loadQlogDirectlyFromURL( { url : "standalone_data/tcp/cdninstagram-com_rachelbrosnahan.json", filename: "DEMO_instagram_rachelbrosnahan (4MB)"} );
+        this.loadQlogDirectlyFromURL( { url : "standalone_data/tcp/wikipedia_Playstation.json", filename: "DEMO_wikipedia_playstation (4MB)"} );
+        
     }
 
     @Action
@@ -250,6 +256,19 @@ export default class ConnectionStore extends VuexModule {
                     text: "This file is now available for visualization, use the menu above to switch views.",
                 });
             }
+            else if ( fileContents.length > 0 && fileContents[0]._source ){
+                // pcap .json loaded
+                const convertedContents = TCPToQlog.convert( fileContents );
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: convertedContents, filename});
+
+                Vue.notify({
+                    group: "default",
+                    title: "Loaded " + filename,
+                    type: "success",
+                    text: "This file is now available for visualization, use the menu above to switch views.",
+                });
+
+            }
             else{
                 console.error("FileManagerContainer:loadDirectlyFromURL: error downloading file : ", url, res);
                 
@@ -262,16 +281,16 @@ export default class ConnectionStore extends VuexModule {
                 });
             }
         })  
-        .catch( (e) => {
-            this.context.commit("adjustOutstandingRequestCount", -1 );
+        // .catch( (e) => {
+        //     this.context.commit("adjustOutstandingRequestCount", -1 );
             
-            Vue.notify({
-                group: "default",
-                title: "ERROR loading " + filename,
-                type: "error",
-                duration: 6000,
-                text: "This file could not be loaded from " + url + ".<br/>View the devtools JavaScript console for more information. " + e,
-            });
-        })
+        //     Vue.notify({
+        //         group: "default",
+        //         title: "ERROR loading " + filename,
+        //         type: "error",
+        //         duration: 6000,
+        //         text: "This file could not be loaded from " + url + ".<br/>View the devtools JavaScript console for more information. " + e,
+        //     });
+        // })
     }
 }

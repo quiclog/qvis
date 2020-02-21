@@ -4,6 +4,7 @@ import MainMenu from "./views/MainMenu.vue";
 import VUEDebug from "./views/VUEDebug.vue";
 import FileManager from "./views/FileManager.vue";
 import SequenceDiagram from "./views/SequenceDiagram.vue";
+import PacketizationDiagram from "./views/PacketizationDiagram.vue";
 import CongestionGraph from "./views/CongestionGraph.vue";
 import MultiplexingGraph from "./views/MultiplexingGraph.vue";
 import Statistics from "./views/Statistics.vue";
@@ -61,6 +62,14 @@ const router = new Router({
             name: "multiplexing",
             components: {
                 default: MultiplexingGraph,
+                menu: MainMenu,
+            },
+        },
+        {
+            path: "/packetization",
+            name: "packetization",
+            components: {
+                default: PacketizationDiagram,
                 menu: MainMenu,
             },
         },

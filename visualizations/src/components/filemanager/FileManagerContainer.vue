@@ -47,7 +47,7 @@
                                     :state="Boolean(filesToUpload.length > 0)"
                                     placeholder="Choose files or drop them here..."
                                     drop-placeholder="Drop files here..."
-                                    accept=".qlog"
+                                    accept=".qlog,.json"
                                     class="text-nowrap text-truncate"
                                     ></b-form-file>
 
@@ -173,6 +173,7 @@
     import { Component, Vue } from "vue-property-decorator";
 
     import ConnectionStore from "@/store/ConnectionStore";
+    import TCPToQLOG from "./pcapconverter/tcptoqlog";
 
 
     @Component({})
@@ -231,7 +232,7 @@
 
             for ( const file of this.filesToUpload ){
 
-                if ( file === null || !file.name.endsWith(".qlog") ){
+                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) ) {
                     Vue.notify({
                         group: "default",
                         title: "Provide .qlog file",
@@ -239,7 +240,7 @@
                         duration: 6000,
                         text: "We currently only support uploading .qlog files. " + file.name,
                     });
-
+                
                     return;
                 }
             }
@@ -258,7 +259,18 @@
                 reader.onload = (evt) => {
                     try{
                         const contentsJSON = JSON.parse( (evt!.target as any).result );
-                        this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
+
+                        if ( file.name.endsWith(".qlog") ) {
+                            this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
+                        }
+                        else if ( file.name.endsWith(".json") ) {
+                            const qlogJSON = TCPToQLOG.convert( contentsJSON );
+                            // this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, filename: uploadFileName});
+                        }
+                        else {
+                            throw new Error("unsupported file format : " + uploadFileName);
+                        }
+
 
                         Vue.notify({
                             group: "default",
