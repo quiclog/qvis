@@ -3,7 +3,10 @@ import * as d3 from 'd3';
 import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2"
 import * as qlog from '@quictools/qlog-schema';
 
-
+interface Range {
+    start: number,
+    size: number
+}
 
 export default class PacketizationDiagramD3Renderer {
 
@@ -133,6 +136,8 @@ export default class PacketizationDiagramD3Renderer {
         let TLSmax = 0; 
         let HTTPmax = 0;
 
+        const TCPPayloadRanges:Array<Range> = new Array<Range>();
+
         let firstApplicationRecordStart = -1;
 
         for ( const eventRaw of this.connection.getEvents() ) {
@@ -142,22 +147,32 @@ export default class PacketizationDiagramD3Renderer {
 
             if ( event.name === TCPEventType ){ // packet_sent or _received, the ones we want to plot
 
+                if ( data.header.payload_length === 0 ){
+                    // ack, not showing these for now
+                    continue;
+                }
+
                 const length = data.header.header_length + data.header.payload_length;
 
-                // TCPData.push({
-                //     index: TCPindex,
+                // TCP packet header
+                TCPData.push({
+                    index: TCPindex,
+                    isPayload: false,
 
-                //     start: TCPmax,
-                //     size: data.header.header_length,
-                // });
+                    start: TCPmax,
+                    size: data.header.header_length,
+                });
 
-                // TCPData.push({
+                // TCP packet payload
+                TCPData.push({
+                    index: TCPindex,
+                    isPayload: true,
 
-                //     index: TCPindex,
+                    start: TCPmax + data.header.header_length,
+                    size: data.header.payload_length,
+                });
 
-                //     start: TCPmax + data.header.header_length,
-                //     size: data.header.header_length,
-                // });
+                TCPPayloadRanges.push( {start: TCPmax + data.header.header_length, size: data.header.payload_length} );
 
                 // TCPData.push({
                 //     index: TCPindex,
@@ -169,17 +184,7 @@ export default class PacketizationDiagramD3Renderer {
                 //     total_length: data.header.payload_length,
                 // });
 
-                TCPData.push({
-                    index: TCPindex,
-                    start: TCPmax,
-
-                    payload_start: TCPmax,
-                    payload_length: data.header.payload_length,
-
-                    total_length: data.header.payload_length,
-                });
-
-                TCPmax += data.header.payload_length;
+                TCPmax += length;
                 ++TCPindex;
 
                 lastTCPEvent = data;
@@ -187,149 +192,133 @@ export default class PacketizationDiagramD3Renderer {
             else if ( event.name === TLSEventType ) {
 
                 const payloadLength = Math.max(0, data.header.payload_length);
-                const length = data.header.header_length + payloadLength + data.header.trailer_length;
+                const recordLength = data.header.header_length + payloadLength + data.header.trailer_length;
 
-                TLSData.push({
-                    contentType: data.header.content_type,
-                    index: TLSindex, 
-                    tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
-                    start: TLSmax,
+                let remainingLength = recordLength; // it's TCP's payload, so the full TLS record length 
 
-                    payload_start: TLSmax + data.header.header_length,
-                    payload_length: payloadLength,
+                console.log("Matching TLS records with TCP payload ranges", recordLength, JSON.stringify(TCPPayloadRanges));
 
-                    total_length: length,
+                let headerWritten = false;
 
-                });
+                while ( TCPPayloadRanges.length > 0 ) {
+                    const range = TCPPayloadRanges.shift();
+
+                    if ( range!.start + range!.size <= range!.start + remainingLength ) {
+                        // full range is consumed
+
+                        console.log("Record fills entire TCP payload, consumed!");
+                    }
+                    else {
+
+                        console.log("Record fills part of TCP payload, SPLIT!", range!.start, range!.size, remainingLength );
+
+                        // range needs to be split
+                        TCPPayloadRanges.unshift( {start: range!.start + remainingLength, size: range!.size - remainingLength} );
+                        range!.size = remainingLength; // this struct isn't added back to the array, so can safely change it for use below
+                    }
+
+                    // save this temp var here, because when writing the header we change range.size... TODO: make this all cleaner
+                    const lengthModifier = range!.size;
+
+                    if ( !headerWritten ) {
+
+                        TLSData.push({
+                            isPayload: false,
+
+                            contentType: data.header.content_type,
+                            index: TLSindex, 
+                            tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+                            
+                            start: range!.start,
+                            size: data.header.header_length,
+
+                            record_length: recordLength,
+                            payload_length: payloadLength,
+                        });
+
+                        range!.start += data.header.header_length;
+                        range!.size -= data.header.header_length;
+
+                        headerWritten = true;
+                    }
+
+                    TLSData.push({
+                        isPayload: true,
+
+                        contentType: data.header.content_type,
+                        index: TLSindex, 
+                        tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+    
+                        record_length: recordLength,
+                        payload_length: payloadLength,
+    
+                        start: range!.start,
+                        size: range!.size,
+                    });
+
+                    if ( range!.size < 0 ) { // sanity check
+                        console.error("PacketizationDiagram: Negative size for TLS record! Should not happen!", range!.size, range, data, TCPPayloadRanges);
+                    }
+
+                    remainingLength -= lengthModifier;
+
+                    if ( remainingLength <= 0 ) {
+                        break;
+                    }
+                }
+
+                if ( remainingLength !== 0 ){
+                    console.error("BAD ALGORITHM MATCHING TLS WITH TCP! " + remainingLength);
+                }
+
+
+
+                // TLSData.push({
+                //     contentType: data.header.content_type,
+                //     index: TLSindex, 
+                //     tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+                //     start: TLSmax,
+
+                //     payload_start: TLSmax + data.header.header_length,
+                //     payload_length: payloadLength,
+
+                //     total_length: length,
+
+                // });
 
                 if ( firstApplicationRecordStart === -1 && data.header.content_type === "application" ) {
                     firstApplicationRecordStart = TLSmax;
                 }
 
-                TLSmax += length;
+                TLSmax += recordLength;
                 ++TLSindex;
 
                 lastTLSEvent = data;
             }
             else if ( event.name === HTTPEventType ) {
 
-                if ( HTTPmax === 0 ) {
-                    HTTPmax = firstApplicationRecordStart;
-                }
-
-                const payloadLength = Math.max(0, data.payload_length);
-                const length = data.header_length + payloadLength + 5 + 16; // 5 + 16 are TLS lengths: REMOVE THEM!!!
-
-                HTTPData.push({
-                    contentType: data.content_type,
-                    index: HTTPindex, 
-                    tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
-                    start: HTTPmax,
-
-                    payload_start: HTTPmax + data.header_length,
-                    payload_length: payloadLength,
-
-                    total_length: length,
-
-                });
-
-                HTTPmax += length;
-                ++HTTPindex;
-            }
-
-                // const streamFrames = new Array<any>();
-
-                // if ( data.frames && data.frames.length > 0 ){
-                //     for ( const frame of data.frames ) {
-
-                //         if ( !frame.stream_id || !StreamGraphDataHelper.isDataStream( frame.stream_id )){
-                //             // skip control streams like QPACK
-                //             continue;
-                //         }
-
-                //         if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
-
-                //             streamFrames.push ( frame );
-
-                //             let ranges = streamRanges.get( frame.stream_id );
-                //             if ( !ranges ){
-                //                 ranges = 
-                //                 {currentHead:-1, highestReceived: -1, holes: new Array<Range>(), filled:new Array<Range>(), cumulativeTimeDifference: 0, timeDifferenceSampleCount: 0, frameCount: 0 };
-                //                 streamRanges.set( frame.stream_id, ranges );
-                //             }
-
-                //             const arrivalInfo:ArrivalInfo = 
-                //                 calculateFrameArrivalType(ranges, event.relativeTime, parseInt(frame.offset, 10), parseInt(frame.offset, 10) + parseInt(frame.length, 10) - 1 );
-
-                //             ranges.frameCount += 1;
-
-                            
-                //             dataSent.push( {
-                //                 streamID: frame.stream_id, 
-                //                 packetNumber: data.header.packet_number,
-                //                 index: packetIndex, 
-                //                 size: frame.length, 
-                //                 countStart: frameCount, 
-                //                 countEnd: frameCount + 1,
-
-                //                 arrivalType: arrivalInfo.type, 
-                //                 arrivalTimeDifference: arrivalInfo.timeDifference,
-                //                 arrivalCreatedHole: arrivalInfo.createdHole,
-
-                //                 offset: parseInt(frame.offset, 10),
-                //                 length: parseInt(frame.length, 10),
-                //                 time: event.relativeTime,
-                //             });
-
-                //             ++frameCount;
-                //             ++packetIndex;
-
-                //             streamIDs.add( frame.stream_id );
-                //         }
-                //     }
-                //}
-            else if ( event.name === qlog.HTTP3EventType.data_moved ) {
-
-                // if ( !StreamGraphDataHelper.isDataStream( data.stream_id )){
-                //     continue;
+                // if ( HTTPmax === 0 ) {
+                //     HTTPmax = firstApplicationRecordStart;
                 // }
 
-                // if ( dataSent.length === 0 ) {
-                //     console.error("data moved but no stream frames seen yet... shouldn't happen!", data);
-                //     continue;
-                // }
+                // const payloadLength = Math.max(0, data.payload_length);
+                // const length = data.header_length + payloadLength + 5 + 16; // 5 + 16 are TLS lengths: REMOVE THEM!!!
 
-                // // would like to simply say that the last element in dataSent led to this, but sadly that's not true if there were coalesced frames in 1 packet... darnit
-                // // so... need to search backwards to see if we can find something
-                // let firstCandidate = undefined;
-                // let foundFrame = undefined;
-                // for ( let i = dataSent.length - 1; i >= 0; --i ) {
-                //     if ( dataSent[i].streamID === "" + data.stream_id ) {
+                // HTTPData.push({
+                //     contentType: data.content_type,
+                //     index: HTTPindex, 
+                //     tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
+                //     start: HTTPmax,
 
-                //         // deal with frames containing two frames of the same stream... then it's not just the last one of that strea, DERP
-                //         // there are stacks that for example encode the headers in a separate frame and the body too (e.g., picoquic)
-                //         if ( firstCandidate === undefined ){
-                //             firstCandidate = dataSent[i];
-                //         }
+                //     payload_start: HTTPmax + data.header_length,
+                //     payload_length: payloadLength,
 
-                //         if ( dataSent[i].offset === parseInt(data.offset, 10) ) {
-                //             foundFrame = dataSent[i];
-                //             break;
-                //         }
-                //     }
-                // }
+                //     total_length: length,
 
-                // if ( firstCandidate === undefined ) {
-                //     console.error("Data moved but no triggering stream frame found, impossible!!!", dataSent, event.relativeTime, data);
-                //     continue;
-                // }
+                // });
 
-                // if ( !foundFrame ) {
-                //     console.error("Data moved but didn't start at previous stream's offset, impossible!!!", foundFrame, event.relativeTime, data);
-                //     continue;
-                // }
-
-                // foundFrame.dataMoved = data.length;
+                // HTTPmax += length;
+                // ++HTTPindex;
             }
         }
 
@@ -352,7 +341,7 @@ export default class PacketizationDiagramD3Renderer {
             .attr("clip-path", "url(#clip)");
 
 
-        const packetSidePadding = 0.3;
+        let packetSidePadding = 0.3;
 
         const xDomain = d3.scaleLinear()
             .domain([0, TCPmax])
@@ -378,7 +367,7 @@ export default class PacketizationDiagramD3Renderer {
                 .style("opacity", .95);
 
             let text = "";
-            text += data.index + " : payload size " + data.payload_length + "<br/>";
+            text += ( data.isPayload ? "Payload " : "Header ") + data.index + " : size " + data.size + "<br/>";
             // text += "[" + data.offset + ", " + (data.offset + data.length - 1) + "] (size: " + data.length + ")";
 
             this.tooltip
@@ -401,7 +390,8 @@ export default class PacketizationDiagramD3Renderer {
                 .style("opacity", .95);
 
             let text = "";
-            text += data.index + " (TCP index: " + data.tcpIndex + ") : payload size " + data.payload_length + " : total size : " + data.total_length  +"<br/>";
+            text += ( data.isPayload ? "Payload " : "Header ") + data.index + " (TCP index: " + data.tcpIndex + ") : partial size " + data.size + "<br/>";
+            text += "Total record length: " + data.record_length + ", Total payload length: " + data.payload_length + "<br/>";
             text += "content type: " + data.contentType;
 
             this.tooltip
@@ -452,12 +442,12 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight + (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
+                .attr("y", (d:any) => packetHeight + packetHeight * (d.isPayload ? 0 : 0.40) )
                 .attr("fill", (d:any) => (d.index % 2 === 0 ? "red" : "pink") )
                 .style("opacity", 1)
                 .attr("class", "tlspacket")
-                .attr("width", (d:any) => xDomain(d.start + d.total_length) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.index % 2 === 0 ? 1 : 0.90))
+                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
+                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
                 .style("pointer-events", "all")
                 .on("mouseover", recordMouseOver)
                 .on("mouseout", packetMouseOut)
@@ -468,13 +458,14 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * 2 + (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
-                .attr("fill", (d:any) => (d.index % 2 === 0 ? "black" : "grey") )
-                .style("opacity", 1)
+                .attr("y", (d:any) => packetHeight * 2 + packetHeight * (d.isPayload ? 0 : 0.40) )
+                .attr("fill", (d:any) => "" + (d.index % 2 === 0 ? "black" : "grey") )
                 .attr("class", "packet")
-                .attr("width", (d:any) => xDomain(d.start + d.total_length) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.index % 2 === 0 ? 1 : 0.90))
+                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
+                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
                 .style("pointer-events", "all")
+                .style("opacity", 1)
+                // .style("opacity",(d:any) => "" + (d.index % 2 === 0 ? 0.5 : 1))
                 .on("mouseover", packetMouseOver)
                 .on("mouseout", packetMouseOut)
                 // .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, d.streamID); });
@@ -513,7 +504,7 @@ export default class PacketizationDiagramD3Renderer {
                 // .transition().duration(200)
                 .attr("x", (d:any) => newX(d.start) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )
-                .attr("width", (d:any) => newX(d.start + d.total_length) - newX(d.start) + packetSidePadding * 2)
+                .attr("width", (d:any) => newX(d.start + d.size) - newX(d.start) + packetSidePadding * 2)
 
             // this.byteRangeRenderer.zoom( newX );
         };
