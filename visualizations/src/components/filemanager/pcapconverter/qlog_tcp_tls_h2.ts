@@ -113,11 +113,19 @@ export interface IEventH2FrameParsed {
 export enum HTTP2FrameTypeName {
     data = "data",
     headers = "headers",
+    priority = "priority",
+    reset_stream = "reset_stream",
     settings = "settings",
+    push_promise = "push_promise",
+    ping = "ping",
+    go_away = "go_away",
+    window_update = "window_update",
+    continuation = "continuation",
     unknown = "unknown",
 }
 
-export type HTTP2Frame = IDataFrame | IHeadersFrame | ISettingsFrame | IUnknownFrame;
+
+export type HTTP2Frame = IDataFrame | IHeadersFrame | ISettingsFrame | IUnknownFrame | IAnyFrame;
 
 export interface IDataFrame{
     frame_type:HTTP2FrameTypeName.data,
@@ -131,11 +139,26 @@ export interface IHeadersFrame {
     frame_type:HTTP2FrameTypeName.headers,
     byte_length?:number,
 
+    headers:Array<IHTTPHeader>,
+
     raw?:string
+}
+
+export interface IHTTPHeader {
+    name:string,
+    value:string,
 }
 
 export interface ISettingsFrame {
     frame_type:HTTP2FrameTypeName.settings,
+    byte_length?:number,
+
+    raw?:string
+}
+
+// TODO: replace with proper frame definitions for all the different frame types!
+export interface IAnyFrame {
+    frame_type:HTTP2FrameTypeName,
     byte_length?:number,
 
     raw?:string

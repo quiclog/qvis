@@ -95,16 +95,74 @@ export default class PacketizationDiagramD3Renderer {
         return true;
     }
 
+    protected extractRanges(ranges:Array<Range>, size:number) {
+        const output:Array<Range> = new Array<Range>();
+
+        let remainingLength = size;
+
+        if ( size === 0 ) {
+            console.warn("Trying to extract ranges for size 0... potential error? Skipping...");
+
+            return output;
+        }
+
+        while ( ranges.length > 0 ) {
+            const range = ranges.shift();
+
+            // either we consume the range, or we need to split it
+            // the last option should only happen once at maximum, at the very end of this run
+            if ( range!.start + range!.size <= range!.start + remainingLength ) {
+                // full range is consumed
+                // console.log("Consuming range!", range!.start, range!.size, remainingLength );
+                output.push( range! );
+            }
+            else {
+                // console.log("Splitting range!", range!.start, range!.size, remainingLength );
+
+                if ( size === 5 && remainingLength < 5 ) { // header is being split... bad for performance
+                    console.warn("Splitting a header range... server is being bad/naive?", size);
+                }
+
+                // range needs to be split
+                ranges.unshift( {start: range!.start + remainingLength, size: range!.size - remainingLength} );
+                range!.size = remainingLength; // this struct isn't added back to the "ranges" array, so can safely change it for use below
+
+                output.push( range! );
+            }
+
+            if ( range!.size < 0 ) { // sanity check
+                console.error("PacketizationDiagram:extractRanges : Negative size after extracting ranges! Should not happen!", range!.size, range, ranges);
+            }
+
+            remainingLength -= range!.size;
+
+            if ( remainingLength < 0 ) { // sanity check
+                alert("Remaining length < 0, CANNOT HAPPEN!");
+                break;
+            }
+
+            if ( remainingLength === 0 ) {
+                break;
+            }
+        }
+
+        if ( remainingLength !== 0 ) {
+            alert("Trying to fill payloadranges that aren't there! " + remainingLength);
+        }
+
+        return output;
+    }
+
     protected async renderLive() {
         console.log("Rendering packetization diagram");
 
-        const parser = this.connection.getEventParser();
+        // const parser = this.connection.getEventParser();
 
         // want total millisecond range in this trace, so last - first
-        const xMSRange = parser.load(this.connection.getEvents()[ this.connection.getEvents().length - 1 ]).absoluteTime - 
-                       parser.load(this.connection.getEvents()[0]).absoluteTime;
+        // const xMSRange = parser.load(this.connection.getEvents()[ this.connection.getEvents().length - 1 ]).absoluteTime - 
+        //                parser.load(this.connection.getEvents()[0]).absoluteTime;
 
-        console.log("DEBUG MS range for this trace: ", xMSRange);
+        // console.log("DEBUG MS range for this trace: ", xMSRange);
 
 
 
@@ -112,12 +170,15 @@ export default class PacketizationDiagramD3Renderer {
         let TCPEventType = qlog.TransportEventType.packet_received;
         let TLSEventType = tcpqlog.TLSEventType.record_parsed;
         let HTTPEventType = tcpqlog.HTTP2EventType.frame_parsed;
+        let HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_created; // client sends request
         let directionText = "received";
+
 
         if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server ){
             TCPEventType = qlog.TransportEventType.packet_sent;
             TLSEventType = tcpqlog.TLSEventType.record_created;
             HTTPEventType = tcpqlog.HTTP2EventType.frame_created;
+            HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_parsed; // server receives request
             directionText = "sent";
         }
 
@@ -133,12 +194,16 @@ export default class PacketizationDiagramD3Renderer {
         let HTTPindex = 0;
 
         let TCPmax = 0;
-        let TLSmax = 0; 
-        let HTTPmax = 0;
+        // let TLSmax = 0; 
+        // let HTTPmax = 0;
+
+        let DEBUG_TLSpayloadSize:number = 0;
+        let DEBUG_HTTPtotalSize:number = 0;
 
         const TCPPayloadRanges:Array<Range> = new Array<Range>();
+        const TLSPayloadRanges:Array<Range> = new Array<Range>();
 
-        let firstApplicationRecordStart = -1;
+        const HTTPStreamInfo:Map<number,any> = new Map<number,any>();
 
         for ( const eventRaw of this.connection.getEvents() ) {
 
@@ -194,34 +259,52 @@ export default class PacketizationDiagramD3Renderer {
                 const payloadLength = Math.max(0, data.header.payload_length);
                 const recordLength = data.header.header_length + payloadLength + data.header.trailer_length;
 
-                let remainingLength = recordLength; // it's TCP's payload, so the full TLS record length 
+                // console.log("Matching TLS records with TCP payload ranges", recordLength, JSON.stringify(TCPPayloadRanges));
 
-                console.log("Matching TLS records with TCP payload ranges", recordLength, JSON.stringify(TCPPayloadRanges));
+                // each TLS record is x bytes header (typically 5 bytes), then payload, then MAC or encryption nonce (typically 16 bytes)
+                const headerRanges  = this.extractRanges( TCPPayloadRanges, data.header.header_length );
+                for ( const headerRange of headerRanges ) {
+                    TLSData.push({
+                        isPayload: false,
 
-                let headerWritten = false;
+                        contentType: data.header.content_type,
+                        index: TLSindex, 
+                        tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+                        
+                        start: headerRange!.start,
+                        size: headerRange.size, 
 
-                while ( TCPPayloadRanges.length > 0 ) {
-                    const range = TCPPayloadRanges.shift();
+                        record_length: recordLength,
+                        payload_length: payloadLength,
+                    });
+                }
+                
+                const payloadRanges = this.extractRanges( TCPPayloadRanges, payloadLength ); 
+                for ( const payloadRange of payloadRanges ) {
+                    TLSData.push({
+                        isPayload: true,
 
-                    if ( range!.start + range!.size <= range!.start + remainingLength ) {
-                        // full range is consumed
+                        contentType: data.header.content_type,
+                        index: TLSindex, 
+                        tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+                        
+                        start: payloadRange!.start,
+                        size: payloadRange.size, 
 
-                        console.log("Record fills entire TCP payload, consumed!");
+                        record_length: recordLength,
+                        payload_length: payloadLength,
+                    });
+
+                    if ( data.header.content_type === "application" ){
+                        TLSPayloadRanges.push( {start: payloadRange!.start, size: payloadRange!.size} );
+                        DEBUG_TLSpayloadSize += payloadRange!.size;
                     }
-                    else {
+                }
 
-                        console.log("Record fills part of TCP payload, SPLIT!", range!.start, range!.size, remainingLength );
+                if ( data.header.trailer_length !== 0 ){
+                    const trailerRanges = this.extractRanges( TCPPayloadRanges, data.header.trailer_length );
 
-                        // range needs to be split
-                        TCPPayloadRanges.unshift( {start: range!.start + remainingLength, size: range!.size - remainingLength} );
-                        range!.size = remainingLength; // this struct isn't added back to the array, so can safely change it for use below
-                    }
-
-                    // save this temp var here, because when writing the header we change range.size... TODO: make this all cleaner
-                    const lengthModifier = range!.size;
-
-                    if ( !headerWritten ) {
-
+                    for ( const trailerRange of trailerRanges ) {
                         TLSData.push({
                             isPayload: false,
 
@@ -229,102 +312,105 @@ export default class PacketizationDiagramD3Renderer {
                             index: TLSindex, 
                             tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
                             
-                            start: range!.start,
-                            size: data.header.header_length,
+                            start: trailerRange!.start,
+                            size: trailerRange.size, 
 
                             record_length: recordLength,
                             payload_length: payloadLength,
                         });
-
-                        range!.start += data.header.header_length;
-                        range!.size -= data.header.header_length;
-
-                        headerWritten = true;
-                    }
-
-                    TLSData.push({
-                        isPayload: true,
-
-                        contentType: data.header.content_type,
-                        index: TLSindex, 
-                        tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
-    
-                        record_length: recordLength,
-                        payload_length: payloadLength,
-    
-                        start: range!.start,
-                        size: range!.size,
-                    });
-
-                    if ( range!.size < 0 ) { // sanity check
-                        console.error("PacketizationDiagram: Negative size for TLS record! Should not happen!", range!.size, range, data, TCPPayloadRanges);
-                    }
-
-                    remainingLength -= lengthModifier;
-
-                    if ( remainingLength <= 0 ) {
-                        break;
                     }
                 }
 
-                if ( remainingLength !== 0 ){
-                    console.error("BAD ALGORITHM MATCHING TLS WITH TCP! " + remainingLength);
-                }
-
-
-
-                // TLSData.push({
-                //     contentType: data.header.content_type,
-                //     index: TLSindex, 
-                //     tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
-                //     start: TLSmax,
-
-                //     payload_start: TLSmax + data.header.header_length,
-                //     payload_length: payloadLength,
-
-                //     total_length: length,
-
-                // });
-
-                if ( firstApplicationRecordStart === -1 && data.header.content_type === "application" ) {
-                    firstApplicationRecordStart = TLSmax;
-                }
-
-                TLSmax += recordLength;
                 ++TLSindex;
 
                 lastTLSEvent = data;
             }
             else if ( event.name === HTTPEventType ) {
 
-                // if ( HTTPmax === 0 ) {
-                //     HTTPmax = firstApplicationRecordStart;
-                // }
+                if ( data.header_length > 0 ) { // MAGIC from client doesn't have a header
+                    const headerRanges = this.extractRanges( TLSPayloadRanges, data.header_length );
+                    for ( const headerRange of headerRanges ) {
+                        HTTPData.push({
+                            isPayload: false,
 
-                // const payloadLength = Math.max(0, data.payload_length);
-                // const length = data.header_length + payloadLength + 5 + 16; // 5 + 16 are TLS lengths: REMOVE THEM!!!
+                            contentType: data.content_type,
+                            index: HTTPindex, 
+                            tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
 
-                // HTTPData.push({
-                //     contentType: data.content_type,
-                //     index: HTTPindex, 
-                //     tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
-                //     start: HTTPmax,
+                            start: headerRange!.start,
+                            size: headerRange!.size,
 
-                //     payload_start: HTTPmax + data.header_length,
-                //     payload_length: payloadLength,
+                            frame_length: data.header_length + data.payload_length,
 
-                //     total_length: length,
+                            http2frame: data,
+                        });
+                    }
 
-                // });
+                    DEBUG_HTTPtotalSize += data.header_length;
+                }
 
-                // HTTPmax += length;
-                // ++HTTPindex;
+                // some frames, like SETTINGS, don't necessarily have a payload
+                if ( data.payload_length > 0 ) {
+                    const payloadRanges = this.extractRanges( TLSPayloadRanges, data.payload_length );
+
+                    for ( const payloadRange of payloadRanges ) {
+                        HTTPData.push({
+                            isPayload: true,
+
+                            contentType: data.content_type,
+                            index: HTTPindex, 
+                            tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
+
+                            start: payloadRange!.start,
+                            size: payloadRange!.size,
+
+                            frame_length: data.header_length + data.payload_length,
+
+                            http2frame: data,
+                        });
+                    }
+
+                    if ( event.data.frame && event.data.frame.frame_type === tcpqlog.HTTP2FrameTypeName.data ) {
+                        const streamID = event.data.stream_id;
+                        if ( streamID !== 0 ) {
+                            if ( !HTTPStreamInfo.has(streamID) ) {
+                                console.error("PacketizationDiagram: trying to increase payload size sum, but streamID not yet known! Potentially Server Push (which we don't support yet)", streamID, HTTPStreamInfo);
+                            }
+                            else {
+                                HTTPStreamInfo.get( streamID ).total_size += data.payload_length;
+                            }
+                        }
+                    }
+
+                    DEBUG_HTTPtotalSize += data.payload_length;
+                }
+                else {
+                    if ( data.frame.frame_type !== tcpqlog.HTTP2FrameTypeName.settings ) { // for settings, we know the server sometimes doesn't send anything
+                        console.warn("Found HTTP frame without payload length... potential error?", data);
+                    }
+                }
+
+                ++HTTPindex;
+            }
+            
+            if ( event.name === HTTPHeadersSentEventType && event.data.frame.frame_type === tcpqlog.HTTP2FrameTypeName.headers ) {
+                // want to link HTTP stream IDs to resource URLs that are transported over the stream
+                const streamID = event.data.stream_id;
+                if ( !HTTPStreamInfo.has(streamID) ) {
+                    HTTPStreamInfo.set( streamID, { headers: event.data.frame.headers, total_size: 0 } );
+                }
+                else {
+                    console.error("PacketizationDiagram: HTTPStreamInfo already had an entry for this stream", streamID, HTTPStreamInfo, event.data);
+                }
             }
         }
 
-        if ( TCPmax !== TLSmax || TCPmax !== HTTPmax || TLSmax !== HTTPmax ) {
-            // alert("sizes of TCP and TLS don't add up! " + TCPmax + " != " + TLSmax + " != " + HTTPmax); // TODO: re-enable!
-            console.error( "sizes of TCP and TLS don't add up! " + TCPmax + " != " + TLSmax + " != " + HTTPmax );
+        if ( TCPPayloadRanges.length !== 0 || TLSPayloadRanges.length !== 0 ){
+            console.error( "Not all payload ranges were used up!", TCPPayloadRanges, TLSPayloadRanges);
+        }
+
+        if ( DEBUG_TLSpayloadSize !== DEBUG_HTTPtotalSize ) {
+            console.error("TLS payload size != HTTP payload size", "TLS: ", DEBUG_TLSpayloadSize, "HTTP: ", DEBUG_HTTPtotalSize, "Diff : ", Math.abs(DEBUG_TLSpayloadSize - DEBUG_HTTPtotalSize) );
         }
 
         console.log("PacketizationDiagram: rendering data", TCPData, TLSData, HTTPData);
@@ -366,8 +452,8 @@ export default class PacketizationDiagramD3Renderer {
                 .duration(100)
                 .style("opacity", .95);
 
-            let text = "";
-            text += ( data.isPayload ? "Payload " : "Header ") + data.index + " : size " + data.size + "<br/>";
+            let text = "TCP ";
+            text += ( data.isPayload ? "Payload #" : "Header #") + data.index + " : packet size " + data.size + "<br/>";
             // text += "[" + data.offset + ", " + (data.offset + data.length - 1) + "] (size: " + data.length + ")";
 
             this.tooltip
@@ -389,9 +475,10 @@ export default class PacketizationDiagramD3Renderer {
                 .duration(100)
                 .style("opacity", .95);
 
-            let text = "";
-            text += ( data.isPayload ? "Payload " : "Header ") + data.index + " (TCP index: " + data.tcpIndex + ") : partial size " + data.size + "<br/>";
-            text += "Total record length: " + data.record_length + ", Total payload length: " + data.payload_length + "<br/>";
+            let text = "TLS ";
+            text += ( data.isPayload ? "Payload #" :  (data.size > 5 ? "Trailer (MAC/auth tag/padding/content type) " : "Header #")) + data.index;
+            text += " (TCP index: " + data.tcpIndex + ") : record size " + data.record_length + ", partial size " + data.size + "<br/>";
+            // text += "Total record length: " + data.record_length + ", Total payload length: " + data.payload_length + "<br/>";
             text += "content type: " + data.contentType;
 
             this.tooltip
@@ -406,9 +493,26 @@ export default class PacketizationDiagramD3Renderer {
                 .duration(100)
                 .style("opacity", .95);
 
-            let text = "";
-            text += data.index + " (TLS index: " + data.tlsIndex + ") : payload size " + data.payload_length + " : total size : " + data.total_length + "<br/>";
-            text += "streamID: " + data.stream_id;
+            let text = "H2 ";
+            text += ( data.isPayload ? "Payload #" : "Header #") + " (TLS index: " + data.tlsIndex + ") : frame size " + data.http2frame.payload_length + ", partial size : " + data.size + "<br/>";
+            text += "frame type: " + data.http2frame.frame.frame_type + ", streamID: " + data.http2frame.stream_id;
+
+            const streamInfo = HTTPStreamInfo.get( data.http2frame.stream_id );
+            if ( streamInfo ) {
+                text += "<br/>";
+                let method = "";
+                let path = "";
+                for ( const header of streamInfo.headers ) {
+                    if ( header.name === ":method" ) {
+                        method = header.value;
+                    }
+                    else if ( header.name === ":path" ) {
+                        path = header.value;
+                    }
+                }
+                text += "" + method + ": " + path + "<br/>";
+                text += "total resource size: " + streamInfo.total_size + "<br/>";
+            }
 
             this.tooltip
                 .html( text )
@@ -426,12 +530,12 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
+                .attr("y", (d:any) => packetHeight * (d.isPayload ? 0 : 0.40) )
                 .attr("fill", (d:any) => (d.index % 2 === 0 ? "blue" : "lightblue") )
                 .style("opacity", 1)
                 .attr("class", "httppacket")
-                .attr("width", (d:any) => xDomain(d.start + d.total_length) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.index % 2 === 0 ? 1 : 0.90))
+                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
+                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
                 .style("pointer-events", "all")
                 .on("mouseover", frameMouseOver)
                 .on("mouseout", packetMouseOut)
@@ -510,7 +614,7 @@ export default class PacketizationDiagramD3Renderer {
         };
         
         const zoom = d3.zoom()
-            .scaleExtent([1, 100])  // This control how much you can unzoom (x0.5) and zoom (x50)
+            .scaleExtent([1, 2000])  // This control how much you can unzoom (x0.5) and zoom (x50)
             .translateExtent([[0, 0], [this.dimensions.width, this.dimensions.height]])
             .extent([[0, 0], [this.dimensions.width, this.dimensions.height]])
             .on("zoom", updateChart);

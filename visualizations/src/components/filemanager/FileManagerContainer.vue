@@ -265,7 +265,7 @@
                         }
                         else if ( file.name.endsWith(".json") ) {
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
-                            // this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, filename: uploadFileName});
+                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, filename: uploadFileName});
                         }
                         else {
                             throw new Error("unsupported file format : " + uploadFileName);
