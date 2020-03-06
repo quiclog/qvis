@@ -5,6 +5,14 @@ interface TCPConnection {
     qlog:qlogschema.ITrace,
     DEBUG_originalEntries:Array<any>,
     probable_url:string|undefined, // guessed from the HTTP/2 :authority header
+    TLSAppDataTrailerSize:number|undefined,
+    TLSRecordsToBeAdjustedForTrailerSize:Array<any>,
+
+
+    DEBUG_HTTPtotalSize:number,
+    DEBUG_TLSpayloadSize:number,
+
+    timestampTracker:Map<Direction, {time: number, seq: number}>,
 }
 
 enum Direction {
@@ -20,9 +28,6 @@ export default class TCPToQlog {
 
         const qlogFile:qlogschema.IQLog = { qlog_version: "draft-02-wip", traces: new Array<qlogschema.ITrace>() };
         const connectionMap:Map<string, TCPConnection> = new Map<string, TCPConnection>();
-
-        TCPToQlog.timestampTracker.set(Direction.sending, { time: -1, seq: -1});
-        TCPToQlog.timestampTracker.set(Direction.receiving, { time: -1, seq: -1} );
         
 
         for ( const entry of pcapJSON ) {
@@ -64,7 +69,18 @@ export default class TCPToQlog {
                                     }, 
                                 DEBUG_originalEntries: [],
                                 probable_url: undefined,
+                                TLSAppDataTrailerSize: undefined,
+                                TLSRecordsToBeAdjustedForTrailerSize: new Array<any>(),
+
+                                DEBUG_HTTPtotalSize: 0,
+                                DEBUG_TLSpayloadSize: 0,
+                                timestampTracker: new Map<Direction, {time: number, seq: number}>(),
                              }; 
+
+                
+
+                connection.timestampTracker.set(Direction.sending, { time: -1, seq: -1});
+                connection.timestampTracker.set(Direction.receiving, { time: -1, seq: -1} );
                                  
                 connectionMap.set( IP[IPsrcField] + ":" + TCP["tcp.srcport"], connection );
 
@@ -85,6 +101,13 @@ export default class TCPToQlog {
             }
             else {
                 connection.qlog.title += " => Unknown URL";
+            }
+
+            if ( !connection.TLSAppDataTrailerSize ) {
+                console.error("TCPToQlog: unable to estimate TLS trailer size from this trace... " + connection.qlog.title);
+            }
+            else {
+                connection.qlog.title += " @ " + connection.TLSAppDataTrailerSize + " TLS trailer size";
             }
 
             // we fix the ordering per Direction in the addEntry function, but between directions, there are still problems
@@ -118,22 +141,19 @@ export default class TCPToQlog {
             }
 
             qlogFile.traces.push( connection.qlog );
+
+            if ( connection.DEBUG_HTTPtotalSize !== connection.DEBUG_TLSpayloadSize ) {
+                console.error("HTTP doesn't fully fill TLS", "TLS: ", connection.DEBUG_TLSpayloadSize, "HTTP: ", connection.DEBUG_HTTPtotalSize, connection.DEBUG_TLSpayloadSize - connection.DEBUG_HTTPtotalSize );
+            }
         }
 
         console.warn("TCPToQlog: remember to add support for HTTP/2 padding to be fully compliant!");
         console.log("TCPToQlog : done converting pcap", connectionMap.values());
 
-        if ( TCPToQlog.DEBUG_HTTPtotalSize !== TCPToQlog.DEBUG_TLSpayloadSize ) {
-            console.error("HTTP doesn't fully fill TLS", "TLS: ", TCPToQlog.DEBUG_TLSpayloadSize, "HTTP: ", TCPToQlog.DEBUG_HTTPtotalSize );
-        }
 
         return qlogFile;
     }
 
-    protected static DEBUG_HTTPtotalSize:number = 0;
-    protected static DEBUG_TLSpayloadSize:number = 0;
-
-    protected static timestampTracker:Map<Direction, {time: number, seq: number}> = new Map<Direction, {time: number, seq: number}>();
     protected static addEntry( connection:TCPConnection, direction:Direction, entry:any ) {
 
         // console.log( entry.frame );
@@ -147,26 +167,26 @@ export default class TCPToQlog {
         const seqNr = parseInt( entry.tcp["tcp.seq"], 10 );
 
         // this should NEVER happen
-        if ( seqNr < TCPToQlog.timestampTracker.get(direction)!.seq ) {   
-            console.error("UNORDERED SEQ NUMBERS", timestamp, " : ", seqNr, " < ", TCPToQlog.timestampTracker.get(direction));
+        if ( seqNr < connection.timestampTracker.get(direction)!.seq ) {   
+            console.error("UNORDERED SEQ NUMBERS", timestamp, " : ", seqNr, " < ", connection.timestampTracker.get(direction));
             // alert("UNORDERED TCP SEQ NUMBERS");
         }
 
-        if ( timestamp < TCPToQlog.timestampTracker.get(direction)!.time ){
+        if ( timestamp < connection.timestampTracker.get(direction)!.time ){
             // if timestamps are off, at least make sure the sequence numbers are correct (i.e., order in JSON is ok, its just the timestamps that are borked)
-            if ( seqNr > TCPToQlog.timestampTracker.get(direction)!.seq ) {
-                timestamp = TCPToQlog.timestampTracker.get(direction)!.time + 0.000001; // pretend everything arrived at +- the same time
+            if ( seqNr > connection.timestampTracker.get(direction)!.seq ) {
+                timestamp = connection.timestampTracker.get(direction)!.time + 0.000001; // pretend everything arrived at +- the same time
                 console.warn("Mismatched timestamps, but sequence numbers were correctly ordered: faking timestamp instead");
     
-                TCPToQlog.timestampTracker.set(direction, { time: timestamp, seq: seqNr } );
+                connection.timestampTracker.set(direction, { time: timestamp, seq: seqNr } );
             }
             else {
-                console.error("UNORDERED TIMESTAMPS", timestamp, " : ", seqNr, " < ", TCPToQlog.timestampTracker.get(direction));
+                console.error("UNORDERED TIMESTAMPS", timestamp, " : ", seqNr, " < ", connection.timestampTracker.get(direction));
             }
         }
         else {
             // normal case: timestamps are well-ordered
-            TCPToQlog.timestampTracker.set(direction, { time: timestamp, seq: seqNr } );
+            connection.timestampTracker.set(direction, { time: timestamp, seq: seqNr } );
         }
 
         // TCP packet info
@@ -201,14 +221,20 @@ export default class TCPToQlog {
             connection.qlog.events.push ( qlogEvent );
         }
 
+        let TLS = undefined;
+        let HTTP = undefined;
+
+        // we extract the TLS records and HTTP2 frames first, as we need the H2 frames to calculate possible TLS trailer size
+        const TLSrecords = new Array<any>();
+        const HTTPframes = new Array<any>();
+
         // sometimes. entry.tls is just the string "Transport Layer Security"... no idea why
         if ( entry.tls && typeof entry.tls !== "string" ) {
-            const TLS = entry.tls;
+            TLS = entry.tls;
 
             // tshark is INREDIBLY inconsistent with how it groups tls records
             // sometimes there are multiple entries in the TLS top level object,
             // sometimes the "tls.record" field is an array
-            const records = new Array<any>();
 
             const extractRecords = (obj:any) => {
                 if ( obj["tls.record"] ){
@@ -218,11 +244,11 @@ export default class TCPToQlog {
                         }
                     }
                     else {
-                        records.push ( obj["tls.record"] );
+                        TLSrecords.push ( obj["tls.record"] );
                     }
                 }
                 else if ( obj["tls.record.length"] ) {
-                    records.push ( obj );
+                    TLSrecords.push ( obj );
                 }
                 else {
                     for ( const el of obj ) {
@@ -252,13 +278,86 @@ export default class TCPToQlog {
             }
 
 
-            if ( records.length === 0 ) {
+            if ( TLSrecords.length === 0 ) {
                 console.error("tcptoqlog: No tls.record... what is happening?", TLS );
 
                 return;
             }
+        }
 
-            for ( const record of records ) {
+        // sometimes. entry.http2 is just the string "HyperText Transport Protocol 2"... no idea why
+        if ( entry.http2 && typeof entry.http2 !== "string" ) {
+
+            HTTP = entry.http2;
+
+            const extractFrames = (obj:any) => {
+                if ( Object.keys(obj).length === 0 ) { // for some reason, there are often empty entries here... skip them
+
+                    // we THINK it only happens if there are multiple TLS record segments in 1 TCP and the latter record is enough to decode part of the H2 frame, but not entirely
+                    // bit wonky to check automatically if that's the case (because the TLS record decoding from up top is non-deterministic... urgh)
+                    console.warn("tcp2qlog: empty HTTP/2 frame... ignoring (expected if TLS record contains a small piece of the H2 frame. Look at the tls.segment.data array contents: 2nd entry should be +- 9 bytes)", entry);
+
+                    return;
+                }
+
+                // the magic number is part of the payload, but wireshark doesn't show its length or anything... dreadful
+                if ( obj["http2.magic"] ) {
+                    obj["http2.length"] = "24"; // always 24 octets long, per-spec (PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n)
+                    obj["http2.type"]   = "magic";
+                }
+
+                if ( obj["http2.stream"] ) {
+                    if ( Array.isArray(obj["http2.stream"]) ) {
+                        for ( const el of obj["http2.stream"] ){
+                            extractFrames(el);
+                        }
+                    }
+                    else {
+                        HTTPframes.push( obj["http2.stream"] );
+                    }
+                }
+                else if ( obj["http2.length"] ){ // member of http2.stream. NOt named http2.stream.length because wireshark is wildly inconsistent
+                    HTTPframes.push ( obj );
+                }
+                // sometimes, one of the entries is just the string "HyperText Transport Protocol 2" and for-of'ing that gives us the individual characters of the string...
+                // as this leads to inifite recursion, don't keep looking if it's a string
+                else if ( typeof obj !== "string" ) {
+                    for ( const el of obj ) {
+                        extractFrames( el );
+                    }
+                }
+            };
+
+            extractFrames( HTTP );
+        }
+
+
+        if ( TLS ) {
+
+
+
+            // DEBUG: REMOVE
+            {
+                let recordLength = 0;
+                for ( const record of TLSrecords ) {
+                    if ( record["tls.record.content_type"]=== "23" ) {
+                        recordLength += parseInt(record["tls.record.length"], 10);
+                    }
+                }
+
+                let httpLength = 0;
+                for ( const frame of HTTPframes ) {
+                    // if ( frame["http2.type"] === "0" ) {
+                    httpLength += parseInt( frame["http2.length"], 10);
+                    // }
+                }
+
+                if ( Math.abs( recordLength - httpLength ) > 500 ) {
+                    console.warn("Weird inconsistencies between frame sizes", recordLength, httpLength, entry);
+                }
+            }
+
+            for ( const record of TLSrecords ) {
                 
                 const qlogEvent:Array<qlogschema.EventField> = new Array<qlogschema.EventField>();
                 qlogEvent.push( timestamp );
@@ -303,19 +402,70 @@ export default class TCPToQlog {
                     console.error("tcptoqlog: TLS application record without app data... weird?", record, TLS);
                 }
 
-                let trailerSize = 0;
-                if ( content_type === "application" ) {
-                    // MAC at the end... hardcoded at 16 for now, will bite us in the ass later no doubt
-                    // only for application-data records, as only those mess with HTTP/2 size calculations, we don't really care about handshake records at this point
-                    trailerSize = 16;
+                const fullPayloadLength = recordLength; // includes all trailers, but not the 5-byte header
+                let totalH2payloadLength = 0;
+                for ( const frame of HTTPframes ) {
+                    const frameLength = parseInt( frame["http2.length"], 10 );
+                    totalH2payloadLength += frameLength + 9;
                 }
 
-                if ( record["tls.record.opaque_type"] ){
-                    // In TLS 1.3, there is a 1-byte record type appended to the plaintext (to deal with padding)
-                    // see also https://github.com/wireshark/wireshark/blob/71e03ef0423ef5215f8b4843433dc623ad1df74a/epan/dissectors/packet-tls.c#L1875
-                    // this 1-byte is NOT included in the record.length field, OF COURSE, giving us some weird off-by-one errors before. Took 1.5 days to find this, urgh
-                    trailerSize += 1;
-                } 
+                // try to find records that contain a full H2 frame in and of itself
+                // most connections have at least one of these...
+                // proper way would be to match H2 frames across TLS records, but that's a bunch more work, tracking re-assembly across TCP packets etc.
+                // this is dirty, but hopefully works well-enough (TM)
+                if ( content_type === "application" && TLSrecords.length === HTTPframes.length && fullPayloadLength - totalH2payloadLength > 0 &&
+                     !entry["tls.segments"] && !TLS["tls.segment.data"] ){
+                    
+                    // console.log("TLS payload length vs h2 consituent lengths:", fullPayloadLength, totalH2payloadLength, fullPayloadLength - totalH2payloadLength, TLS, HTTP, entry);
+
+                    const suggestedTrailerSize = fullPayloadLength - totalH2payloadLength;
+
+                    if (suggestedTrailerSize !== 16 &&
+                        suggestedTrailerSize  !== 17 && // + 1 because TLS 1.3 repeats content type at the back against padding
+                        // suggestedTrailerSize !== 4 && 
+                        suggestedTrailerSize !== 8 && 
+                        suggestedTrailerSize !== 24) {
+                            console.error("TCPToQlog: TLS trailer size is not 16, 17, 8 or 24: potential error! TODO: actually check with negotiated cipher what is expected here!", suggestedTrailerSize);
+                    } 
+                    else if ( !connection.TLSAppDataTrailerSize ) {
+                        connection.TLSAppDataTrailerSize = suggestedTrailerSize;
+                        console.log("TCPToQlog: TLS trailer size estimated", connection.TLSAppDataTrailerSize, connection.TLSRecordsToBeAdjustedForTrailerSize, entry);
+
+                        for ( const recordToBeAdjusted of connection.TLSRecordsToBeAdjustedForTrailerSize ) {
+                            recordToBeAdjusted.header.trailer_length = connection.TLSAppDataTrailerSize;
+                            recordToBeAdjusted.header.payload_length = recordToBeAdjusted.header.payload_length - recordToBeAdjusted.header.trailer_length;
+
+                            if ( recordToBeAdjusted.header.payload_length < 0 ) {
+                                console.error("TCPToQlog: adjusting for TLS trailer size lead to negative size...", recordToBeAdjusted);
+                            }
+
+                            connection.DEBUG_TLSpayloadSize -= recordToBeAdjusted.header.trailer_length;
+                        }
+
+                        connection.TLSRecordsToBeAdjustedForTrailerSize = new Array<any>();
+                    }
+                    else {
+                        if ( connection.TLSAppDataTrailerSize !== fullPayloadLength - totalH2payloadLength ) {
+                            console.error("TCPToQlog: guesstimated TLS trailer size was inconsistent", connection.TLSAppDataTrailerSize, "!=", fullPayloadLength - totalH2payloadLength, fullPayloadLength, totalH2payloadLength, TLS, HTTP, entry);
+                        }
+                    } 
+                }
+
+
+                const trailerSize = (connection.TLSAppDataTrailerSize && content_type === "application") ? connection.TLSAppDataTrailerSize : 0;
+                
+                // if ( content_type === "application" ) {
+                //     // MAC at the end... hardcoded at 16 for now, will bite us in the ass later no doubt
+                //     // only for application-data records, as only those mess with HTTP/2 size calculations, we don't really care about handshake records at this point
+                //     trailerSize = 16;
+                // }
+
+                // if ( record["tls.record.opaque_type"] ){
+                //     // In TLS 1.3, there is a 1-byte record type appended to the plaintext (to deal with padding)
+                //     // see also https://github.com/wireshark/wireshark/blob/71e03ef0423ef5215f8b4843433dc623ad1df74a/epan/dissectors/packet-tls.c#L1875
+                //     // this 1-byte is NOT included in the record.length field, OF COURSE, giving us some weird off-by-one errors before. Took 1.5 days to find this, urgh
+                //     trailerSize += 1;
+                // } 
 
                 // some defensive programming, since we got hit so hard with the 1-byte opaque_type above
                 const expectedRecordFields = ["tls.record.content_type", "tls.record.opaque_type", "tls.record.length", "tls.record.version", "tls.app_data", "tls.handshake", "tls.change_cipher_spec", "tls.handshake.fragments", "tls.alert_message"];
@@ -336,8 +486,13 @@ export default class TCPToQlog {
                     },
                 }
 
-                if ( packetSent.header.content_type === "application" ){
-                    this.DEBUG_TLSpayloadSize += recordLength - trailerSize;
+                // re-adjusted these later when we know the actual trailer size
+                if ( content_type === "application" && !connection.TLSAppDataTrailerSize ) {
+                    connection.TLSRecordsToBeAdjustedForTrailerSize.push ( packetSent );
+                }
+
+                if ( packetSent.header.content_type === "application" ) {
+                    connection.DEBUG_TLSpayloadSize += recordLength - trailerSize;
                 }
 
                 if ( packetSent.header.payload_length === 0 ) {
@@ -355,58 +510,11 @@ export default class TCPToQlog {
 
         }
 
-        // sometimes. entry.http2 is just the string "HyperText Transport Protocol 2"... no idea why
-        if ( entry.http2 && typeof entry.http2 !== "string" ) {
-
-            const HTTP = entry.http2;
-
-
-            const frames = new Array<any>();
-
-            const extractFrames = (obj:any) => {
-                if ( Object.keys(obj).length === 0 ) { // for some reason, there are often empty entries here... skip them
-
-                    // we THINK it only happens if there are multiple TLS record segments in 1 TCP and the latter record is enough to decode part of the H2 frame, but not entirely
-                    // bit wonky to check automatically if that's the case (because the TLS record decoding from up top is non-deterministic... urgh)
-                    console.warn("tcp2qlog: empty HTTP/2 frame... ignoring (expected if TLS record contains a small piece of the H2 frame. Look at the tls.segment.data array contents: 2nd entry should be +- 9 bytes)", entry);
-
-                    return;
-                }
-
-                // the magic number is part of the payload, but wireshark doesn't show its length or anything... dreadful
-                if ( obj["http2.magic"] ) {
-                    obj["http2.length"] = "24"; // always 24 octets long, per-spec (PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n)
-                    obj["http2.type"]   = "magic";
-                }
-
-                if ( obj["http2.stream"] ) {
-                    if ( Array.isArray(obj["http2.stream"]) ) {
-                        for ( const el of obj["http2.stream"] ){
-                            extractFrames(el);
-                        }
-                    }
-                    else {
-                        frames.push( obj["http2.stream"] );
-                    }
-                }
-                else if ( obj["http2.length"] ){ // member of http2.stream. NOt named http2.stream.length because wireshark is wildly inconsistent
-                    frames.push ( obj );
-                }
-                // sometimes, one of the entries is just the string "HyperText Transport Protocol 2" and for-of'ing that gives us the individual characters of the string...
-                // as this leads to inifite recursion, don't keep looking if it's a string
-                else if ( typeof obj !== "string" ) {
-                    for ( const el of obj ) {
-                        extractFrames( el );
-                    }
-                }
-            };
-
-            extractFrames( HTTP );
-
-
+        if ( HTTP ) {
+            
             const DEBUG_frameSizeTracker:Array<number> = [];
 
-            for ( const frame of frames ) {
+            for ( const frame of HTTPframes ) {
                 // defensive programming: make sure sizes between TLS and HTTP2 match
                 // reassembled length is only when we actually had split records. Borks when records nicely fit inside TCP packets, so comment this out for now 
                 // {
@@ -501,7 +609,7 @@ export default class TCPToQlog {
                             } 
                         }
 
-                        console.log("HTTP Headers frame discovered", (frameData as tcpschema.IHeadersFrame).headers);
+                        // console.log("HTTP Headers frame discovered", (frameData as tcpschema.IHeadersFrame).headers);
 
                         break;  
 
@@ -524,7 +632,7 @@ export default class TCPToQlog {
 
                 DEBUG_frameSizeTracker.push( frameLength + headerLength );
         
-                this.DEBUG_HTTPtotalSize += headerLength + frameLength;
+                connection.DEBUG_HTTPtotalSize += headerLength + frameLength;
 
                 qlogEvent.push( frameSent );
         
