@@ -727,9 +727,48 @@ export class EventFieldsParser implements IQlogEventParser {
             this.timeIndex = eventFieldNames.indexOf("relative_time"); // typically 0
 
             if ( this.timeIndex === -1 ){
-                this.timeTrackingMethod = TimeTrackingMethod.DELTA_TIME;
+                this.timeIndex = eventFieldNames.indexOf("delta_time"); // typically 0 
 
-                console.error("QlogLoader: No proper timestamp present in qlog file. This tool doesn't support delta_time yet!", trace.eventFieldNames);
+                if ( this.timeIndex === -1 ) {
+                    console.error("QlogLoader: No proper timestamp present in qlog file. Pick one of either time, relative_time or delta_time", trace.eventFieldNames);
+                }
+                else {
+
+                    // DELTA_TIME is a weird one: timestamps are encoded relatively to the -previous- one
+                    // since we don't always want to loop over events in-order, we support this using a pre-processing step here
+                    // we basically construct the ABSOLUTE timestamps for all the events and then pretend we had absolute all along
+                    // this only works if we have the events set here though...
+                    this.timeTrackingMethod = TimeTrackingMethod.ABSOLUTE_TIME;
+
+                    const allEvents = trace.getEvents()
+                    if ( !allEvents || allEvents.length === 0 ) {
+                        console.error("QlogLoader: DELTA_TIME requires all events to be set before setEventParser is called... was not the case here!");
+                    }
+                    else {
+                        // allow both a start time in commonFields.reference_time AND as the first event element
+                        if ( trace.commonFields && trace.commonFields.reference_time !== undefined ){
+                            this.addTime = 0;
+                            this.subtractTime = parseFloat(trace.commonFields.reference_time);
+                            allEvents[0][this.timeIndex] += this.subtractTime; // so we can start from event 1 below
+                            // note: it's not just = this.subtractTime: the ref_time could be set when the process starts and stay the same for many connections that start later 
+                            // put differently: first timestamp isn't always 0
+                        }
+                        else {
+                            this.addTime = 0;
+                            this.subtractTime = parseFloat( allEvents[0][this.timeIndex] );
+                        }
+                    }
+
+                    // transform the timestamps into absolute timestamps starting from the initial time found above
+                    // e.g., initial time is 1500, then we have 3, 5, 7
+                    // then the total timestamps should be 1500, 1503, 1508, 1515
+                    let previousTime = this.subtractTime;
+                    for ( let i = 1; i < allEvents.length; ++i  ) { // start at 1, because the first event can be special, see above
+                        // console.log("Starting at ", allEvents[i][ this.timeIndex ], "+", previousTime, " gives ", parseFloat(allEvents[i][ this.timeIndex ]) + previousTime);
+                        allEvents[i][ this.timeIndex ] = parseFloat(allEvents[i][ this.timeIndex ]) + previousTime;
+                        previousTime = allEvents[i][ this.timeIndex ];
+                    }
+                }
             }
             else {
                 // Timestamps are in RELATIVE time
