@@ -35,9 +35,9 @@
                     <b-nav-item to="/multiplexing" class="multiplexing-link" :active="$route.fullPath.indexOf('/multiplexing') >= 0">
                         Multiplexing
                     </b-nav-item>
-                    <b-nav-item to="/packetization" class="packetization-link" :active="$route.fullPath.indexOf('/packetization') >= 0">
+                    <!-- <b-nav-item to="/packetization" class="packetization-link" :active="$route.fullPath.indexOf('/packetization') >= 0">
                         Packetization
-                    </b-nav-item>
+                    </b-nav-item> -->
                     <b-nav-item to="/stats" class="stats-link" :active="$route.fullPath.indexOf('/stats') >= 0">
                         qlog stats
                     </b-nav-item>
