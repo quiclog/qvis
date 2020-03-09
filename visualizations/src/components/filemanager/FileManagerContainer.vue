@@ -64,7 +64,7 @@
                                     ></b-form-file>
                             </b-col>
                             <b-col cols="1" md="auto"> 
-                                <b-button @click="uploadFile()" :disabled="filesToUpload.length === 0" variant="primary">Upload</b-button>
+                                <b-button @click="uploadFile()" :disabled="filesToUpload.length === 0" variant="primary">Import</b-button>
                             </b-col>
                         </b-row>
                     </form>

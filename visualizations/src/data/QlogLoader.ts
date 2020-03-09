@@ -141,6 +141,7 @@ export class QlogLoader {
                     else {
                         misOrdered = true;
                         console.error("QlogLoader:draft02 : timestamps were not in the correct order!", parsedEvt.absoluteTime, " < ", minimumTime, parsedEvt);
+                        break;
                     }
                 }
 
@@ -149,7 +150,7 @@ export class QlogLoader {
                     console.error("QlogLoader:draft02 : manually sorted trace on timestamps!", connection.getEvents());
                     connection.setEventParser( new EventFieldsParser() ); // because startTime etc. could have changes because of the re-ordering
 
-                    alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
+                    alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down and isn't guaranteed to be stable if the timestamps aren't unique! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
                 }
             }
         }
@@ -302,6 +303,30 @@ export class QlogLoader {
                 if ( needsUpgrade ){
                     QlogLoader.fixPreviousInto01( connection );
                 }
+
+                 // TODO: remove! Slows down normal traces!
+                let misOrdered = false;
+                let minimumTime = -1;
+                for ( const evt of connection.getEvents() ){
+                    const parsedEvt = connection.parseEvent(evt);
+                     
+                    if ( parsedEvt.absoluteTime >= minimumTime ){
+                        minimumTime = parsedEvt.absoluteTime;
+                    }
+                    else {
+                        misOrdered = true;
+                        console.error("QlogLoader:draft01 : timestamps were not in the correct order!", parsedEvt.absoluteTime, " < ", minimumTime, parsedEvt);
+                        break;
+                    }
+                 }
+ 
+                if ( misOrdered ){
+                    connection.getEvents().sort( (a, b) => { return connection.parseEvent(a).absoluteTime - connection.parseEvent(b).absoluteTime });
+                    console.error("QlogLoader:draft01 : manually sorted trace on timestamps!", connection.getEvents());
+                    connection.setEventParser( new EventFieldsParser() ); // because startTime etc. could have changes because of the re-ordering
+ 
+                    alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down and isn't guaranteed to be stable if the timestamps aren't unique! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
+                 }
             }
         }
 
