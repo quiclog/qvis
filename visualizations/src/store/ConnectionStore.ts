@@ -7,6 +7,7 @@ import { QlogLoader, PreSpecEventParser } from '@/data/QlogLoader';
 import { IQlogRawEvent } from '@/data/QlogEventParser';
 import Vue from 'vue';
 import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
+import StreamingJSONParser from '@/components/filemanager/utils/StreamingJSONParser';
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -164,7 +165,7 @@ export default class ConnectionStore extends VuexModule {
                     fileContents = apireturns.data.qlog; // returned json has multiple fields, the actual qlog is inside the .qlog field
                 }
                 else {
-                    fileContents = JSON.parse(apireturns.data.qlog);
+                    fileContents = StreamingJSONParser.parseQlogText(apireturns.data.qlog);
                 }
                 
                 let urlToLoadShort = urlToLoad;
@@ -242,12 +243,14 @@ export default class ConnectionStore extends VuexModule {
 
         this.context.commit("adjustOutstandingRequestCount", 1 );
 
-        axios.get( url, {responseType: "json"} )
+        axios.get( url, {responseType: "text", transformResponse: undefined} ) // transformResponse needed because responseType 'text' doesn't prevent them from parsing JSON...
         .then( (res:AxiosResponse<any> ) => {
 
             this.context.commit("adjustOutstandingRequestCount", -1 );
 
-            const fileContents:any = res.data;
+            const fileContentsRaw:any = res.data;
+
+            let fileContents:any = StreamingJSONParser.parseQlogText( fileContentsRaw );
 
             if ( fileContents && !fileContents.error && fileContents.qlog_version ){
                 this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
@@ -261,6 +264,12 @@ export default class ConnectionStore extends VuexModule {
             }
             else if ( fileContents.length > 0 && fileContents[0]._source ){
                 // pcap .json loaded
+
+                // was already parsed, but potentially the file had duplicate keys that we missed with normal JSON.parse
+                // this is because wireshark's default JSON output has duplicate keys and even tshark output with --no-duplicate-keys has bugs
+                // so we have to deal with this manually here
+                fileContents = StreamingJSONParser.parseJSONWithDeduplication( fileContentsRaw );
+
                 const convertedContents = TCPToQlog.convert( fileContents );
                 this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: convertedContents, filename});
 

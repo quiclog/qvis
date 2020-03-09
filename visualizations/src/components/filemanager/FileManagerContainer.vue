@@ -175,6 +175,7 @@
     import ConnectionStore from "@/store/ConnectionStore";
     import TCPToQLOG from "./pcapconverter/tcptoqlog";
 
+    import StreamingJSONParser from "./utils/StreamingJSONParser";
 
     @Component({})
     export default class FileManagerContainer extends Vue {
@@ -258,19 +259,20 @@
 
                 reader.onload = (evt) => {
                     try{
-                        const contentsJSON = JSON.parse( (evt!.target as any).result );
 
                         if ( file.name.endsWith(".qlog") ) {
+                            const contentsJSON = StreamingJSONParser.parseQlogText( (evt!.target as any).result );
                             this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
                         }
                         else if ( file.name.endsWith(".json") ) {
+                            const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
+
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
                             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, filename: uploadFileName});
                         }
-                        else {
+                        else { 
                             throw new Error("unsupported file format : " + uploadFileName);
                         }
-
 
                         Vue.notify({
                             group: "default",
