@@ -2,7 +2,7 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import SequenceDiagramConfig, { SequenceDiagramConnection } from '../data/SequenceDiagramConfig';
-import { VantagePointType, IEventConnectionStateUpdated } from '@quictools/qlog-schema';
+import { VantagePointType, IEventConnectionStateUpdated, QUICFrameTypeName } from '@quictools/qlog-schema';
 import { IQlogRawEvent, IQlogEventParser } from '@/data/QlogEventParser';
 
 interface VerticalRange {
@@ -1270,25 +1270,83 @@ export default class SequenceDiagramD3Renderer {
                         textContainer.appendChild(textSpanFront);
 
                         if ( evt.data.frames ){
-                            for ( const frameRaw of evt.data.frames ) {
-                                const frame = frameRaw as qlog.QuicFrame;
 
-                                const textSpan = document.createElement("span");
-                                const [bgColor, textColor] = this.frameTypeToColor( frame.frame_type );
-                                textSpan.textContent = this.frameToShortString( frame );
-                                textSpan.style.color = textColor;
-                                textSpan.style.backgroundColor = bgColor;
-                                textSpan.style.paddingLeft = "5px";
-                                textSpan.style.paddingRight = "5px";
-                                textSpan.style.border = "1px white";
-                                textSpan.style.borderStyle = "none solid";
-                                textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
-                                if ( directionText === ">" ) {
-                                    textContainer.prepend(textSpan);
+                            let framesToRender:undefined | Array<any> = undefined;
+
+                            // in some cases, we have MANY frames in a single packet (e.g., some tests have 50+, if there are many ACK gaps it can also be dozens)
+                            // so, if there are more than 10 (and more than 5 of a particular type) we aggregate them into a single visual entity
+                            if ( evt.data.frames.length > 10 ) {
+
+                                const typeCounter:Map<QUICFrameTypeName, Array<any>> = new Map<QUICFrameTypeName, Array<any>>();
+
+                                // count how many of each type, because we only want to aggregate those of the same type
+                                for ( const frameRaw of evt.data.frames ) {
+                                    let frames = typeCounter.get( frameRaw.frame_type );
+                                    if ( !frames ) {
+                                        frames = new Array<any>();
+                                        typeCounter.set( frameRaw.frame_type, frames );
+                                    }
+
+                                    frames.push(frameRaw)
                                 }
-                                else {
-                                    textContainer.appendChild(textSpan);
+
+                                for ( const [frameTypeName,frames] of typeCounter.entries() ) {
+
+                                    if ( frames.length > 5 ) {
+                                        const textSpan = document.createElement("span");
+                                        const [bgColor, textColor] = this.frameTypeToColor( frameTypeName );
+                                        textSpan.textContent = frames.length + " " + frameTypeName + " frames (click for details)";
+                                        textSpan.style.color = textColor;
+                                        textSpan.style.backgroundColor = bgColor;
+                                        textSpan.style.paddingLeft = "5px";
+                                        textSpan.style.paddingRight = "5px";
+                                        textSpan.style.border = "1px white";
+                                        textSpan.style.borderStyle = "none solid";
+                                        textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
+                                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                                        if ( directionText === ">" ) {
+                                            textContainer.prepend(textSpan);
+                                        }
+                                        else {
+                                            textContainer.appendChild(textSpan);
+                                        }
+                                    }
+                                    else {
+                                        // not more than 5, we still want to render individual frames below
+                                        if ( !framesToRender ) {
+                                            framesToRender = new Array<any>();
+                                        }
+                                        
+                                        framesToRender.push( ...frames );
+                                    }
+                                }
+                            }
+                            else { // < 10 overall, just render each frame individually
+                                framesToRender = evt.data.frames;
+                            }
+                            
+                            if ( framesToRender ) {
+
+                                for ( const frameRaw of framesToRender ) {
+                                    const frame = frameRaw as qlog.QuicFrame;
+
+                                    const textSpan = document.createElement("span");
+                                    const [bgColor, textColor] = this.frameTypeToColor( frame.frame_type );
+                                    textSpan.textContent = this.frameToShortString( frame );
+                                    textSpan.style.color = textColor;
+                                    textSpan.style.backgroundColor = bgColor;
+                                    textSpan.style.paddingLeft = "5px";
+                                    textSpan.style.paddingRight = "5px";
+                                    textSpan.style.border = "1px white";
+                                    textSpan.style.borderStyle = "none solid";
+                                    textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
+                                    textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                                    if ( directionText === ">" ) {
+                                        textContainer.prepend(textSpan);
+                                    }
+                                    else {
+                                        textContainer.appendChild(textSpan);
+                                    }
                                 }
                             }
                         }
