@@ -237,6 +237,15 @@ export default class TCPToQlog {
             // sometimes the "tls.record" field is an array
 
             const extractRecords = (obj:any) => {
+                if ( Object.keys(obj).length === 0 ) { // for some reason, there are often empty entries here... skip them
+
+                    // we THINK it only happens if there are multiple TLS record segments in 1 TCP and the latter record is enough to decode part of the H2 frame, but not entirely
+                    // bit wonky to check automatically if that's the case (because the TLS record decoding from up top is non-deterministic... urgh)
+                    console.warn("tcp2qlog: empty TLS record... ignoring", obj, entry);
+
+                    return;
+                }
+
                 if ( obj["tls.record"] ){
                     if ( Array.isArray(obj["tls.record"]) ) {
                         for ( const el of obj["tls.record"] ) {
@@ -251,8 +260,14 @@ export default class TCPToQlog {
                     TLSrecords.push ( obj );
                 }
                 else {
-                    for ( const el of obj ) {
-                        extractRecords( el );
+
+                    try {
+                        for ( const el of obj ) {
+                            extractRecords( el );
+                        }
+                    }
+                    catch (e) {
+                        console.error("TLS object was not iterable, skipping. Typically only if we have TLS Unknown Record!", obj, entry);
                     }
                 }
             };
@@ -322,8 +337,13 @@ export default class TCPToQlog {
                 // sometimes, one of the entries is just the string "HyperText Transport Protocol 2" and for-of'ing that gives us the individual characters of the string...
                 // as this leads to inifite recursion, don't keep looking if it's a string
                 else if ( typeof obj !== "string" ) {
-                    for ( const el of obj ) {
-                        extractFrames( el );
+                    try{
+                        for ( const el of obj ) {
+                            extractFrames( el );
+                        }
+                    }
+                    catch (e) {
+                        console.error("HTTP/2 object was not iterable, skipping. Haven't seen this before!", obj, entry);
                     }
                 }
             };

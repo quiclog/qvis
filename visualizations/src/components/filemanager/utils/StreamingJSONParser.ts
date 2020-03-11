@@ -29,6 +29,12 @@ export default class StreamingJSONParser {
             let finalOutput:any = {};
             let cleanExit = false;
 
+            // if there are event entries after the closing of the file (e.g., the closing brackets are written by thread 1, then thread 2 writes more events)
+            // the oboe parser will start generating a new root, which is not exactly the one we want (the old one is typically better)
+            // As long as we're parsing normally, the original root shouldn't change
+            // so we track that one and then, if there are errors, compare it with the latest one and pick the most likely candidate
+            let initialRoot:any = undefined;
+
             const oboeStream = oboe()
                 // .node({
                 //     'node:*': ( node:any, path:any ) => {
@@ -38,6 +44,12 @@ export default class StreamingJSONParser {
 
                 .on('node:*', (node:any, path:Array<any>, ancestors:any) => {
 
+                    if ( !initialRoot ) {
+                        initialRoot = oboeStream.root();
+                    }
+
+                    // console.log("Node parsed", oboeStream.root());
+
                     return node;
                 })
                 .done( (output:any) => {
@@ -46,7 +58,28 @@ export default class StreamingJSONParser {
                 })
                 .fail( (errorReport:any ) => {
                     // any fails will get here, and we can ignore them for the final output
-                    console.error( "StreamingJSONParser: There were errors in your qlog/JSON file. It was parsed with the fallback parser up until the point of the error.", errorReport  );
+                    console.error( "StreamingJSONParser: There were errors in your qlog/JSON file. It was parsed with the fallback parser up until the point of the error.", errorReport, oboeStream.root() );
+                
+                    let initialLength = 0;
+                    let currentLength = 0;
+
+                    const currentRoot = oboeStream.root();
+
+                    if ( initialRoot && initialRoot.traces && initialRoot.traces.length && initialRoot.traces.length > 0 && initialRoot.traces[0].events && initialRoot.traces[0].events.length > 0 ) {
+                        initialLength = initialRoot.traces[0].events.length;
+                    }
+
+                    if ( currentRoot && currentRoot.traces && currentRoot.traces.length && currentRoot.traces.length > 0 && currentRoot.traces[0].events && currentRoot.traces[0].events.length > 0 ) {
+                        currentLength = currentRoot.traces[0].events.length;
+                    }
+
+                    if ( currentLength >= initialLength ) {
+                        finalOutput = currentRoot;
+                    }
+                    else {
+                        finalOutput = initialRoot;
+                    }
+
                 });
 
             oboeStream.emit('data', text);
@@ -64,7 +97,9 @@ export default class StreamingJSONParser {
             }
             else {
 
-                finalOutput = oboeStream.root();
+                if ( !finalOutput ) {
+                    finalOutput = oboeStream.root();
+                }
 
                 // oboe parses field-by-field, so if the JSON is cut off after some fields but not enough to form a full qlog event, it still fails...
                 // (in other words: we have valid JSON, but not valid qlog)
