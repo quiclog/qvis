@@ -405,20 +405,22 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 if ( data.frames && data.frames.length > 0 ){
                     for ( const frame of data.frames ) {
 
-                        if ( !frame.stream_id || !StreamGraphDataHelper.isDataStream( frame.stream_id )){
+                        if ( frame.stream_id === undefined || !StreamGraphDataHelper.isDataStream( "" + frame.stream_id )){
                             // skip control streams like QPACK
                             continue;
                         }
+
+                        const streamID = parseInt( frame.stream_id, 10 );
 
                         if ( frame.frame_type && frame.frame_type === qlog.QUICFrameTypeName.stream ){
 
                             streamFrames.push ( frame );
 
-                            let ranges = streamRanges.get( frame.stream_id );
+                            let ranges = streamRanges.get( streamID );
                             if ( !ranges ){
                                 ranges = 
                                 {currentHead:-1, highestReceived: -1, holes: new Array<Range>(), filled:new Array<Range>(), cumulativeTimeDifference: 0, timeDifferenceSampleCount: 0, frameCount: 0 };
-                                streamRanges.set( frame.stream_id, ranges );
+                                streamRanges.set( streamID, ranges );
                             }
 
                             const arrivalInfo:ArrivalInfo = 
@@ -428,7 +430,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
                             
                             dataSent.push( {
-                                streamID: frame.stream_id, 
+                                streamID: streamID, 
                                 packetNumber: data.header.packet_number,
                                 index: packetIndex, 
                                 size: frame.length, 
@@ -447,14 +449,14 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                             ++frameCount;
                             ++packetIndex;
 
-                            streamIDs.add( frame.stream_id );
+                            streamIDs.add( streamID );
                         }
                     }
                 }
             }
             else if ( event.name === qlog.HTTP3EventType.data_moved ) {
 
-                if ( !StreamGraphDataHelper.isDataStream( data.stream_id )){
+                if ( !StreamGraphDataHelper.isDataStream( "" + data.stream_id )){
                     continue;
                 }
 
@@ -468,7 +470,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 let firstCandidate = undefined;
                 let foundFrame = undefined;
                 for ( let i = dataSent.length - 1; i >= 0; --i ) {
-                    if ( dataSent[i].streamID === "" + data.stream_id ) {
+                    if ( "" + dataSent[i].streamID === "" + data.stream_id ) {
 
                         // deal with frames containing two frames of the same stream... then it's not just the last one of that strea, DERP
                         // there are stacks that for example encode the headers in a separate frame and the body too (e.g., picoquic)
@@ -596,7 +598,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
                 .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
+                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)

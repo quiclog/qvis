@@ -137,7 +137,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .append("rect")
                 .attr("x", (d:any) => { return xDomain(d.countStart); } )
                 .attr("y", (d:any) => yDomain(d.offset) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] )
+                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
@@ -151,7 +151,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .append("rect")
                 .attr("x", (d:any) => xDomain(1) )
                 .attr("y", (d:any) => yDomain(d.offset) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor(d.streamID)[0] )
+                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] )
                 .style("opacity", opacity)
                 .attr("class", "pingback")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(1)))
@@ -187,17 +187,17 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
             // console.log("Looking for Y values between", startIndex, endIndex);
 
-            let startY = Number.MAX_VALUE;
-            let endY = 0;
+            let startY:number = Number.MAX_VALUE;
+            let endY:number = 0;
 
             // TODO: first frame we find doesn't necessarily have the lowest offset... need to loop through the entire range and find lowest offset... auch
 
             for ( let i = startIndex; i < endIndex; ++i ){
                 const frame = allFrames[i];
-                if ( frame.streamID === "" + streamID ) {
+                if ( "" + frame.streamID === "" + streamID ) {
                     // console.log("Found frame for stream at index ",i, " with offset ", frame.offset, frame );
                     if ( frame.offset < startY ) {
-                        startY = frame.offset;
+                        startY = parseInt(frame.offset, 0);
                     }
                 }
             }
@@ -209,9 +209,9 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                     continue;
                 }
 
-                if ( frame.streamID === "" + streamID ) {
-                    if ( frame.offset + frame.length - 1 > endY ) {
-                        endY = frame.offset + frame.length - 1;
+                if ( "" + frame.streamID === "" + streamID ) {
+                    if ( parseInt(frame.offset, 10) + parseInt(frame.length, 10) - 1 > endY ) {
+                        endY = parseInt(frame.offset, 0) + parseInt(frame.length, 10) - 1;
                     }
                 }
             }

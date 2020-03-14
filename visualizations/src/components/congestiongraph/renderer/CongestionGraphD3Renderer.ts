@@ -1136,10 +1136,10 @@ export default class CongestionGraphD3Renderer {
                     }
                 }
                 else if ( frame.frame_type === qlog.QUICFrameTypeName.max_stream_data ) {
-                    if ( (frame as qlog.IMaxStreamDataFrame).maximum !== undefined ){
+                    if ( (frame as qlog.IMaxStreamDataFrame).maximum !== undefined ) {
                         // we cannot keep a rolling sum, as the changes are not cumulative but absolute
                         // so keep track of each absolute value per-stream and sum them up each time something changes
-                        const streamID = (frame as qlog.IMaxStreamDataFrame).stream_id;
+                        const streamID = "" + (frame as qlog.IMaxStreamDataFrame).stream_id;
                         streamFCMap.set( streamID, parseFloat(frame.maximum) );
                         
                         let streamFCSum = 0;
@@ -1288,7 +1288,7 @@ export default class CongestionGraphD3Renderer {
             const data = parsedPacket.data;
             this.createPrivateNamespace(packet);
 
-            if (!data.packet_number) {
+            if ( data.packet_number === undefined ) {
                 console.error("Packet was LOST that didn't contain a packet_number field...", packet);
                 continue;
             }

@@ -104,7 +104,7 @@ export default class MultiplexingGraphD3SimulationRenderer {
                 continue;
             }
 
-            if ( !StreamGraphDataHelper.isDataStream( data.stream_id )) {
+            if ( !StreamGraphDataHelper.isDataStream( "" + data.stream_id )) {
                 // skip control streams like QPACK
                 continue;
             }
@@ -174,7 +174,7 @@ export default class MultiplexingGraphD3SimulationRenderer {
                 .attr("x", (d:any) => { return xDomain(d.count) - 0.15; } )
                 .attr("y", (d:any) => { return 0; } )
                 // .attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
-                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor(d.streamID)[0]; } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0]; } )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => { return xDomain(d.count + 1) - xDomain(d.count)  + 0.3; })

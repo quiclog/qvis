@@ -404,7 +404,7 @@ export default class SequenceDiagramD3Renderer {
                 const data = evt.data as qlog.IEventPacket;
 
                 if ( data.packet_type === qlog.PacketType.initial && 
-                     data.header && data.header.packet_number === "0" ) {
+                     data.header && ( "" + data.header.packet_number === "0" ) ) {
                         firstInitialSent = evt;
                         break;
                 }
@@ -415,7 +415,7 @@ export default class SequenceDiagramD3Renderer {
                 const data = evt.data as qlog.IEventPacket;
                 
                 if ( data.packet_type === qlog.PacketType.initial && 
-                     data.header && data.header.packet_number === "0" ) {
+                     data.header &&  ( "" + data.header.packet_number === "0" ) ) {
                         firstInitialReceived = evt;
                         break;
                 }
@@ -576,14 +576,14 @@ export default class SequenceDiagramD3Renderer {
 
             if ( evt.name === qlog.TransportEventType.packet_sent &&
                     evt.data.packet_type === qlog.PacketType.initial && 
-                    evt.data.header.packet_number === "0" ) {
+                    ( "" + evt.data.header.packet_number === "0" ) ) {
                     initialSent = rawEvt;
                     continue;
             }
 
             if ( evt.name === qlog.TransportEventType.packet_received &&
                 evt.data.packet_type === qlog.PacketType.initial && 
-                evt.data.header.packet_number === "0" ) {
+                ( "" + evt.data.header.packet_number === "0" ) ) {
                     initialReceived = rawEvt;
             }
 
@@ -597,7 +597,7 @@ export default class SequenceDiagramD3Renderer {
 
             if ( evt.name === qlog.TransportEventType.packet_received &&
                 evt.data.packet_type === qlog.PacketType.initial && 
-                evt.data.header.packet_number === "0" ) {
+                ( "" + evt.data.header.packet_number === "0" ) ) {
                     serverInitialReceived = rawEvt;
             }
 

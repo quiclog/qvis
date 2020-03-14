@@ -375,7 +375,7 @@ export default class PacketizationDiagramD3Renderer {
                     }
 
                     if ( event.data.frame && event.data.frame.frame_type === tcpqlog.HTTP2FrameTypeName.data ) {
-                        const streamID = event.data.stream_id;
+                        const streamID = parseInt( event.data.stream_id, 10 );
                         if ( streamID !== 0 ) {
                             if ( !HTTPStreamInfo.has(streamID) ) {
                                 console.error("PacketizationDiagram: trying to increase payload size sum, but streamID not yet known! Potentially Server Push (which we don't support yet)", streamID, HTTPStreamInfo);
@@ -399,7 +399,7 @@ export default class PacketizationDiagramD3Renderer {
             
             if ( event.name === HTTPHeadersSentEventType && event.data.frame.frame_type === tcpqlog.HTTP2FrameTypeName.headers ) {
                 // want to link HTTP stream IDs to resource URLs that are transported over the stream
-                const streamID = event.data.stream_id;
+                const streamID = parseInt( event.data.stream_id, 10 );
                 if ( !HTTPStreamInfo.has(streamID) ) {
                     HTTPStreamInfo.set( streamID, { headers: event.data.frame.headers, total_size: 0 } );
                 }
@@ -511,7 +511,7 @@ export default class PacketizationDiagramD3Renderer {
                 text += "<b>STREAM END BIT SET</b>";
             }
 
-            const streamInfo = HTTPStreamInfo.get( data.http2frame.stream_id );
+            const streamInfo = HTTPStreamInfo.get( parseInt(data.http2frame.stream_id, 10) );
             if ( streamInfo ) {
                 text += "<br/>";
                 let method = "";

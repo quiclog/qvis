@@ -537,10 +537,10 @@ export class QlogLoader {
                         data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
 
-                    if ( data.header && data.header.packet_number !== undefined ){
-                        // some draft-00 traces use simple ints instead of strings for packet numbers. This breaks things.
-                        data.header.packet_number = "" + data.header.packet_number;
-                    }
+                    // if ( data.header && data.header.packet_number !== undefined ){
+                    //     // some draft-00 traces use simple ints instead of strings for packet numbers. This breaks things.
+                    //     data.header.packet_number = "" + data.header.packet_number;
+                    // }
                 }
 
                 QlogLoader.fixPreviousInto01( connection );

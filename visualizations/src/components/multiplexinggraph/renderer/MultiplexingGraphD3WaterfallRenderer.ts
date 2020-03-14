@@ -141,16 +141,18 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             }
 
             for ( const streamFrame of streamFrames ){
-                if ( !StreamGraphDataHelper.isDataStream( streamFrame.stream_id )) {
+                if ( !StreamGraphDataHelper.isDataStream( "" + streamFrame.stream_id )) {
                     // skip control streams like QPACK
                     continue;
                 }
+
+                const streamID = parseInt( streamFrame.stream_id, 10 );
 
                 if ( evt.name === dataEventType ) {
                     ++dataFrameCount;
                 }
 
-                let stream = streams.get( streamFrame.stream_id );
+                let stream = streams.get( streamID );
                 if ( !stream ){
                     
                     if ( evt.name !== requestEventType ){
@@ -158,8 +160,8 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                         break;
                     }
 
-                    stream = { stream_id: streamFrame.stream_id, order: streams.size, requestIndex: dataFrameCount, startIndex: -1, stopIndex: -1 };
-                    streams.set( stream.stream_id, stream );
+                    stream = { stream_id: streamID, order: streams.size, requestIndex: dataFrameCount, startIndex: -1, stopIndex: -1 };
+                    streams.set( streamID, stream );
                 }
                 else {
                     if ( evt.name !== dataEventType ){
@@ -244,7 +246,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .attr("x", (d:any) => { return xDomain(d.startIndex) - 0.15; } )
                 .attr("y", (d:any) => { return d.order * (this.barHeight / streams.size); } )
                 // .attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
-                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor(d.stream_id)[0]; } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor("" + d.stream_id)[0]; } )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
@@ -256,7 +258,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             .append("circle")
                 .attr("cx", (d:any) => { return xDomain(d.requestIndex) + circleWidth / 2; } )
                 .attr("cy", (d:any) => { return ((d.order) * (this.barHeight / streams.size)) + (circleWidth / 1.6); } ) // 1.6 should be 2, but 1.6 somehow looks better...
-                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor(d.stream_id)[0]; } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor("" + d.stream_id)[0]; } )
                 .attr("stroke", "black" )
                 .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
                 .attr("r", circleWidth / 2 );

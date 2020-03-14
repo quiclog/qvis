@@ -26,7 +26,7 @@ export default class StreamingJSONParser {
         }
         else {
 
-            let finalOutput:any = {};
+            let finalOutput:any = undefined;
             let cleanExit = false;
 
             // if there are event entries after the closing of the file (e.g., the closing brackets are written by thread 1, then thread 2 writes more events)
