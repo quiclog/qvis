@@ -89,6 +89,8 @@ export interface IRecordHeader {
     payload_length?:number,
     header_length?:number,
     trailer_length?:number,
+
+    DEBUG_wiresharkFrameNumber?:number,
 }
 
 
@@ -131,6 +133,7 @@ export interface IDataFrame{
     frame_type:HTTP2FrameTypeName.data,
 
     byte_length?:number,
+    stream_end?:boolean,
 
     raw?:string
 }
@@ -141,6 +144,7 @@ export interface IHeadersFrame {
 
     headers:Array<IHTTPHeader>,
 
+    stream_end?:boolean,
     raw?:string
 }
 

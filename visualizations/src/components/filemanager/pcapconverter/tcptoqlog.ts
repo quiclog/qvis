@@ -33,7 +33,8 @@ export default class TCPToQlog {
         for ( const entry of pcapJSON ) {
 
             if ( !entry._source || !entry._source.layers || (!entry._source.layers.ip && !entry._source.layers.ipv6) || !entry._source.layers.tcp ){
-                console.error("Bad entry in JSON, skipping", entry._source.layers);
+                // console.error("Bad entry in JSON, skipping", entry._source.layers);
+                // this is normal behaviour if we just dump a wireshark trace as a whole: will contain other protocols such as DNS as well, which we're not interested in here
                 continue;
             }
 
@@ -390,17 +391,26 @@ export default class TCPToQlog {
                     qlogEvent.push( tcpschema.TLSEventType.record_parsed );
                 }
 
+                let contentTypeValue = "";
+                if ( record["tls.record.content_type"] ) {
+                    contentTypeValue = record["tls.record.content_type"];
+                }
+                // keep this off for now, at least for this we know up until where it still works
+                // else if ( record["tls.record.opaque_type"] ) { // in some cases with re-ordered packets, content_Type isn't present but opaque_type is... very strange
+                //     contentTypeValue = record["tls.record.opaque_type"];
+                // }
+
                 let content_type:"handshake"|"alert"|"application"|"change-cipherspec"|"unknown" = "unknown";
-                if ( record["tls.record.content_type"] === "23" ) {
+                if ( contentTypeValue === "23" ) {
                     content_type = "application";
                 }
-                else if ( record["tls.record.content_type"] === "22" ) {
+                else if ( contentTypeValue === "22" ) {
                     content_type = "handshake";
                 }
-                else if ( record["tls.record.content_type"] === "21" ) {
+                else if ( contentTypeValue === "21" ) {
                     content_type = "alert";
                 }
-                else if ( record["tls.record.content_type"] === "20" ) {
+                else if ( contentTypeValue === "20" ) {
                     content_type = "change-cipherspec";
                 }
 
@@ -488,7 +498,7 @@ export default class TCPToQlog {
                 // } 
 
                 // some defensive programming, since we got hit so hard with the 1-byte opaque_type above
-                const expectedRecordFields = ["tls.record.content_type", "tls.record.opaque_type", "tls.record.length", "tls.record.version", "tls.app_data", "tls.handshake", "tls.change_cipher_spec", "tls.handshake.fragments", "tls.alert_message"];
+                const expectedRecordFields = ["tls.record.content_type", "tls.record.opaque_type", "tls.record.length", "tls.record.version", "tls.app_data", "tls.handshake", "tls.change_cipher_spec", "tls.handshake.fragments", "tls.alert_message", "tls.reassembled_in", "tls.handshake.reassembled_in"];
                 for ( const field of Object.keys(record) ) {
                     if ( expectedRecordFields.indexOf(field) < 0 ) {
                         alert("Unknown field found in TLS record: " + field);
@@ -503,6 +513,8 @@ export default class TCPToQlog {
                         header_length: 5, // TLS record header length is always 5
                         trailer_length: trailerSize, 
                         payload_length: recordLength - trailerSize,
+
+                        DEBUG_wiresharkFrameNumber: parseInt( entry.frame["frame.number"], 10 ),
                     },
                 }
 
@@ -629,12 +641,20 @@ export default class TCPToQlog {
                             } 
                         }
 
+                        if ( frame["http2.flags_tree"] && frame["http2.flags_tree"]["http2.flags.end_stream"] ) {
+                            (frameData as tcpschema.IHeadersFrame).stream_end = (frame["http2.flags_tree"]["http2.flags.end_stream"] === "1") ? true : false;
+                        }
+
                         // console.log("HTTP Headers frame discovered", (frameData as tcpschema.IHeadersFrame).headers);
 
                         break;  
 
                     case tcpschema.HTTP2FrameTypeName.data: 
                         (frameData as tcpschema.IDataFrame).byte_length = frameLength;
+
+                        if ( frame["http2.flags_tree"] && frame["http2.flags_tree"]["http2.flags.end_stream"] ) {
+                            (frameData as tcpschema.IDataFrame).stream_end = (frame["http2.flags_tree"]["http2.flags.end_stream"] === "1") ? true : false;
+                        }
                         break;
 
                     default:

@@ -270,6 +270,8 @@ export default class PacketizationDiagramD3Renderer {
                         contentType: data.header.content_type,
                         index: TLSindex, 
                         tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
+
+                        DEBUG_wiresharkFrameNumber: data.header.DEBUG_wiresharkFrameNumber,
                         
                         start: headerRange!.start,
                         size: headerRange.size, 
@@ -288,6 +290,8 @@ export default class PacketizationDiagramD3Renderer {
                         index: TLSindex, 
                         tcpIndex: TCPindex - 1, // belongs to the "previous" TCP packet
                         
+                        DEBUG_wiresharkFrameNumber: data.header.DEBUG_wiresharkFrameNumber,
+
                         start: payloadRange!.start,
                         size: payloadRange.size, 
 
@@ -478,6 +482,11 @@ export default class PacketizationDiagramD3Renderer {
             let text = "TLS ";
             text += ( data.isPayload ? "Payload #" :  (data.size > 5 ? "Trailer (MAC/auth tag/padding/content type) " : "Header #")) + data.index;
             text += " (TCP index: " + data.tcpIndex + ") : record size " + data.record_length + ", partial size " + data.size + "<br/>";
+
+            if ( data.DEBUG_wiresharkFrameNumber ) {
+                text += "Wireshark frame number (DEBUG): " + data.DEBUG_wiresharkFrameNumber + "<br/>";
+            }
+
             // text += "Total record length: " + data.record_length + ", Total payload length: " + data.payload_length + "<br/>";
             text += "content type: " + data.contentType;
 
@@ -496,6 +505,11 @@ export default class PacketizationDiagramD3Renderer {
             let text = "H2 ";
             text += ( data.isPayload ? "Payload #" : "Header #") + " (TLS index: " + data.tlsIndex + ") : frame size " + data.http2frame.payload_length + ", partial size : " + data.size + "<br/>";
             text += "frame type: " + data.http2frame.frame.frame_type + ", streamID: " + data.http2frame.stream_id;
+
+            if ( data.http2frame.frame.stream_end ) {
+                text += "<br/>";
+                text += "<b>STREAM END BIT SET</b>";
+            }
 
             const streamInfo = HTTPStreamInfo.get( data.http2frame.stream_id );
             if ( streamInfo ) {
