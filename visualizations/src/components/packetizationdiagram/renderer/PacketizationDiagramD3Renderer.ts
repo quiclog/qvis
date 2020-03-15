@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 import PacketizationTCPPreProcessor from './PacketizationTCPPreProcessor';
 import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
+import { PreSpecEventParser } from '@/data/QlogLoader';
 
 
 export default class PacketizationDiagramD3Renderer {
@@ -54,7 +55,7 @@ export default class PacketizationDiagramD3Renderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
+        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 80};
         if ( this.axisLocation === "top" ){
             this.dimensions.margin.top = 20;
         }
@@ -118,12 +119,13 @@ export default class PacketizationDiagramD3Renderer {
         const HTTPToString      = lanes[2].rangeToString;
         const StreamToString    = lanes[3].rangeToString;
 
-        let TCPmax = 0;
-        if ( TCPData.length > 0 ) {
-            TCPmax = TCPData[ TCPData.length - 1 ].start + TCPData[ TCPData.length - 1 ].size;
+        let xMax = 0;
+        if ( lanes.length > 0 && lanes[0].ranges && lanes[0].ranges.length > 0 ) {
+            const bottomRanges = lanes[0].ranges;
+            xMax = bottomRanges[ bottomRanges.length - 1 ].start + bottomRanges[ bottomRanges.length - 1 ].size;
         }
 
-        console.log("PacketizationDiagram: rendering data", TCPData, TLSData, HTTPData, StreamData);
+        console.log("PacketizationDiagram: rendering data", lanes);
 
         const clip = this.svg.append("defs").append("SVG:clipPath")
             .attr("id", "clip")
@@ -137,10 +139,10 @@ export default class PacketizationDiagramD3Renderer {
             .attr("clip-path", "url(#clip)");
 
 
-        let packetSidePadding = 0.3;
+        const packetSidePadding = 0.3;
 
         const xDomain = d3.scaleLinear()
-            .domain([0, TCPmax])
+            .domain([0, xMax])
             .range([ 0, this.dimensions.width ]);
 
         const xAxis = this.svg.append("g");
@@ -177,80 +179,54 @@ export default class PacketizationDiagramD3Renderer {
         };
 
         const packetHeight = this.totalHeight * (1 / lanes.length);
-        const typeGap = this.totalHeight * 0.05;
-        const typeHeight = this.totalHeight * 0.275;
 
-        rects
-            .selectAll("rect.streampacket")
-            .data(StreamData)
-            .enter()
-            .append("rect")
-                .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * (d.isPayload ? 0 : 0.40) )
-                .attr("fill", (d:any) => d.color )
-                .style("opacity", 1)
-                .attr("class", "streampacket")
-                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * 0.60)
-                .style("pointer-events", "all")
-                .on("mouseover", (data:any, index:any) => { return mouseOver( StreamToString, data, index ); })
-                .on("mouseout", mouseOut )
+        // goal: a string like ".packet,.tlspacket,.httppacket,.streampacket", to be used when zooming to select all elements at once
+        const allClassNames = lanes.reduce( (prev, cur) => { prev.push( "." + cur.CSSClassName ); return prev; }, new Array<string>()).join(",");
 
-        rects
-            .selectAll("rect.httppacket")
-            .data(HTTPData)
-            .enter()
-            .append("rect")
-                .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight + packetHeight * (d.isPayload ? 0 : 0.40) )
-                .attr("fill", (d:any) => (d.index % 2 === 0 ? "blue" : "lightblue") )
-                .style("opacity", 1)
-                .attr("class", "httppacket")
-                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
-                .style("pointer-events", "all")
-                .on("mouseover", (data:any, index:any) => { return mouseOver( HTTPToString, data, index ); })
-                .on("mouseout", mouseOut )
+        for ( const [index, lane] of lanes.entries() ) {
 
-        rects
-            .selectAll("rect.tlspacket")
-            .data(TLSData)
-            .enter()
-            .append("rect")
-                .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * 2 + packetHeight * (d.isPayload ? 0 : 0.40) )
-                .attr("fill", (d:any) => (d.index % 2 === 0 ? "red" : "pink") )
-                .style("opacity", 1)
-                .attr("class", "tlspacket")
-                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
-                .style("pointer-events", "all")
-                .on("mouseover", (data:any, index:any) => { return mouseOver( TLSToString, data, index ); })
-                .on("mouseout", mouseOut )
+            // in the lanes array, the bottom range (e.g., TCP) is on index 0, the one above that (e.g., TLS) on index 1, etc.
+            // however, when rendering, our y=0 is on the TOP left, instead of bottom left (so e.g., the Stream info need to be on index 0, TCP on index 3)
+            // so we have to invert the range to accurately calculate y positions
+            const yOffsetMultiplier = (lanes.length - index) - 1; // e.g., index 3 (last in a range of 4) gets: (4 - 3) - 1 = 0, which is the top of the graph, as expected
 
-        rects
-            .selectAll("rect.packet")
-            .data(TCPData)
-            .enter()
-            .append("rect")
-                .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * 3 + packetHeight * (d.isPayload ? 0 : 0.40) )
-                .attr("fill", (d:any) => "" + (d.index % 2 === 0 ? "black" : "grey") )
-                .attr("class", "packet")
-                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
-                .attr("height", (d:any) => packetHeight * (d.isPayload ? 1 : 0.60))
-                .style("pointer-events", "all")
-                .style("opacity", 1)
-                // .style("opacity",(d:any) => "" + (d.index % 2 === 0 ? 0.5 : 1))
-                .on("mouseover", (data:any, index:any) => { return mouseOver( TCPToString, data, index ); })
-                .on("mouseout", mouseOut )
-                // .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, d.streamID); });
+            const heightModifier = (lane.heightModifier !== undefined) ? lane.heightModifier : 1;
+
+            rects
+                .selectAll("rect." + lane.CSSClassName )
+                .data(lane.ranges)
+                .enter()
+                .append("rect")
+                    .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
+                    .attr("y", (d:any) => (packetHeight * yOffsetMultiplier) + packetHeight * (d.isPayload ? 0 : 0.40) )
+                    .attr("fill", (d:any) => d.color )
+                    .style("opacity", 1)
+                    .attr("class",  lane.CSSClassName)
+                    .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
+                    .attr("height", (d:any) => heightModifier * (packetHeight * (d.isPayload ? 1 : 0.60)))
+                    .style("pointer-events", "all")
+                    .on("mouseover", (data:any, index:any) => { return mouseOver( lane.rangeToString, data, index ); })
+                    .on("mouseout", mouseOut );
+
+            this.svg.append('g')
+                // text
+                .append("text")
+                    .attr("x", -5 )
+                    .attr("y", (packetHeight * yOffsetMultiplier) + (packetHeight / 1.75) ) // 1.75 should be 2, but eyeballing says 1.75 is better
+                    .attr("dominant-baseline", "middle")
+                    .style("text-anchor", "end")
+                    .style("font-size", "14")
+                    .style("font-family", "Trebuchet MS")
+                    .attr("fill", "#000000")
+                    .text( lane.name ); 
+
+        }
 
         // legend
         this.svg.append('g')
             // text
             .append("text")
-                .attr("x", xDomain(TCPmax / 2) )
+                .attr("x", xDomain(xMax / 2) )
                 .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 ) // + 1 is eyeballed magic number
                 .attr("dominant-baseline", "baseline")
                 .style("text-anchor", "middle")
@@ -276,7 +252,7 @@ export default class PacketizationDiagramD3Renderer {
 
             // update position
             rects
-                .selectAll(".packet,.tlspacket,.httppacket,.streampacket")
+                .selectAll( allClassNames )
                 // .transition().duration(200)
                 .attr("x", (d:any) => newX(d.start) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )

@@ -3,20 +3,23 @@ export interface PacketizationRange {
     size:number,
 
     isPayload:boolean,
-    contentType:string,
+    contentType?:string, // e.g., header frame, payload frame, application record, ...
 
     index:number,
     lowerLayerIndex:number, // for easier correlation with lower layer ranges
 
     color:string,
 
-    rawPacket:any, // the raw qlog event
-    extra:any // extra info needed to stringify-this 
+    rawPacket?:any, // the raw qlog event
+    extra?:any // extra info needed to stringify-this 
 }
 
 export interface PacketizationLane {
-    name:string, // showed next to the lane
+    name:string, // showed next to the lane, purely visual
+    CSSClassName:string, // CSS class used for items on this lane 
     rangeToString:(r:PacketizationRange) => string, // used when hovering over a range to show additional information
+
+    heightModifier?:number, // mainly to reduce the height of an individual lane
 
     ranges:Array<PacketizationRange> // the actual ranges to be drawn in the lane
 }

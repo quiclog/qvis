@@ -74,10 +74,8 @@ export default class PacketizationTCPPreProcessor {
 
                     color: ( TCPindex % 2 === 0 ) ? "black" : "grey",
 
-                    contentType: "",
                     lowerLayerIndex: -1,
                     rawPacket: data,
-                    extra: undefined,
                 });
 
                 // TCP packet payload
@@ -90,10 +88,8 @@ export default class PacketizationTCPPreProcessor {
 
                     color: ( TCPindex % 2 === 0 ) ? "black" : "grey",
 
-                    contentType: "",
                     lowerLayerIndex: -1,
                     rawPacket: data,
-                    extra: undefined,
                 });
 
                 TCPPayloadRanges.push( {start: TCPmax + data.header.header_length, size: data.header.payload_length} );
@@ -338,10 +334,10 @@ export default class PacketizationTCPPreProcessor {
             console.error("TLS payload size != HTTP payload size", "TLS: ", DEBUG_TLSpayloadSize, "HTTP: ", DEBUG_HTTPtotalSize, "Diff : ", Math.abs(DEBUG_TLSpayloadSize - DEBUG_HTTPtotalSize) );
         }
 
-        output.push( { name: "TCP",         ranges: TCPData,     rangeToString: PacketizationTCPPreProcessor.tcpRangeToString } );
-        output.push( { name: "TLS",         ranges: TLSData,     rangeToString: PacketizationTCPPreProcessor.tlsRangeToString } );
-        output.push( { name: "HTTP/2",      ranges: HTTPData,    rangeToString: (r:PacketizationRange) => { return PacketizationTCPPreProcessor.httpRangeToString(r, HTTPStreamInfo); } } );
-        output.push( { name: "Stream IDs",  ranges: StreamData,  rangeToString: (r:PacketizationRange) => { return PacketizationTCPPreProcessor.httpRangeToString(r, HTTPStreamInfo); } } );
+        output.push( { name: "TCP",         CSSClassName: "tcppacket",      ranges: TCPData,     rangeToString: PacketizationTCPPreProcessor.tcpRangeToString } );
+        output.push( { name: "TLS",         CSSClassName: "tlspacket",      ranges: TLSData,     rangeToString: PacketizationTCPPreProcessor.tlsRangeToString } );
+        output.push( { name: "HTTP/2",      CSSClassName: "httppacket",     ranges: HTTPData,    rangeToString: (r:PacketizationRange) => { return PacketizationTCPPreProcessor.httpRangeToString(r, HTTPStreamInfo); } } );
+        output.push( { name: "Stream IDs",  CSSClassName: "streampacket",   ranges: StreamData,  rangeToString: (r:PacketizationRange) => { return PacketizationTCPPreProcessor.streamRangeToString(r, HTTPStreamInfo); }, heightModifier: 0.6 } );
         
         return output;
     }
@@ -402,4 +398,33 @@ export default class PacketizationTCPPreProcessor {
         return text;
     };
 
+    public static streamRangeToString(data:PacketizationRange, HTTPStreamInfo:Map<number, any>) {
+
+        let text = "H2 ";
+        text += "streamID: " + data.rawPacket.stream_id;
+
+        if ( data.rawPacket.frame.stream_end ) {
+            text += "<br/>";
+            text += "<b>STREAM END BIT SET</b>";
+        }
+
+        const streamInfo = HTTPStreamInfo.get( parseInt(data.rawPacket.stream_id, 10) );
+        if ( streamInfo ) {
+            text += "<br/>";
+            let method = "";
+            let path = "";
+            for ( const header of streamInfo.headers ) {
+                if ( header.name === ":method" ) {
+                    method = header.value;
+                }
+                else if ( header.name === ":path" ) {
+                    path = header.value;
+                }
+            }
+            text += "" + method + ": " + path + "<br/>";
+            text += "total resource size: " + streamInfo.total_size + "<br/>";
+        }
+
+        return text;
+    };
 }
