@@ -2,6 +2,7 @@ import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
 import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2"
 import * as qlog from '@quictools/qlog-schema';
+import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 
 interface Range {
     start: number,
@@ -188,6 +189,7 @@ export default class PacketizationDiagramD3Renderer {
         const TCPData:Array<any> = [];
         const TLSData:Array<any> = [];
         const HTTPData:Array<any> = [];
+        const StreamData:Array<any> = [];
 
         let TCPindex = 0;
         let TLSindex = 0;
@@ -348,6 +350,27 @@ export default class PacketizationDiagramD3Renderer {
 
                             http2frame: data,
                         });
+
+                        if ( data.stream_id !== undefined ) {
+                            const streamID = parseInt( data.stream_id, 10 );
+
+                            StreamData.push({
+                                isPayload: true,
+
+                                contentType: data.content_type,
+                                index: HTTPindex, 
+                                tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
+
+                                start: headerRange!.start,
+                                size: headerRange!.size,
+
+                                frame_length: data.header_length + data.payload_length,
+
+                                http2frame: data,
+
+                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID )[0],
+                            });
+                        }
                     }
 
                     DEBUG_HTTPtotalSize += data.header_length;
@@ -372,6 +395,28 @@ export default class PacketizationDiagramD3Renderer {
 
                             http2frame: data,
                         });
+
+
+                        if ( data.stream_id !== undefined ) {
+                            const streamID = parseInt( data.stream_id, 10 );
+
+                            StreamData.push({
+                                isPayload: true,
+
+                                contentType: data.content_type,
+                                index: HTTPindex, 
+                                tlsIndex: TLSindex - 1, // belongs to the "previous" TLS record // TODO: this is probably wrong... 
+
+                                start: payloadRange!.start,
+                                size: payloadRange!.size,
+
+                                frame_length: data.header_length + data.payload_length,
+
+                                http2frame: data,
+
+                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID )[0],
+                            });
+                        }
                     }
 
                     if ( event.data.frame && event.data.frame.frame_type === tcpqlog.HTTP2FrameTypeName.data ) {
@@ -534,9 +579,29 @@ export default class PacketizationDiagramD3Renderer {
                 .style("top", (d3.event.pageY - 75) + "px");
         };
 
-        const packetHeight = this.totalHeight * 0.333;
+        const laneCount = 4; 
+
+        const packetHeight = this.totalHeight * (1 / laneCount);
         const typeGap = this.totalHeight * 0.05;
         const typeHeight = this.totalHeight * 0.275;
+
+        console.log("StreamData to be rendered", StreamData);
+
+        rects
+            .selectAll("rect.streampacket")
+            .data(StreamData)
+            .enter()
+            .append("rect")
+                .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
+                .attr("y", (d:any) => packetHeight * (d.isPayload ? 0 : 0.40) )
+                .attr("fill", (d:any) => d.color )
+                .style("opacity", 1)
+                .attr("class", "streampacket")
+                .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
+                .attr("height", (d:any) => packetHeight * 0.60)
+                .style("pointer-events", "all")
+                .on("mouseover", frameMouseOver)
+                .on("mouseout", packetMouseOut)
 
         rects
             .selectAll("rect.httppacket")
@@ -544,7 +609,7 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * (d.isPayload ? 0 : 0.40) )
+                .attr("y", (d:any) => packetHeight + packetHeight * (d.isPayload ? 0 : 0.40) )
                 .attr("fill", (d:any) => (d.index % 2 === 0 ? "blue" : "lightblue") )
                 .style("opacity", 1)
                 .attr("class", "httppacket")
@@ -560,7 +625,7 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight + packetHeight * (d.isPayload ? 0 : 0.40) )
+                .attr("y", (d:any) => packetHeight * 2 + packetHeight * (d.isPayload ? 0 : 0.40) )
                 .attr("fill", (d:any) => (d.index % 2 === 0 ? "red" : "pink") )
                 .style("opacity", 1)
                 .attr("class", "tlspacket")
@@ -576,7 +641,7 @@ export default class PacketizationDiagramD3Renderer {
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.start) - packetSidePadding )
-                .attr("y", (d:any) => packetHeight * 2 + packetHeight * (d.isPayload ? 0 : 0.40) )
+                .attr("y", (d:any) => packetHeight * 3 + packetHeight * (d.isPayload ? 0 : 0.40) )
                 .attr("fill", (d:any) => "" + (d.index % 2 === 0 ? "black" : "grey") )
                 .attr("class", "packet")
                 .attr("width", (d:any) => xDomain(d.start + d.size) - xDomain(d.start) + packetSidePadding * 2)
@@ -618,7 +683,7 @@ export default class PacketizationDiagramD3Renderer {
 
             // update position
             rects
-                .selectAll(".packet,.tlspacket,.httppacket")
+                .selectAll(".packet,.tlspacket,.httppacket,.streampacket")
                 // .transition().duration(200)
                 .attr("x", (d:any) => newX(d.start) - packetSidePadding )
                 // .attr("y", (d:any) => { return 50; } )

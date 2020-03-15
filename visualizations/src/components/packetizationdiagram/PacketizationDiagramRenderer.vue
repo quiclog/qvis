@@ -3,7 +3,6 @@
         <!-- <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div> -->
 
-        <h1>FIGURE OUT WHERE EMPTY ENTRIES IN JSON COME FROM. Also visible in wireshark?</h1>
         <div id="packetization-diagram" style="width: 100%; border:5px solid #f8d7da; min-height: 200px;">
             <!-- <svg id="packetization-diagram-svg">
                 
