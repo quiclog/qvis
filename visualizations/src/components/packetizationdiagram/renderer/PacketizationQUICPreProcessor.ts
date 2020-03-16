@@ -254,21 +254,35 @@ export default class PacketizationQUICPreProcessor {
 
                     let frameStart = QUICmax + headerLength;
 
-                    frameStart += PacketizationQUICPreProcessor.backfillFrameSizes( payloadLength, data.frames );
+                    const offset = PacketizationQUICPreProcessor.backfillFrameSizes( payloadLength, data.frames );
+                    // offset is needed when we try to guesstimate the frame sizes ourselves (if frame.frame_size isn't set)
+                    // if offset != 0, we've guesstimated wrong
+                    // deal with this by adding a bogus frame
+                    if ( offset !== 0 ) {
+                        const bogus = {
+                            header_size: offset,
+                            payload_size: 0,
 
+                            frame_type: "qvis-injected FILLER (deal with incorrectly guesstimated frame size)",
+                        };
+
+                        data.frames.unshift( bogus );
+ 
+                        // frameStart += offset; // no longer needed now we add the bogus frame
+                    }
 
                     for ( const frame of data.frames ) {
                         
                         if ( frame.header_size > 0 ){
                             // QUIC frame header
                             QUICFrameData.push({
-                                index: QUICFrameIndex,
+                                index: (frame.frame_type.indexOf("qvis") >= 0 ? -1 : QUICFrameIndex),
                                 isPayload: false,
             
                                 start: frameStart,
                                 size: frame.header_size,
             
-                                color: ( QUICFrameIndex % 2 === 0 ) ? "red" : "pink",
+                                color: (frame.frame_type.indexOf("qvis") >= 0 ? "yellow" : ( QUICFrameIndex % 2 === 0 ) ? "red" : "pink" ),
             
                                 contentType: frame.frame_type,
             
@@ -318,7 +332,9 @@ export default class PacketizationQUICPreProcessor {
 
                         frameStart += frame.header_size + frame.payload_size;
 
-                        ++QUICFrameIndex;
+                        if ( frame.frame_type.indexOf("qvis") < 0 ) {
+                            ++QUICFrameIndex;
+                        }
                     }
                 }
 
@@ -503,9 +519,7 @@ export default class PacketizationQUICPreProcessor {
             offset += (payloadLength - totalFrameLength);
 
             if ( offset !== 0 ){
-                if ( !PacketizationQUICPreProcessor.frameSizeErrorShown ) {
-                    console.error("PacketizationQUICPreProcessor: frame_sizes don't fill the entire packet payload!", offset);
-                }
+                console.error("PacketizationQUICPreProcessor: frame_sizes don't fill the entire packet payload!", offset);
             }
         }
         else {
