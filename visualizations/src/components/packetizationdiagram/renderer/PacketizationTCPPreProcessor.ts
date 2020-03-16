@@ -1,4 +1,4 @@
-import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2"
+import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2";
 import * as qlog from '@quictools/qlog-schema';
 import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor } from './PacketizationDiagramModels';
 import QlogConnection from '@/data/Connection';
@@ -25,9 +25,6 @@ export default class PacketizationTCPPreProcessor {
             HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_parsed; // server receives request
             directionText = "sent";
         }
-
-        let lastTCPEvent:any = undefined;
-        let lastTLSEvent:any = undefined;
 
         const TCPData:Array<PacketizationRange> = [];
         const TLSData:Array<PacketizationRange> = [];
@@ -96,8 +93,6 @@ export default class PacketizationTCPPreProcessor {
 
                 TCPmax += length;
                 ++TCPindex;
-
-                lastTCPEvent = data;
             }
             else if ( event.name === TLSEventType ) {
 
@@ -188,8 +183,6 @@ export default class PacketizationTCPPreProcessor {
                 }
 
                 ++TLSindex;
-
-                lastTLSEvent = data;
             }
             else if ( event.name === HTTPEventType ) {
 
@@ -228,7 +221,7 @@ export default class PacketizationTCPPreProcessor {
                                 start: headerRange!.start,
                                 size: headerRange!.size,
 
-                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID )[0],
+                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP2" )[0],
 
                                 extra: {
                                     frame_length: data.header_length + data.payload_length,
@@ -280,7 +273,7 @@ export default class PacketizationTCPPreProcessor {
                                 start: payloadRange!.start,
                                 size: payloadRange!.size,
 
-                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID )[0],
+                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP2" )[0],
 
                                 extra: {
                                     frame_length: data.header_length + data.payload_length,
@@ -295,7 +288,7 @@ export default class PacketizationTCPPreProcessor {
                         const streamID = parseInt( event.data.stream_id, 10 );
                         if ( streamID !== 0 ) {
                             if ( !HTTPStreamInfo.has(streamID) ) {
-                                console.error("PacketizationDiagram: trying to increase payload size sum, but streamID not yet known! Potentially Server Push (which we don't support yet)", streamID, HTTPStreamInfo);
+                                console.error("PacketizationTCPPreprocessor: trying to increase payload size sum, but streamID not yet known! Potentially Server Push (which we don't support yet)", streamID, HTTPStreamInfo);
                             }
                             else {
                                 HTTPStreamInfo.get( streamID ).total_size += data.payload_length;
@@ -307,7 +300,7 @@ export default class PacketizationTCPPreProcessor {
                 }
                 else {
                     if ( data.frame.frame_type !== tcpqlog.HTTP2FrameTypeName.settings ) { // for settings, we know the server sometimes doesn't send anything
-                        console.warn("Found HTTP frame without payload length... potential error?", data);
+                        console.warn("PacketizationTCPPreprocessor: Found HTTP frame without payload length... potential error?", data);
                     }
                 }
 
@@ -321,13 +314,13 @@ export default class PacketizationTCPPreProcessor {
                     HTTPStreamInfo.set( streamID, { headers: event.data.frame.headers, total_size: 0 } );
                 }
                 else {
-                    console.error("PacketizationDiagram: HTTPStreamInfo already had an entry for this stream", streamID, HTTPStreamInfo, event.data);
+                    console.error("PacketizationTCPPreprocessor: HTTPStreamInfo already had an entry for this stream", streamID, HTTPStreamInfo, event.data);
                 }
             }
         }
 
         if ( TCPPayloadRanges.length !== 0 || TLSPayloadRanges.length !== 0 ){
-            console.error( "Not all payload ranges were used up!", TCPPayloadRanges, TLSPayloadRanges);
+            console.error( "PacketizationTCPPreprocessor: Not all payload ranges were used up!", TCPPayloadRanges, TLSPayloadRanges);
         }
 
         if ( DEBUG_TLSpayloadSize !== DEBUG_HTTPtotalSize ) {

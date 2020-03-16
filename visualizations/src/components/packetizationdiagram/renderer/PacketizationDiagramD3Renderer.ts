@@ -4,6 +4,7 @@ import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 import PacketizationTCPPreProcessor from './PacketizationTCPPreProcessor';
 import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
 import { PreSpecEventParser } from '@/data/QlogLoader';
+import PacketizationQUICPreProcessor from './PacketizationQUICPreProcessor';
 
 
 export default class PacketizationDiagramD3Renderer {
@@ -55,7 +56,7 @@ export default class PacketizationDiagramD3Renderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 80};
+        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 100};
         if ( this.axisLocation === "top" ){
             this.dimensions.margin.top = 20;
         }
@@ -106,18 +107,15 @@ export default class PacketizationDiagramD3Renderer {
 
         // console.log("DEBUG MS range for this trace: ", xMSRange);
 
+        let lanes = [];
 
-        const lanes = PacketizationTCPPreProcessor.process(this.connection);
-        
-        const TCPData = lanes[0].ranges;
-        const TLSData = lanes[1].ranges;
-        const HTTPData = lanes[2].ranges;
-        const StreamData = lanes[3].ranges;
+        if ( this.connection.commonFields.protocol_type === "TCP_HTTP2" ) {
+            lanes = PacketizationTCPPreProcessor.process(this.connection);
+        }
+        else { // assuming QUIC_H3
+            lanes = PacketizationQUICPreProcessor.process(this.connection);
+        }
 
-        const TCPToString       = lanes[0].rangeToString;
-        const TLSToString       = lanes[1].rangeToString;
-        const HTTPToString      = lanes[2].rangeToString;
-        const StreamToString    = lanes[3].rangeToString;
 
         let xMax = 0;
         if ( lanes.length > 0 && lanes[0].ranges && lanes[0].ranges.length > 0 ) {

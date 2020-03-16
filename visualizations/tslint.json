@@ -15,7 +15,7 @@
     "interface-name": false,
     "one-line": false,
     "ordered-imports": false,
-    "max-line-length": [true, 200],
+    "max-line-length": [true, 250],
     "no-console": false,
     "object-literal-shorthand": false,
     "no-unnecessary-initializer": false,
