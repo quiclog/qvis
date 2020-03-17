@@ -199,7 +199,8 @@ export default class PacketizationQUICPreProcessor {
                 }
 
                 const totalPacketLength = data.header.packet_size;
-                let payloadLength = data.header.payload_length;
+                const trailerLength = 16; // default authentication tag size is 16 bytes // TODO: support GCM8?
+                let payloadLength = data.header.payload_length - trailerLength;
                 let headerLength = totalPacketLength - payloadLength;
 
                 // lane 1 : QUIC packets
@@ -214,7 +215,7 @@ export default class PacketizationQUICPreProcessor {
                         headerLength = Math.min(4, totalPacketLength); // TODO: actually calculate
                     }
 
-                    payloadLength = totalPacketLength - headerLength;
+                    payloadLength = totalPacketLength - headerLength - trailerLength;
                 }
 
                 // QUIC packet header
@@ -240,6 +241,22 @@ export default class PacketizationQUICPreProcessor {
 
                     start: QUICmax + headerLength,
                     size: payloadLength,
+
+                    color: ( QUICPacketIndex % 2 === 0 ) ? "black" : "grey",
+
+                    contentType: data.packet_type,
+
+                    lowerLayerIndex: -1,
+                    rawPacket: data,
+                });
+
+                // QUIC tailer (authentication tag)
+                QUICPacketData.push({
+                    index: QUICPacketIndex,
+                    isPayload: false,
+
+                    start: QUICmax + headerLength + payloadLength,
+                    size: trailerLength,
 
                     color: ( QUICPacketIndex % 2 === 0 ) ? "black" : "grey",
 
@@ -435,7 +452,8 @@ export default class PacketizationQUICPreProcessor {
     public static quicRangeToString(data:PacketizationRange) {
 
         let text = "QUIC ";
-        text += ( data.isPayload ? "Payload #" : "Header #") + data.index + " : size " + data.size + "<br/>";
+
+        text += ( data.isPayload ? "Payload #" : (data.size === 16 ? "Trailer (authentication tag) #" : "Header #")) + data.index + " : size " + data.size + "<br/>";
         text += "Packet type : " + data.contentType + ", Packet nr : " + data.rawPacket.header.packet_number + "<br/>";
 
         return text;
