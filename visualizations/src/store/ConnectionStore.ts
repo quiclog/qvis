@@ -158,6 +158,7 @@ export default class ConnectionStore extends VuexModule {
 
             this.context.commit("adjustOutstandingRequestCount", -1);
 
+
             if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
 
                 let fileContents:any = {};
@@ -166,6 +167,10 @@ export default class ConnectionStore extends VuexModule {
                 }
                 else {
                     fileContents = StreamingJSONParser.parseQlogText(apireturns.data.qlog);
+                }
+
+                if ( fileContents.traces && fileContents.traces.length > 0 && fileContents.traces[0].error_description ) {
+                    throw Error("Trace had an error: " + JSON.stringify(fileContents));
                 }
                 
                 let urlToLoadShort = urlToLoad;
@@ -252,7 +257,7 @@ export default class ConnectionStore extends VuexModule {
 
             let fileContents:any = StreamingJSONParser.parseQlogText( fileContentsRaw );
 
-            if ( fileContents && !fileContents.error && fileContents.qlog_version ){
+            if ( fileContents && !fileContents.error && !fileContents.error_description && fileContents.qlog_version ){
                 this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
 
                 Vue.notify({

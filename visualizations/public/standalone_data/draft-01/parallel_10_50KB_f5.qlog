@@ -2,7 +2,7 @@
     "qlog_version": "draft-01",
     "traces": [
         {
-            "description" : "10 resources loaded in parallel, to showcase the multiplexing graph",
+            "description" : "10 resources loaded in parallel, to showcase the multiplexing graph and packetization diagram",
             "common_fields": {
                 "ODCID": "8b8c8ba3cae71a66",
                 "reference_time": "1575028855415"

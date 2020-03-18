@@ -1,13 +1,13 @@
 import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2";
 import * as qlog from '@quictools/qlog-schema';
-import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor } from './PacketizationDiagramModels';
+import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor, PacketizationDirection } from './PacketizationDiagramModels';
 import QlogConnection from '@/data/Connection';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 
 export default class PacketizationTCPPreProcessor {
 
 
-    public static process( tcpConnection:QlogConnection ):Array<PacketizationLane> {
+    public static process( tcpConnection:QlogConnection, direction:PacketizationDirection ):Array<PacketizationLane> {
         const output = new Array<PacketizationLane>();
 
 
@@ -15,15 +15,22 @@ export default class PacketizationTCPPreProcessor {
         let TCPEventType = qlog.TransportEventType.packet_received;
         let TLSEventType = tcpqlog.TLSEventType.record_parsed;
         let HTTPEventType = tcpqlog.HTTP2EventType.frame_parsed;
-        let HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_created; // client sends request
         let directionText = "received";
 
-        if ( tcpConnection.vantagePoint && tcpConnection.vantagePoint.type === qlog.VantagePointType.server ){
+        // if ( tcpConnection.vantagePoint && tcpConnection.vantagePoint.type === qlog.VantagePointType.server ){
+        if ( direction === PacketizationDirection.sending ){
             TCPEventType = qlog.TransportEventType.packet_sent;
             TLSEventType = tcpqlog.TLSEventType.record_created;
             HTTPEventType = tcpqlog.HTTP2EventType.frame_created;
-            HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_parsed; // server receives request
             directionText = "sent";
+        }
+
+        let HTTPHeadersSentEventType; // default value
+        if ( tcpConnection.vantagePoint && tcpConnection.vantagePoint.type === qlog.VantagePointType.server ) {
+            HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_parsed // server receives request
+        }
+        else if ( tcpConnection.vantagePoint && tcpConnection.vantagePoint.type === qlog.VantagePointType.client ) {
+            HTTPHeadersSentEventType = tcpqlog.HTTP2EventType.frame_created; // client sends request
         }
 
         const TCPData:Array<PacketizationRange> = [];

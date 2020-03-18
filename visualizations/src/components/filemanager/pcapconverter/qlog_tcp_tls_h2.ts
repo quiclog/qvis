@@ -124,6 +124,7 @@ export enum HTTP2FrameTypeName {
     window_update = "window_update",
     continuation = "continuation",
     unknown = "unknown",
+    magic = "magic",
 }
 
 

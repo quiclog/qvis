@@ -1,10 +1,12 @@
 import QlogConnection from '@/data/Connection';
+import * as qlog from '@quictools/qlog-schema';
 import * as d3 from 'd3';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 import PacketizationTCPPreProcessor from './PacketizationTCPPreProcessor';
 import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
 import { PreSpecEventParser } from '@/data/QlogLoader';
 import PacketizationQUICPreProcessor from './PacketizationQUICPreProcessor';
+import { PacketizationDirection } from './PacketizationDiagramModels';
 
 
 export default class PacketizationDiagramD3Renderer {
@@ -18,6 +20,7 @@ export default class PacketizationDiagramD3Renderer {
     protected svg!:any;
     protected tooltip!:any;
     protected connection!:QlogConnection;
+    protected direction!:PacketizationDirection;
 
     protected totalHeight = 100;
 
@@ -26,8 +29,10 @@ export default class PacketizationDiagramD3Renderer {
     constructor(containerID:string) {
         this.containerID = containerID;
     }
+
+    public getDirection() { return this.direction; }  
    
-    public async render(connection:QlogConnection, collapsed:boolean ):Promise<boolean> {
+    public async render(connection:QlogConnection, direction:PacketizationDirection ):Promise<boolean> {
         if ( this.rendering ) {
             return false;
         }
@@ -36,7 +41,7 @@ export default class PacketizationDiagramD3Renderer {
 
         this.rendering = true;
 
-        const canContinue:boolean = this.setup(connection);
+        const canContinue:boolean = this.setup(connection, direction);
 
         if ( !canContinue ) {
             this.rendering = false;
@@ -50,15 +55,17 @@ export default class PacketizationDiagramD3Renderer {
         return true;
     }
 
-    protected setup(connection:QlogConnection){
+    protected setup(connection:QlogConnection, direction:PacketizationDirection){
         this.connection = connection;
         this.connection.setupLookupTable();
 
+        this.direction = direction;
+
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 100};
+        this.dimensions.margin = {top: 30, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 100};
         if ( this.axisLocation === "top" ){
-            this.dimensions.margin.top = 20;
+            this.dimensions.margin.top = 30;
         }
         else {
             this.dimensions.margin.bottom = 40;
@@ -110,10 +117,10 @@ export default class PacketizationDiagramD3Renderer {
         let lanes = [];
 
         if ( this.connection.commonFields.protocol_type === "TCP_HTTP2" ) {
-            lanes = PacketizationTCPPreProcessor.process(this.connection);
+            lanes = PacketizationTCPPreProcessor.process(this.connection, this.direction);
         }
         else { // assuming QUIC_H3
-            lanes = PacketizationQUICPreProcessor.process(this.connection);
+            lanes = PacketizationQUICPreProcessor.process(this.connection, this.direction);
         }
 
 
@@ -232,7 +239,38 @@ export default class PacketizationDiagramD3Renderer {
                 .style("font-family", "Trebuchet MS")
                 // .style("font-weight", "bold")
                 .attr("fill", "#000000")
-                .text( "Bytes" ); 
+                .text( "Bytes " + (this.direction === PacketizationDirection.sending ? "sent" : "received") ); 
+
+        let flowLabel = "";
+        if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server ) { 
+            if ( this.direction === PacketizationDirection.sending ) {
+                flowLabel = "Data sent from server to client (trace vantagepoint = server)";
+            }
+            else {
+                flowLabel = "Data received by server from client (trace vantagepoint = server)";
+            }
+        }
+        else if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.client ) {
+            if ( this.direction === PacketizationDirection.sending ) {
+                flowLabel = "Data sent from client to server (trace vantagepoint = client)";
+            }
+            else {
+                flowLabel = "Data received by client from server (trace vantagepoint = client)";
+            }
+        }
+        
+        this.svg.append('g')
+            // text
+            .append("text")
+                .attr("x", xDomain(xMax / 2) )
+                .attr("y", -10 ) // eyeballed
+                .attr("dominant-baseline", "baseline")
+                .style("text-anchor", "middle")
+                .style("font-size", "14")
+                .style("font-family", "Trebuchet MS")
+                // .style("font-weight", "bold")
+                .attr("fill", "#000000")
+                .text( flowLabel );
 
         const updateChart = () => {
 

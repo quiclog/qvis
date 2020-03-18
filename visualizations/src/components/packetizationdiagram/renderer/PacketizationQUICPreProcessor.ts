@@ -1,26 +1,31 @@
 import * as qlog from '@quictools/qlog-schema';
-import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor } from './PacketizationDiagramModels';
+import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor, PacketizationDirection } from './PacketizationDiagramModels';
 import QlogConnection from '@/data/Connection';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 
 export default class PacketizationQUICPreProcessor {
 
 
-    public static process( connection:QlogConnection ):Array<PacketizationLane> {
+    public static process( connection:QlogConnection, direction:PacketizationDirection ):Array<PacketizationLane> {
         const output = new Array<PacketizationLane>();
         PacketizationQUICPreProcessor.frameSizeErrorShown = false;
 
         // clients receive data, servers send it
         let QUICEventType = qlog.TransportEventType.packet_received;
         let HTTPEventType = qlog.HTTP3EventType.frame_parsed;
-        let HTTPHeadersSentEventType = qlog.HTTP3EventType.frame_created; // client sends request
-        let directionText = "received";
 
-        if ( connection.vantagePoint && connection.vantagePoint.type === qlog.VantagePointType.server ){
+        // if ( connection.vantagePoint && connection.vantagePoint.type === qlog.VantagePointType.server ){
+        if ( direction === PacketizationDirection.sending ) {
             QUICEventType = qlog.TransportEventType.packet_sent;
             HTTPEventType = qlog.HTTP3EventType.frame_created;
+        }
+
+        let HTTPHeadersSentEventType;
+        if ( connection.vantagePoint && connection.vantagePoint.type === qlog.VantagePointType.server ) {
             HTTPHeadersSentEventType = qlog.HTTP3EventType.frame_parsed; // server receives request
-            directionText = "sent";
+        }
+        else if ( connection.vantagePoint && connection.vantagePoint.type === qlog.VantagePointType.client ) {
+            HTTPHeadersSentEventType = qlog.HTTP3EventType.frame_created; // client sends request
         }
 
         const QUICPacketData:Array<PacketizationRange> = [];
@@ -198,7 +203,7 @@ export default class PacketizationQUICPreProcessor {
                     continue;
                 }
 
-                const totalPacketLength = data.header.packet_size;
+                const totalPacketLength = parseInt( data.header.packet_size, 10 );
                 const trailerLength = 16; // default authentication tag size is 16 bytes // TODO: support GCM8?
                 let payloadLength = data.header.payload_length - trailerLength;
                 let headerLength = totalPacketLength - payloadLength;
@@ -368,9 +373,20 @@ export default class PacketizationQUICPreProcessor {
 
                 const payloadRangesForStream = QUICPayloadRangesPerStream.get( "" + data.stream_id );
 
+                let skipProcessing = false;
+
                 if ( !payloadRangesForStream ) {
-                    console.error("No payload ranges known for this stream_id, skipping...", payloadRangesForStream, data.stream_id, QUICPayloadRangesPerStream);
-                    continue;
+                    if ( direction === PacketizationDirection.sending ) {
+                        // when sending, frames are created before they are sent, so frame_created events happen before packet_sent and so also before QUICPayloadRangesPerStream is filled for this stream
+                        // since we already had the setup with the HTTP3OutstandingFramesPerStream to deal with frame_parsed only happening once, even if the full frame hadn't been received yet
+                        // we re-use this here for "too early" frame_created events as well
+                        // the frames are added to outstandingFrames, but not yet processed, which is called when the packet_sent actually happens above
+                        skipProcessing = true;
+                    } 
+                    else {
+                        console.error("No payload ranges known for this stream_id, skipping...", payloadRangesForStream, data.stream_id, JSON.stringify(QUICPayloadRangesPerStream) );
+                        continue;
+                    }
                 }
 
                 let outstandingFrames = HTTP3OutstandingFramesPerStream.get( "" + data.stream_id );
@@ -383,7 +399,9 @@ export default class PacketizationQUICPreProcessor {
                 // so, we hold back frames until they can be fully filled in the payload ranges
                 outstandingFrames.push( data );
 
-                processHTTP3Frames( outstandingFrames, payloadRangesForStream );
+                if ( !skipProcessing ) {
+                    processHTTP3Frames( outstandingFrames, payloadRangesForStream! );
+                }
 
             } // end checking for HTTP3 events
 
@@ -404,10 +422,16 @@ export default class PacketizationQUICPreProcessor {
         let controlStreamData = 0;
         for ( const entry of QUICPayloadRangesPerStream.entries() ) {
 
-            // 3, 7, 11 etc. are typically control streams opened by the server. clients don't always log frames for them (e.g., QPACK control messages)
-            // so for the, it's "normal" to have leftover data, we check for that below with DEBUG_HTTPTotalSize
+            // 0, 4, 8 and 1, 5, 9, etc. are normal bidirectional data streams
+            // 3, 7, 11 and 2,6,10 etc. are typically unidirectional control streams and implementations don't always log frames for them (e.g., QPACK control messages)
+            // so for these, it's "normal" to have leftover data, we check for that below with DEBUG_HTTPTotalSize
             const streamID = parseInt(entry[0], 10);
-            if ( (streamID + 1) % 4 === 0 ) { 
+            if ( (streamID + 1) % 4 === 0 ) { // 3, 7, 11, ...
+                for ( const range of entry[1] ) {
+                    controlStreamData += range.size;
+                }
+            }
+            else if ( (streamID + 2) % 4 === 0 ) { // 2, 6, 10, ...
                 for ( const range of entry[1] ) {
                     controlStreamData += range.size;
                 }
@@ -556,8 +580,11 @@ export default class PacketizationQUICPreProcessor {
             for ( const frame of frames ) {
                 if ( frame.frame_type === qlog.QUICFrameTypeName.stream ) {
                     if ( frame.length ) {
-                        frame.frame_size = fakeFrameHeaderSize + frame.length;// TODO: consider re-transmissions/overlapping data/etc. with .offset
+                        frame.frame_size = fakeFrameHeaderSize + parseInt(frame.length, 10);// TODO: consider re-transmissions/overlapping data/etc. with .offset
                         simulatedPayloadLength += frame.frame_size; 
+                    }
+                    else {
+                        console.error("PacketizationQUICPreProcessor: stream frame with no length attribute! skipping...", frame);
                     }
                 }
                 else {
@@ -592,7 +619,7 @@ export default class PacketizationQUICPreProcessor {
         for ( const frame of frames ) {
             if ( frame.length ) { // STREAM and CRYPTO for now
                 frame.header_size = frame.frame_size - frame.length;
-                frame.payload_size = frame.length;
+                frame.payload_size = parseInt( frame.length, 10 );
             }
             else {
                 frame.header_size = frame.frame_size;

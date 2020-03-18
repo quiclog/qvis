@@ -569,6 +569,10 @@ export default class TCPToQlog {
                 qlogEvent.push( tcpschema.EventCategory.http2 );
                 
                 if ( direction === Direction.sending ) {
+                    // NOTE: normally, if this would be logged in an implementation, frame_created would be logged BEFORE packet_sent
+                    // however, because we're parsing from a pcap, it is logged AFTER the packet_sent... 
+                    // this has caused us some grief in the PacketizationDiagram setup, though it's actually easier on the logic if it's logged after
+                    // TODO: ideally, though, for consistency, we should refactor this and inject these before the previous packet_sent (does require updates to the TCP packetizationDiagram logic)
                     qlogEvent.push( tcpschema.HTTP2EventType.frame_created );
                 }
                 else {
@@ -607,6 +611,8 @@ export default class TCPToQlog {
                         case "9":
                             return tcpschema.HTTP2FrameTypeName.continuation;
                             break;
+                        case "magic":
+                            return tcpschema.HTTP2FrameTypeName.magic;
 
                         default:
                             return tcpschema.HTTP2FrameTypeName.unknown;
@@ -663,7 +669,7 @@ export default class TCPToQlog {
 
                 // frameCreated and frameParsed are basically the same, just use Sent here
                 const frameSent:tcpschema.IEventH2FrameCreated = {
-                    stream_id: parseInt( frame["http2.streamid"], 10 ),
+                    stream_id: ( frame["http2.type"] !== "magic" ? parseInt( frame["http2.streamid"], 10 ) : -1),
                     payload_length: frameLength,
                     header_length: headerLength,
 

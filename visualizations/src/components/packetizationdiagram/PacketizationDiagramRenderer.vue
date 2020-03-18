@@ -3,7 +3,13 @@
         <!-- <div>ManualRTT: {{config.manualRTT}}</div>
         <div>Scale: {{config.scale}}</div> -->
 
-        <div id="packetization-diagram" style="width: 100%; border:5px solid #f8d7da; min-height: 200px;">
+        <div id="packetization-diagram-top" style="width: 100%; min-height: 200px;">
+            <!-- <svg id="packetization-diagram-svg">
+                
+            </svg> -->
+        </div>
+
+        <div id="packetization-diagram-bottom" style="width: 100%; min-height: 200px;">
             <!-- <svg id="packetization-diagram-svg">
                 
             </svg> -->
@@ -17,6 +23,7 @@
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import PacketizationDiagramConfig from "./data/PacketizationDiagramConfig";
     import PacketizationDiagramD3Renderer from "./renderer/PacketizationDiagramD3Renderer";
+    import { PacketizationDirection } from "./renderer/PacketizationDiagramModels";
 
     @Component
     export default class PacketizationDiagramRenderer extends Vue {
@@ -29,16 +36,19 @@
             return this.config.connections;
         }
 
-        protected renderer: PacketizationDiagramD3Renderer | undefined = undefined;
+        protected rendererTop:      PacketizationDiagramD3Renderer | undefined = undefined;
+        protected rendererBottom:   PacketizationDiagramD3Renderer | undefined = undefined;
 
         public created(){
-            this.renderer = new PacketizationDiagramD3Renderer("packetization-diagram");
+            this.rendererTop    = new PacketizationDiagramD3Renderer("packetization-diagram-top");
+            this.rendererBottom = new PacketizationDiagramD3Renderer("packetization-diagram-bottom");
         }
 
         public mounted(){
             // mainly for when we switch away, and then back to the PacketizationDiagram
-            if ( this.config && this.renderer && this.config.connections.length > 0 ) {
-                this.renderer.render( this.config.connections[0], this.config.collapsed );
+            if ( this.config && this.rendererTop && this.rendererBottom && this.config.connections.length > 0 ) {
+                this.rendererTop.render(    this.config.connections[0], PacketizationDirection.receiving ); 
+                this.rendererBottom.render( this.config.connections[0], PacketizationDirection.sending ); 
             }
         }
 
@@ -48,12 +58,12 @@
         protected async onConfigChanged(newConfig: PacketizationDiagramConfig, oldConfig: PacketizationDiagramConfig) {
             console.log("PacketizationDiagramRenderer:onConfigChanged : ", newConfig, oldConfig);
 
-            if ( this.renderer ) {
+            if ( this.rendererTop && this.rendererBottom ) {
 
                 // Because of the Vue reactivity, we come into this function multiple times but we just want to do the first
                 // so the .rendering var helps deal with that
                 // TODO: fix this OR bring this logic into this component, rather than on the renderer
-                if ( !this.renderer.rendering ){
+                if ( !this.rendererTop.rendering ){
 
                     if ( newConfig.connections && newConfig.connections[0].getEvents().length > 10000 ){
                         Vue.notify({
@@ -67,7 +77,19 @@
                         await new Promise( (resolve) => setTimeout(resolve, 200));
                     }
 
-                    this.renderer.render( newConfig.connections[0], newConfig.collapsed ).then( (rendered:boolean) => {
+                    this.rendererTop.render( newConfig.connections[0], PacketizationDirection.receiving ).then( (rendered:boolean) => {
+
+                        if ( !rendered ) {
+                            Vue.notify({
+                                group: "default",
+                                title: "Trace could not be rendered",
+                                type: "error",
+                                text: "This trace could not be rendered. There could be an error or a previous file was still rendering.<br/>See the JavaScript devtools for more information.",
+                            });
+                        }
+                    });
+
+                    this.rendererBottom.render( newConfig.connections[0], PacketizationDirection.sending ).then( (rendered:boolean) => {
 
                         if ( !rendered ) {
                             Vue.notify({

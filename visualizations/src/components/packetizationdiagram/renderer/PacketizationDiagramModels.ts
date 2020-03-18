@@ -1,5 +1,10 @@
 import * as qlog from '@quictools/qlog-schema';
 
+export enum PacketizationDirection {
+    sending,
+    receiving,
+}
+
 export interface PacketizationRange {
     start:number,
     size:number,
