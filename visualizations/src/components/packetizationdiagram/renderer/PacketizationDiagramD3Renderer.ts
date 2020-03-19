@@ -116,7 +116,7 @@ export default class PacketizationDiagramD3Renderer {
 
         let lanes = [];
 
-        if ( this.connection.commonFields.protocol_type === "TCP_HTTP2" ) {
+        if ( this.connection.commonFields && this.connection.commonFields.protocol_type === "TCP_HTTP2" ) {
             lanes = PacketizationTCPPreProcessor.process(this.connection, this.direction);
         }
         else { // assuming QUIC_H3
