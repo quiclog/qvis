@@ -232,7 +232,7 @@ export default class PacketizationDiagramD3Renderer {
             // text
             .append("text")
                 .attr("x", xDomain(xMax / 2) )
-                .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 ) // + 1 is eyeballed magic number
+                .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 )
                 .attr("dominant-baseline", "baseline")
                 .style("text-anchor", "middle")
                 .style("font-size", "14")
@@ -240,6 +240,54 @@ export default class PacketizationDiagramD3Renderer {
                 // .style("font-weight", "bold")
                 .attr("fill", "#000000")
                 .text( "Bytes " + (this.direction === PacketizationDirection.sending ? "sent" : "received") ); 
+
+        if ( lanes[0].max_size_local ) {
+
+            const localname = (this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server) ? "server" : "client";
+            const remotename = (localname === "client") ? "server" : "client";
+
+            this.svg.append('g')
+                // text
+                .append("text")
+                    .attr("x", xDomain(xMax) - 450 )
+                    .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 )
+                    .attr("dominant-baseline", "baseline")
+                    .style("text-anchor", "start")
+                    .style("font-size", "14")
+                    .style("font-family", "Trebuchet MS")
+                    // .style("font-weight", "bold")
+                    .attr("fill", "#000000")
+                    .text( "max receiving size " + localname + ": " + lanes[0].max_size_local );
+
+            this.svg.append('g')
+                // text
+                .append("text")
+                    .attr("x", xDomain(xMax) )
+                    .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 )
+                    .attr("dominant-baseline", "baseline")
+                    .style("text-anchor", "end")
+                    .style("font-size", "14")
+                    .style("font-family", "Trebuchet MS")
+                    // .style("font-weight", "bold")
+                    .attr("fill", "#000000")
+                    .text( "max receiving size " + remotename + ": " + lanes[0].max_size_remote );
+        }
+
+        if ( lanes[0].efficiency ) {
+
+            this.svg.append('g')
+                // text
+                .append("text")
+                    .attr("x", xDomain(0) )
+                    .attr("y", this.dimensions.height + this.dimensions.margin.bottom - 10 )
+                    .attr("dominant-baseline", "baseline")
+                    .style("text-anchor", "start")
+                    .style("font-size", "14")
+                    .style("font-family", "Trebuchet MS")
+                    // .style("font-weight", "bold")
+                    .attr("fill", "#000000")
+                    .text( "efficiency " + (lanes[0].efficiency * 100).toFixed(2) + "%" );
+        }
 
         let flowLabel = "";
         if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server ) { 

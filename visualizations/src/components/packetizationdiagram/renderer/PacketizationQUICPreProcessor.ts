@@ -28,6 +28,9 @@ export default class PacketizationQUICPreProcessor {
             HTTPHeadersSentEventType = qlog.HTTP3EventType.frame_created; // client sends request
         }
 
+        let max_packet_size_local = 65527;
+        let max_packet_size_remote = 65527;
+
         const QUICPacketData:Array<PacketizationRange> = [];
         const QUICFrameData:Array<PacketizationRange> = [];
         const HTTPData:Array<PacketizationRange> = [];
@@ -39,8 +42,13 @@ export default class PacketizationQUICPreProcessor {
 
         let QUICmax = 0;
 
+        // these two need to be the same, or there is a problem with the trace
         let DEBUG_QUICpayloadSize:number = 0;
         let DEBUG_HTTPtotalSize:number = 0;
+
+        // these two are used to calculate "efficiency" (how much of the QUIC bytes are actually used to transport application-level data)
+        let QUICtotalSize:number =  0;
+        let HTTPpayloadSize:number = 0;
 
         const QUICPayloadRangesPerStream:Map<string, Array<LightweightRange>> = new Map<string, Array<LightweightRange>>();
         const HTTP3OutstandingFramesPerStream:Map<string, Array<qlog.IEventH3FrameCreated>> = new Map<string, Array<qlog.IEventH3FrameCreated>>();
@@ -181,6 +189,12 @@ export default class PacketizationQUICPreProcessor {
                                 HTTPStreamInfo.get( streamID ).total_size += framePayloadLength;
                             }
                         }
+                    }
+
+                    if ( frameEvt.frame && 
+                         (frameEvt.frame.frame_type === qlog.HTTP3FrameTypeName.data ||
+                          frameEvt.frame.frame_type === qlog.HTTP3FrameTypeName.headers) ) {
+                            HTTPpayloadSize += framePayloadLength;
                     }
 
                     DEBUG_HTTPtotalSize += framePayloadLength;
@@ -362,6 +376,8 @@ export default class PacketizationQUICPreProcessor {
 
                 QUICmax += totalPacketLength;
                 ++QUICPacketIndex;
+
+                QUICtotalSize += totalPacketLength;
             } // end checking for QUIC events
 
             else if ( event.name === HTTPEventType ) { // frame_created or _parsed
@@ -417,6 +433,18 @@ export default class PacketizationQUICPreProcessor {
                 }
             }
 
+            if ( event.name === qlog.TransportEventType.parameters_set ) {
+                if ( data.owner && data.owner === "local" ) {
+                    if ( data.max_packet_size ) {
+                        max_packet_size_local = data.max_packet_size;
+                    }
+                }
+                else if ( data.owner && data.owner === "remote" ) {
+                    if ( data.max_packet_size ) {
+                        max_packet_size_remote = data.max_packet_size;
+                    }
+                }
+            }
         } // end looping over all events
 
         let controlStreamData = 0;
@@ -463,8 +491,9 @@ export default class PacketizationQUICPreProcessor {
         //     console.log("QUIC and HTTP3 payload sizes were equal! as they should be!", DEBUG_QUICpayloadSize, DEBUG_HTTPtotalSize);
         // }
 
+        const efficiency = HTTPpayloadSize / QUICtotalSize;
 
-        output.push( { name: "QUIC packets",         CSSClassName: "quicpacket",      ranges: QUICPacketData,     rangeToString: PacketizationQUICPreProcessor.quicRangeToString } );
+        output.push( { name: "QUIC packets",         CSSClassName: "quicpacket",      ranges: QUICPacketData,     rangeToString: PacketizationQUICPreProcessor.quicRangeToString, max_size_local: max_packet_size_local, max_size_remote: max_packet_size_remote, efficiency: efficiency } );
         output.push( { name: "QUIC frames",          CSSClassName: "quicframe",       ranges: QUICFrameData,      rangeToString: PacketizationQUICPreProcessor.quicFrameRangeToString } );
         output.push( { name: "HTTP/3",               CSSClassName: "httpframe",       ranges: HTTPData,           rangeToString: (r:PacketizationRange) => { return PacketizationQUICPreProcessor.httpFrameRangeToString(r, HTTPStreamInfo); } } );
         output.push( { name: "Stream IDs",           CSSClassName: "streampacket",    ranges: StreamData,         rangeToString: (r:PacketizationRange) => { return PacketizationQUICPreProcessor.streamRangeToString(r, HTTPStreamInfo); }, heightModifier: 0.6 } );

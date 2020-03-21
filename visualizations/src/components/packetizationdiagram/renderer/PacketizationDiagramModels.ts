@@ -28,7 +28,12 @@ export interface PacketizationLane {
 
     heightModifier?:number, // mainly to reduce the height of an individual lane
 
-    ranges:Array<PacketizationRange> // the actual ranges to be drawn in the lane
+    ranges:Array<PacketizationRange>, // the actual ranges to be drawn in the lane
+
+    max_size_local?:number,
+    max_size_remote?:number,
+
+    efficiency?:number
 }
 
 
