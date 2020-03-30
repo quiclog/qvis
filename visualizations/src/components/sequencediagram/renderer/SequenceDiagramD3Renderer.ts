@@ -915,7 +915,7 @@ export default class SequenceDiagramD3Renderer {
                     const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacket;
                     
                     // need to check for .type as well to deal with different packet number spaces
-                    if (candidate.packet_type === evt.packet_type && candidate.header!.packet_number === evt.header!.packet_number ){
+                    if (candidate.packet_type === evt.packet_type && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
                         break;
@@ -1675,7 +1675,7 @@ export default class SequenceDiagramD3Renderer {
                         pnSpaceString = "appdata ";
                     }
                 }
-                
+
                 return pnSpaceString + " " + (evt.data.timer_type !== undefined ? ( "" + evt.data.timer_type).toUpperCase() + " " : " ") + "timer " + evt.data.event_type + timeString;
                 break;
 
