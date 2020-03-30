@@ -297,6 +297,14 @@ export class QlogLoader {
                                 break;
                             }
                         }
+                        else if ( parsedEvt.data.packet_type === "onertt" ) {
+                            needsUpgrade = true;
+                            break;
+                        }
+                        else if ( parsedEvt.data.packet_type === "zerortt" ) {
+                            needsUpgrade = true;
+                            break;
+                        }
                     }
                 }
 
@@ -427,6 +435,13 @@ export class QlogLoader {
                 }
 
                 parsedEvt.data.parameters = [];
+            }
+            
+            if ( parsedEvt.data.packet_type === "onertt" ) {
+                parsedEvt.data.packet_type = qlog01.PacketType.onertt;
+            }
+            else if ( parsedEvt.data.packet_type === "zerortt" ) {
+                parsedEvt.data.packet_type = qlog01.PacketType.zerortt;
             }
         }
     }
