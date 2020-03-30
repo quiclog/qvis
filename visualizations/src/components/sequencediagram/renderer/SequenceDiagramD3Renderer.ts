@@ -1548,7 +1548,8 @@ export default class SequenceDiagramD3Renderer {
         else if ( evt.name === qlog.RecoveryEventType.metrics_updated ||
                   evt.name === qlog.TransportEventType.parameters_set ||
                   evt.name === qlog.RecoveryEventType.parameters_set ||
-                  evt.name === qlog.HTTP3EventType.parameters_set ){
+                  evt.name === qlog.HTTP3EventType.parameters_set || 
+                  evt.name === "loss_timer_updated" ){ // FIXME: properly link to qlog schema once that's been updated
             return this.frameTypeToColor( qlog.QUICFrameTypeName.max_data );
         }
         else if ( evt.name === qlog.HTTP3EventType.frame_created ||
@@ -1660,6 +1661,24 @@ export default class SequenceDiagramD3Renderer {
             case qlog.ConnectivityEventType.connection_state_updated:
                 return "Connection state: " + evt.data.new; 
                 break;
+
+            case "loss_timer_updated": // FIXME: properly link to qlog schema once that's been updated
+                const delta = (evt.data.delta !== undefined) ? evt.data.delta : evt.data.timeout; // timeout is old-school, delta should be used now
+                let timeString = "";
+                if ( evt.data.event_type === "set" ) {
+                    timeString = " @ " + (evt.relativeTime + evt.timeToMilliseconds(delta)).toFixed(4); // + " (" + parseFloat(delta).toFixed(2) + ")";
+                }
+                let pnSpaceString = "";
+                if ( evt.data.packet_number_space !== undefined ) {
+                    pnSpaceString = evt.data.packet_number_space + " ";
+                    if ( evt.data.packet_number_space === "application_data" ) {
+                        pnSpaceString = "appdata ";
+                    }
+                }
+                
+                return pnSpaceString + " " + (evt.data.timer_type !== undefined ? ( "" + evt.data.timer_type).toUpperCase() + " " : " ") + "timer " + evt.data.event_type + timeString;
+                break;
+
             default:
                 return evt.name;
                 break;
