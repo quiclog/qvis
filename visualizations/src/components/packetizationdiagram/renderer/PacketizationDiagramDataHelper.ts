@@ -76,7 +76,7 @@ export default class PacketizationDiagramDataHelper {
                 let streamIDnumber = parseInt( streamID, 10 );
 
                 if ( streamIDnumber > 52 ) {
-                    streamIDnumber = streamIDnumber % 53;
+                    streamIDnumber = streamIDnumber % 56;
                 }
 
                 if ( lut.has("" + streamIDnumber ) ) {

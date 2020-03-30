@@ -515,7 +515,7 @@ export default class PacketizationQUICPreProcessor {
     public static quicFrameRangeToString(data:PacketizationRange) {
 
         let text = "QUIC Frame #" + data.index + " : size " + data.size + "<br/>";
-        text += "Frame type : " + data.contentType + ", stream ID: " + (data.rawPacket && data.rawPacket.stream_id ? data.rawPacket.stream_id : "none") + "<br/>";
+        text += "Frame type : " + data.contentType + ", stream ID: " + (data.rawPacket && data.rawPacket.stream_id !== undefined ? data.rawPacket.stream_id : "none") + "<br/>";
 
         return text;
     };
@@ -608,7 +608,7 @@ export default class PacketizationQUICPreProcessor {
             let otherFrameCount = 0;
             for ( const frame of frames ) {
                 if ( frame.frame_type === qlog.QUICFrameTypeName.stream ) {
-                    if ( frame.length ) {
+                    if ( frame.length !== undefined ) {
                         frame.frame_size = fakeFrameHeaderSize + parseInt(frame.length, 10);// TODO: consider re-transmissions/overlapping data/etc. with .offset
                         simulatedPayloadLength += frame.frame_size; 
                     }
