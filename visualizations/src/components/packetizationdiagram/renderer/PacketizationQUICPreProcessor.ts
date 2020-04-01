@@ -363,6 +363,11 @@ export default class PacketizationQUICPreProcessor {
                                 if ( outstandingFrames && outstandingFrames.length > 0 ) {
                                     processHTTP3Frames( outstandingFrames, ranges );
                                 }
+
+                                if ( frame.stream_id !== undefined && frame.stream_id % 2 !== 0 ) {
+                                    // unidirectional stream
+                                    console.log("PacketizationPreProcessor: data seen on unidirectional stream: ", frame.stream_id, frame, data );
+                                }
                             }
                         }
 
@@ -516,6 +521,9 @@ export default class PacketizationQUICPreProcessor {
 
         let text = "QUIC Frame #" + data.index + " : size " + data.size + "<br/>";
         text += "Frame type : " + data.contentType + ", stream ID: " + (data.rawPacket && data.rawPacket.stream_id !== undefined ? data.rawPacket.stream_id : "none") + "<br/>";
+        if ( data.rawPacket && data.rawPacket.fin === true ) {
+            text += "<b>FIN BIT SET</b>";
+        }
 
         return text;
     };
@@ -615,6 +623,10 @@ export default class PacketizationQUICPreProcessor {
                     else {
                         console.error("PacketizationQUICPreProcessor: stream frame with no length attribute! skipping...", frame);
                     }
+                }
+                if ( frame.frame_type === qlog.QUICFrameTypeName.max_streams ) {
+                    // did strange things to googlevideo endpoint, so hack something that looks more plausible here
+                    frame.frame_size = fakeFrameHeaderSize + 4;
                 }
                 else {
                     otherFrameCount++;
