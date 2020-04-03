@@ -32,6 +32,7 @@ interface Interval {
 enum arrowTargetProperty {
     left = "leftTarget",
     right = "rightTarget",
+    lost = "packetLost",
 };
 
 export default class SequenceDiagramD3Renderer {
@@ -909,6 +910,7 @@ export default class SequenceDiagramD3Renderer {
                 const endCandidateIndex:number   = Math.min( endEvents.length - 1, lastFoundTargetIndex + endEventsFraction ); // go forward 10% events, but not beyond the array length
 
 
+                let counterpartFound = false;
                 for ( let c = startCandidateIndex; c <= endCandidateIndex; ++c ) {
                     // note : event can be either sent or received, but interfaces are the same, so doesn't matter atm
                     // TODO: define separate interface for this in the qlog schema!
@@ -918,8 +920,21 @@ export default class SequenceDiagramD3Renderer {
                     if (candidate.packet_type === evt.packet_type && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
+                        counterpartFound = true;
                         break;
                     }
+                }
+
+                if ( !counterpartFound ) {
+                    // we suspect the packet is lost... 
+                    // we COULD look for an explicit packet_lost event, but most implementations don't log those yet, so we need to be robust against those
+
+                    // NOTE: if we have only a single real trace loaded, we will never see lost events this way
+                    // to support that, we'd have to look at ACK gaps and out-of-order offsets in STREAM frames etc.
+                    // do-able (see the multiplexing diagram for example) but complex TODO
+
+                    // packet is assumed lost
+                    metadata[arrowTargetProperty.lost] = metadataTargetProperty; // store the direction in here, so we know where to draw the lost event to
                 }
 
                 if ( metadata[metadataTargetProperty] === undefined ){
@@ -1093,6 +1108,12 @@ export default class SequenceDiagramD3Renderer {
 
         const output = '';
 
+        // to help visualizing lost packets
+        // we put these outside of the traces-loop, because otherwise lost packets at the start of each extent would have 0
+        // seems like it would be rare enough not to matter, but turns out it isn't...
+        let previousYDiffLeft = 0;
+        let previousYDiffRight = 0;
+
         for ( const extent of extentsToRender ){
 
             const extentContainer = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -1162,17 +1183,54 @@ export default class SequenceDiagramD3Renderer {
                     let offsetMultiplier:number|undefined = undefined;
                     let directionText:string|undefined = undefined;
                     let directionColor:string|undefined = undefined;
+                    let packetLost:boolean = false;
+
+                    const colorRight = "#0468cc"; // blue
+                    const colorLeft = "#a80f3a"; // red
+
                     if  (currentMetadata[ arrowTargetProperty.right ] ){
                         offsetMultiplier = 1;
                         target = (currentMetadata[ arrowTargetProperty.right ] as any).qvis.sequencediagram;
                         directionText = ">";
-                        directionColor = "#0468cc"; // blue
+                        directionColor = colorRight;
+
+                        previousYDiffRight = target.y - currentY; // top y = 0, so target should be larger than current
                     }
                     else if ( currentMetadata[ arrowTargetProperty.left ] ){
                         offsetMultiplier = -1;
                         target = (currentMetadata[ arrowTargetProperty.left ] as any).qvis.sequencediagram;
                         directionText = "<";
-                        directionColor = "#a80f3a"; // red
+                        directionColor = colorLeft; // red
+
+                        previousYDiffLeft = target.y - currentY; // top y = 0, so target should be larger than current
+                    }
+                    else if ( currentMetadata[ arrowTargetProperty.lost ] !== undefined ) {
+                        // packet is lost: want to draw half an arrow
+
+                        // for this, need to figure out the halfway point, which is... a bit challenging?
+                        // we have to extrapolate the slant of the arrow (indicating the latency) from the previously seen latency in this direction
+                        // then interpolate along that slant to the middle
+
+                        if ( currentMetadata[ arrowTargetProperty.lost ] === arrowTargetProperty.right ) {
+                            // packet on the left was sent to the right
+                            offsetMultiplier = 0.5; // halfway arrow
+                            target = { y: currentY + (previousYDiffRight / 2) }; // halfway down what we previously went down (not perfect, but best approx. we can make?)
+
+                            directionText = ">";
+                            directionColor = colorRight;
+                        }
+                        else {
+                            // packet on the right was sent to the left
+                            offsetMultiplier = -0.5; // halfway arrow
+                            target = { y: currentY + (previousYDiffLeft / 2) }; // halfway down what we previously went down (not perfect, but best approx. we can make?)
+
+                            directionText = "<";
+                            directionColor = colorLeft;
+                        }
+
+                        packetLost = true;
+
+                        // console.error("LOST PACKET DRAWN", evt.data, previousYDiffLeft, previousYDiffRight, offsetMultiplier, target, currentX );
                     }
 
                     if ( offsetMultiplier ) { // if not, the current event does not have a connecting arrow
@@ -1210,6 +1268,26 @@ export default class SequenceDiagramD3Renderer {
                         arrow.setAttribute('fill', 'transparent');
                         arrow.setAttribute('transform', `rotate(${angle},${arrowX},${target.y})`);
                         extentContainer.appendChild( arrow );
+
+                        if ( packetLost ) {
+                            // draw an X next to the arrow
+                            const crossX = targetX + ((offsetMultiplier * 0.02) * this.bandWidth);
+                            const crossY = target.y + ((target.y - currentY) * 0.02);  
+
+                            // start top left, draw line. Then move bottom left, draw line
+                            let path = "M" + (crossX - 10) + " " + (crossY - 10);
+                            path += " L" + (crossX + 10) + " " + (crossY + 10);
+                            path += " M" + (crossX - 10) + " " + (crossY + 10);
+                            path += " L" + (crossX + 10) + " " + (crossY - 10);
+
+                            const cross = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                            cross.setAttribute('d', path );
+                            cross.setAttribute('stroke-width', '4');
+                            cross.setAttribute('stroke', "red");
+                            cross.setAttribute('fill', 'transparent');
+                            cross.setAttribute('transform', `rotate(${angle},${crossX},${crossY})`);
+                            extentContainer.appendChild( cross );
+                        }
 
                         // make the text 90% of the width of the arrow
                         const textWidth = Math.sqrt( Math.pow( targetX - currentX, 2) + Math.pow( target.y - currentY, 2) ) * 0.9;
