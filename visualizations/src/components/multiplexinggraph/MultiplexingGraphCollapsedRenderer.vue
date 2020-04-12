@@ -123,6 +123,12 @@
                 if ( this.connection !== undefined ) {
                     if ( this.showwaterfall ) {
                         this.waterfallRenderer.render ( this.connection );
+                        // needed to hook up click handlers
+                        // FIXME: this is quite dirty... should probably be done with a general config object
+                        this.dataRenderer.waterfallRenderer = this.waterfallRenderer;
+                    }
+                    else {
+                        this.dataRenderer.waterfallRenderer = undefined;
                     }
                     // this.fifoRenderer.render( this.connection );
                     this.dataRenderer.render( this.connection );

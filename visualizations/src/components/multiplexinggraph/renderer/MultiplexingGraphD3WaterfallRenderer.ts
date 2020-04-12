@@ -10,6 +10,9 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
     public rendering:boolean = false;
 
+    // FIXME: do this properly with a passed-in config object or something!
+    public onStreamClicked: ((streamID:string) => void) | undefined = undefined // set by the CollapsedRenderer directly (yes, I know, dirty)
+
     protected svg!:any;
     protected connection!:QlogConnection;
 
@@ -250,7 +253,8 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
-                .attr("height", (this.barHeight / streams.size) - 1);
+                .attr("height", (this.barHeight / streams.size) - 1)
+                .on("click", (d:any) => { if ( this.onStreamClicked ) { this.onStreamClicked("" + d.stream_id); } });
 
         const circleWidth = Math.min(15 ,((this.barHeight / streams.size) - 1) / 1.2);
 

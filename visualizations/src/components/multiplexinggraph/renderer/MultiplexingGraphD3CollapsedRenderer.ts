@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import StreamGraphDataHelper from './MultiplexingGraphDataHelper';
 import MultiplexingGraphD3ByterangesRenderer from './MultiplexingGraphD3ByterangesRenderer';
+import MultiplexingGraphD3WaterfallRenderer from './MultiplexingGraphD3WaterfallRenderer';
 
 
 interface StreamRange {
@@ -44,6 +45,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
     public axisLocation:"top"|"bottom" = "bottom";
 
     public byteRangeRenderer!:MultiplexingGraphD3ByterangesRenderer;
+    public waterfallRenderer:MultiplexingGraphD3WaterfallRenderer|undefined = undefined; // set from outside. FIXME: dirty!
 
     // public svgID:string;
     public rendering:boolean = false;
@@ -719,5 +721,16 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         if ( dataSent.length > 0 ) {
             this.byteRangeRenderer.render( dataSent, dataMoved, 0 );
         }
+
+
+        // make sure that if someone clicks on the waterfall renderer, it also updates the byteRangeRenderer
+        if ( this.waterfallRenderer !== undefined ){
+            this.waterfallRenderer.onStreamClicked = (streamID:string) => {
+                if ( this.byteRangeRenderer !== undefined ) {
+                    this.byteRangeRenderer.render( dataSent, dataMoved, parseInt(streamID, 0) );
+                }
+            };
+        }
     }
+
 }
