@@ -1406,6 +1406,11 @@ export default class SequenceDiagramD3Renderer {
                             if ( framesToRender ) {
 
                                 for ( const frameRaw of framesToRender ) {
+
+                                    if ( frameRaw.qvis && frameRaw.qvis.sequence && frameRaw.qvis.sequence.hide ) {
+                                        continue;
+                                    }
+
                                     const frame = frameRaw as qlog.QuicFrame;
 
                                     const textSpan = document.createElement("span");

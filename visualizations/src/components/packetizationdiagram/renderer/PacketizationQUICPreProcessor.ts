@@ -300,6 +300,8 @@ export default class PacketizationQUICPreProcessor {
                             payload_size: 0,
 
                             frame_type: "qvis-injected FILLER (deal with incorrectly guesstimated frame size)",
+
+                            qvis: { sequence: { hide: true } }, // make sure these don't show up in the sequence diagram
                         };
 
                         data.frames.unshift( bogus );
