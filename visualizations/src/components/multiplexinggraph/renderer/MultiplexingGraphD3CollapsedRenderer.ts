@@ -393,6 +393,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         };
 
         const dataSent:Array<any> = [];
+        const dataMoved:Array<any> = [];
         for ( const eventRaw of this.connection.getEvents() ) {
 
             const event = this.connection.parseEvent( eventRaw );
@@ -460,34 +461,34 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                     continue;
                 }
 
+                if ( data.from !== "transport" && data.to !== "application") { // only dealing with data bubbling up from the transport at the moment 
+                    continue;
+                }
+
                 if ( dataSent.length === 0 ) {
                     console.error("data moved but no stream frames seen yet... shouldn't happen!", data);
                     continue;
                 }
 
-                // would like to simply say that the last element in dataSent led to this, but sadly that's not true if there were coalesced frames in 1 packet... darnit
-                // so... need to search backwards to see if we can find something
-                let firstCandidate = undefined;
+                const movedOffset = parseInt( data.offset, 10 );
+                const movedLength = parseInt( data.length, 10 );
+
+                if ( movedLength === 0 ) {
+                    console.error("data_moved event with length 0, shouldn't happen! ignoring...", data);
+                    continue;
+                }
+
+                // can't simply say dataSent[ dataSent.length - 1 ] is the STREAM frame we need, because multiple STREAM frames of different streams could be in a single packet
+                // as such, find the last STREAM frame of the stream the data_moved belongs to
+                // NOTE: if you e.g., have 15 small STREAM frames of the same stream in one packet (which is possible, but a bit odd)
+                // then this won't be 100% accurate, as the first data_moved was probably triggered by the first STREAM frame, not the 15th, though here we find the 15th
+                // we had older versions of this code looking for that, but the benefits didn't outweight the complexity in the end. 
                 let foundFrame = undefined;
                 for ( let i = dataSent.length - 1; i >= 0; --i ) {
                     if ( "" + dataSent[i].streamID === "" + data.stream_id ) {
-
-                        // deal with frames containing two frames of the same stream... then it's not just the last one of that strea, DERP
-                        // there are stacks that for example encode the headers in a separate frame and the body too (e.g., picoquic)
-                        if ( firstCandidate === undefined ){
-                            firstCandidate = dataSent[i];
-                        }
-
-                        if ( dataSent[i].offset === parseInt(data.offset, 10) ) {
-                            foundFrame = dataSent[i];
-                            break;
-                        }
+                        foundFrame = dataSent[i];
+                        break;
                     }
-                }
-
-                if ( firstCandidate === undefined ) {
-                    console.error("Data moved but no triggering stream frame found, impossible!!!", dataSent, event.relativeTime, data);
-                    continue;
                 }
 
                 if ( !foundFrame ) {
@@ -495,7 +496,13 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                     continue;
                 }
 
-                foundFrame.dataMoved = data.length;
+                dataMoved.push({
+                    streamID: parseInt(data.stream_id, 10),
+                    countStart: foundFrame.countStart,
+                    countEnd: foundFrame.countEnd,
+                    offset: movedOffset,
+                    length: movedLength,
+                });
             }
         }
 
@@ -606,7 +613,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .style("pointer-events", "all")
                 .on("mouseover", packetMouseOver)
                 .on("mouseout", packetMouseOut)
-                .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, d.streamID); });
+                .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, dataMoved, d.streamID); });
 
         rects
             .selectAll("rect.retransmitPacket")
@@ -710,7 +717,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
         this.svg.call(zoom);
 
         if ( dataSent.length > 0 ) {
-            this.byteRangeRenderer.render( dataSent, 0 );
+            this.byteRangeRenderer.render( dataSent, dataMoved, 0 );
         }
     }
 }

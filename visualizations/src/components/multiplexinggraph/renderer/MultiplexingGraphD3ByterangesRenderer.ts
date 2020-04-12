@@ -22,7 +22,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         this.containerID = containerID;
     }
    
-    public async render( allFrames:Array<any>, streamID:number ):Promise<boolean> {
+    public async render( allFrames:Array<any>, allDataMoved:Array<any>, streamID:number ):Promise<boolean> {
         if ( this.rendering ) {
             return false;
         }
@@ -39,7 +39,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             return false;
         }
 
-        await this.renderLive( allFrames, streamID );
+        await this.renderLive( allFrames, allDataMoved, streamID );
         this.rendering = false;
 
         return true;
@@ -79,10 +79,11 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         return true;
     }
 
-    protected async renderLive( allFrames:Array<any>, streamID:number ) {
+    protected async renderLive( allFrames:Array<any>, allDataMoved:Array<any>, streamID:number ) {
         console.log("Rendering multiplexing byteranges graph", streamID);
 
         const streamFrames = allFrames.filter( (d:any) => "" + d.streamID === "" + streamID );
+        const dataMoved = allDataMoved.filter( (d:any) => "" + d.streamID === "" + streamID );
 
         // final frame isn't necessarily the last one in the file, due to retransmits
         // so we need to actually search for the largest one
@@ -161,7 +162,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
         const movedOffset = 2;
         rects
             .selectAll("rect.dataMoved")
-            .data( streamFrames.filter( (d:any) => d.dataMoved !== undefined ) )
+            .data( dataMoved )
             .enter()
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.countStart + movedOffset) )
@@ -170,7 +171,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
                 .style("opacity", 1)
                 .attr("class", "dataMoved")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
-                .attr("height", (d:any) => yDomain( d.offset + d.dataMoved - 1) - yDomain(d.offset));
+                .attr("height", (d:any) => yDomain( d.offset + d.length - 1) - yDomain(d.offset));
 
         this.updateZoom = (newXDomain:any) => {
 
@@ -246,10 +247,10 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
             rects
                 .selectAll(".dataMoved")
-                    .attr("x",      (d:any) => newX(d.countStart + 2) )
+                    .attr("x",      (d:any) => newX(d.countStart + 1) )
                     .attr("width",  (d:any) => Math.max(1, newX(d.countEnd) - newX(d.countStart)) )
                     .attr("y",      (d:any) => newY( d.offset ) )
-                    .attr("height", (d:any) => { return newY( d.offset + d.dataMoved - 1) - newY(d.offset); } )
+                    .attr("height", (d:any) => { return newY( d.offset + d.length - 1) - newY(d.offset); } )
         };
     }
 }
