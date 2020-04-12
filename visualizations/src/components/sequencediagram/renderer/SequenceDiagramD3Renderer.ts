@@ -61,14 +61,47 @@ export default class SequenceDiagramD3Renderer {
 
     private frameTypeToColorLUT:Map<string, Array<string>> = new Map<string, Array<string>>();
 
-    private onEventClicked: (event: any) => void;
+    private onEventClicked: (rawEvt: any, connection:QlogConnection) => void;
 
     private ignoreEventName = "ignoreseq"; // needs to be lowercase!!
 
-    constructor(containerID:string, svgID:string, onEventClicked: (packet: any) => void) {
+    constructor(containerID:string, svgID:string, onEventClicked: (packet: any, extra: any) => void) {
         this.containerID = containerID;
         this.svgID = svgID;
-        this.onEventClicked = onEventClicked;
+
+        this.onEventClicked = (rawEvt:any, connection:QlogConnection ) => { 
+            
+            const allEvents = connection.getEvents();
+            let evt:IQlogEventParser|undefined = connection.parseEvent( rawEvt );
+
+            const metrics:Map<string, any> = new Map<string, any>();
+
+            if ( evt.name === qlog.RecoveryEventType.metrics_updated ) {
+                // if we have metrics updated, we want to be able to show the state of -all- recovery metrics at that time, not just the updated ones
+                // for this, we start from the start of the events and aggregate all into a dictionary of values to show them 
+                evt = undefined; // to make sure we're not tempted to re-use this here, as we shouldn't, because of how .parseEvent() works
+
+                for ( const candidateRaw of allEvents ) {
+
+                    const candidate = connection.parseEvent( candidateRaw );
+
+                    if ( candidate.name === qlog.RecoveryEventType.metrics_updated ) {
+                        for ( const metricName of Object.keys(candidate.data) ) {
+                            metrics.set( metricName, candidate.data[metricName] );
+                        }
+                    }
+
+                    if ( candidateRaw === rawEvt ) {
+                        break; // don't want to go further than the current metrics_updated
+                    }
+                }
+
+                onEventClicked( rawEvt, Object.fromEntries( metrics ) );
+            }
+            else {
+                onEventClicked(rawEvt, undefined);
+            }
+        }
     }
    
     public async render(traces:Array<SequenceDiagramConnection>, timeResolution:number):Promise<boolean> {
@@ -1153,7 +1186,7 @@ export default class SequenceDiagramD3Renderer {
                     rect.setAttribute('width', ""  + (rectSize));
                     rect.setAttribute('height', "" + (rectSize));
                     rect.setAttribute('fill', 'green');
-                    rect.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                    rect.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
@@ -1344,7 +1377,7 @@ export default class SequenceDiagramD3Renderer {
                         textSpanFront.style.border = "1px white";
                         textSpanFront.style.borderStyle = "none solid";
                         textSpanFront.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                        textSpanFront.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                        textSpanFront.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
                         textContainer.appendChild(textSpanFront);
 
                         if ( evt.data.frames ){
@@ -1381,7 +1414,7 @@ export default class SequenceDiagramD3Renderer {
                                         textSpan.style.border = "1px white";
                                         textSpan.style.borderStyle = "none solid";
                                         textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
                                         if ( directionText === ">" ) {
                                             textContainer.prepend(textSpan);
                                         }
@@ -1423,7 +1456,7 @@ export default class SequenceDiagramD3Renderer {
                                     textSpan.style.border = "1px white";
                                     textSpan.style.borderStyle = "none solid";
                                     textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                    textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                                    textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
                                     if ( directionText === ">" ) {
                                         textContainer.prepend(textSpan);
                                     }
@@ -1505,7 +1538,7 @@ export default class SequenceDiagramD3Renderer {
                         textSpan.style.borderStyle = "none solid";
                         // textSpan.style.cssFloat = "right";
                         textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt);
+                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
                         // textContainer.appendChild(textSpan);
                         
                         textContainerOuter.appendChild(textSpan);

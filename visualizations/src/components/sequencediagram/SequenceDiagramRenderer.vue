@@ -10,6 +10,9 @@
         </div>
         <b-modal id="event-modal" hide-footer title="Event detail">
             <pre class="d-block">{{ eventDetail }}</pre>
+            <!-- TODO: make this configurable: not all extra data will be recovery-metric related down the line! -->
+            <p style="font-weight: bold;" v-if="this.eventDetailExtra !== null">Value of all recovery metrics at this point:</p>
+            <pre v-if="this.eventDetailExtra !== null" class="d-block">{{ eventDetailExtra }}</pre>
             <b-button class="mt-3" block @click="hideEventModal">Close</b-button>
         </b-modal>
     </div>
@@ -33,6 +36,7 @@
         public config!: SequenceDiagramConfig;
 
         public eventDetail: string = '';
+        public eventDetailExtra: string|null = null; // not undefined, because that would make this propery un-reactive
 
         protected get connections(){
             return this.config.connections;
@@ -56,8 +60,16 @@
             this.$bvModal.hide("event-modal");
         }
 
-        protected showEventModal(event: any) {
+        protected showEventModal(event: any, extra: any) {
+
             this.eventDetail = JSON.stringify(event, null, 2);
+            if ( extra !== undefined ) {
+                this.eventDetailExtra = JSON.stringify( extra, null , 2);
+            }
+            else {
+                this.eventDetailExtra = null;
+            }
+            
             this.$bvModal.show("event-modal");
         }
 
