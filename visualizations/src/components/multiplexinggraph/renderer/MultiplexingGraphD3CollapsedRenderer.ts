@@ -605,7 +605,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             .append("rect")
                 .attr("x", (d:any) => xDomain(d.countStart) - packetSidePadding )
                 .attr("y", (d:any) => (d.index % 2 === 0 ? 0 : packetHeight * 0.05) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
+                .attr("fill", (d:any) => StreamGraphDataHelper.StreamIDToColor("" + d.streamID)[0] /*"" + colorDomain( "" + d.streamID )*/ )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => xDomain(d.countEnd) - xDomain(d.countStart) + packetSidePadding * 2)

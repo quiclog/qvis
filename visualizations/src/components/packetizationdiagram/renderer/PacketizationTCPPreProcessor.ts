@@ -228,7 +228,7 @@ export default class PacketizationTCPPreProcessor {
                                 start: headerRange!.start,
                                 size: headerRange!.size,
 
-                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP2" )[0],
+                                color: PacketizationDiagramDataHelper.StreamIDToColor( "" + streamID, "HTTP2" )[0],
 
                                 extra: {
                                     frame_length: data.header_length + data.payload_length,
@@ -280,7 +280,7 @@ export default class PacketizationTCPPreProcessor {
                                 start: payloadRange!.start,
                                 size: payloadRange!.size,
 
-                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP2" )[0],
+                                color: PacketizationDiagramDataHelper.StreamIDToColor( "" + streamID, "HTTP2" )[0],
 
                                 extra: {
                                     frame_length: data.header_length + data.payload_length,

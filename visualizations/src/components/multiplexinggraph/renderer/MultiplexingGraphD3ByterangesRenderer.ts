@@ -138,7 +138,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .append("rect")
                 .attr("x", (d:any) => { return xDomain(d.countStart); } )
                 .attr("y", (d:any) => yDomain(d.offset) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] )
+                .attr("fill", (d:any) => StreamGraphDataHelper.StreamIDToColor("" + d.streamID)[0] )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(d.countStart)) * widthModifier)
@@ -152,14 +152,14 @@ export default class MultiplexingGraphD3ByterangesRenderer {
             .append("rect")
                 .attr("x", (d:any) => xDomain(1) )
                 .attr("y", (d:any) => yDomain(d.offset) )
-                .attr("fill", (d:any) => StreamGraphDataHelper.streamIDToColor("" + d.streamID)[0] )
+                .attr("fill", (d:any) => StreamGraphDataHelper.StreamIDToColor("" + d.streamID)[0] )
                 .style("opacity", opacity)
                 .attr("class", "pingback")
                 .attr("width", (d:any) => Math.max(1, xDomain(d.countEnd) - xDomain(1)))
                 .attr("height", (d:any) => yDomain( d.length - 1))
             // .style("pointer-events", "all")
 
-        const movedOffset = 2;
+        const movedOffset = 1;
         rects
             .selectAll("rect.dataMoved")
             .data( dataMoved )
@@ -247,7 +247,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
             rects
                 .selectAll(".dataMoved")
-                    .attr("x",      (d:any) => newX(d.countStart + 1) )
+                    .attr("x",      (d:any) => newX(d.countStart + movedOffset) )
                     .attr("width",  (d:any) => Math.max(1, newX(d.countEnd) - newX(d.countStart)) )
                     .attr("y",      (d:any) => newY( d.offset ) )
                     .attr("height", (d:any) => { return newY( d.offset + d.length - 1) - newY(d.offset); } )

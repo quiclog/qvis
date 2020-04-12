@@ -246,7 +246,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .attr("x", (d:any) => { return xDomain(d.startIndex) - 0.15; } )
                 .attr("y", (d:any) => { return d.order * (this.barHeight / streams.size); } )
                 // .attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
-                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor("" + d.stream_id)[0]; } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
@@ -258,7 +258,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             .append("circle")
                 .attr("cx", (d:any) => { return xDomain(d.requestIndex) + circleWidth / 2; } )
                 .attr("cy", (d:any) => { return ((d.order) * (this.barHeight / streams.size)) + (circleWidth / 1.6); } ) // 1.6 should be 2, but 1.6 somehow looks better...
-                .attr("fill", (d:any) => { return StreamGraphDataHelper.streamIDToColor("" + d.stream_id)[0]; } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
                 .attr("stroke", "black" )
                 .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
                 .attr("r", circleWidth / 2 );

@@ -115,7 +115,7 @@ export default class PacketizationQUICPreProcessor {
                             start: headerRange!.start,
                             size: headerRange!.size,
 
-                            color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP3" )[0],
+                            color: PacketizationDiagramDataHelper.StreamIDToColor( "" + streamID, "HTTP3" )[0],
 
                             extra: {
                                 frame_length: frameHeaderLength + framePayloadLength,
@@ -168,7 +168,7 @@ export default class PacketizationQUICPreProcessor {
                                 start: payloadRange!.start,
                                 size: payloadRange!.size,
 
-                                color: PacketizationDiagramDataHelper.streamIDToColor( "" + streamID, "HTTP3" )[0],
+                                color: PacketizationDiagramDataHelper.StreamIDToColor( "" + streamID, "HTTP3" )[0],
 
                                 extra: {
                                     frame_length: frameHeaderLength + framePayloadLength,
