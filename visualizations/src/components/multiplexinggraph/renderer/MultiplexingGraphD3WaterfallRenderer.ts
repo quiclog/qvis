@@ -174,7 +174,8 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                     if ( stream.startIndex === -1 ){
                         stream.startIndex = dataFrameCount;
                     }
-                    else if ( dataFrameCount > stream.stopIndex ){
+                    
+                    if ( dataFrameCount > stream.stopIndex ){
                         stream.stopIndex = dataFrameCount;
                     }
                 }
@@ -253,10 +254,10 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .style("opacity", 1)
                 .attr("class", "packet")
                 .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
-                .attr("height", (this.barHeight / streams.size) - 1)
+                .attr("height", Math.max((this.barHeight / streams.size) - 1, 0.01))
                 .on("click", (d:any) => { if ( this.onStreamClicked ) { this.onStreamClicked("" + d.stream_id); } });
 
-        const circleWidth = Math.min(15 ,((this.barHeight / streams.size) - 1) / 1.2);
+        const circleWidth = Math.min(15 ,Math.max(((this.barHeight / streams.size) - 1) / 1.2, 0.01));
 
         rects2
             .append("circle")
