@@ -56,6 +56,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
     protected barHeight = 70;
 
+    protected currentDomain:any = undefined;
+
     private dimensions:any = {};
 
     constructor(containerID:string, byteRangeContainerID:string) {
@@ -551,6 +553,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             .domain([1, frameCount])
             .range([ 0, this.dimensions.width ]);
 
+        this.currentDomain = xDomain;
+
         const xAxis = this.svg.append("g");
         
         if ( this.axisLocation === "top" ) {
@@ -615,7 +619,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
                 .style("pointer-events", "all")
                 .on("mouseover", packetMouseOver)
                 .on("mouseout", packetMouseOut)
-                .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, dataMoved, d.streamID); });
+                .on("click", (d:any) => { this.byteRangeRenderer.render(dataSent, dataMoved, d.streamID); this.byteRangeRenderer.zoom( this.currentDomain ); });
 
         rects
             .selectAll("rect.retransmitPacket")
@@ -690,6 +694,8 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             // recover the new scale
             const newX = d3.event.transform.rescaleX(xDomain);
 
+            this.currentDomain = newX;
+
             // update axes with these new boundaries
             // xAxis./*transition().duration(200).*/call(d3.axisBottom(newX));
             if ( this.axisLocation === "top" ){
@@ -728,6 +734,7 @@ export default class MultiplexingGraphD3CollapsedRenderer {
             this.waterfallRenderer.onStreamClicked = (streamID:string) => {
                 if ( this.byteRangeRenderer !== undefined ) {
                     this.byteRangeRenderer.render( dataSent, dataMoved, parseInt(streamID, 0) );
+                    this.byteRangeRenderer.zoom( this.currentDomain );
                 }
             };
         }
