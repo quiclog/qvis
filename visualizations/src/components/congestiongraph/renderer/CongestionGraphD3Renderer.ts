@@ -911,7 +911,9 @@ export default class CongestionGraphD3Renderer {
     private drawRect(canvasContext: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, color: string){
         canvasContext.beginPath();
         canvasContext.fillStyle = color;
-        canvasContext.rect(x, y, width * this.mainGraphState.currentPerspective().drawScaleX, -height * this.mainGraphState.currentPerspective().drawScaleY);
+        // seems like things with height < 0.05 don't actually get drawn... so clamp it.
+        //  this is less accurate at max zoomed-out for large traces, but at least draws something
+        canvasContext.rect(x, y, width * this.mainGraphState.currentPerspective().drawScaleX, Math.min(-0.05, -height * this.mainGraphState.currentPerspective().drawScaleY));
         canvasContext.fill();
     }
 

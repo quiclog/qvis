@@ -194,7 +194,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                     }
 
                     stream.frameCount++;
-                    stream.totalData += streamFrame.length;
+                    stream.totalData += parseInt(streamFrame.length, 0);
                 }
             }
         }
