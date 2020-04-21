@@ -13,6 +13,11 @@ export default class MultiplexingGraphD3WaterfallRenderer {
     // FIXME: do this properly with a passed-in config object or something!
     public onStreamClicked: ((streamID:string) => void) | undefined = undefined // set by the CollapsedRenderer directly (yes, I know, dirty)
 
+    // TODO: merge this with the one above in a proper event emitter setup
+    // the above is to handle clicks from within the CollapsedRenderer (to update the ByteRangesRenderer)
+    // this one is to handle clicks from the upper-layer Vue renderer to show stream details
+    protected onStreamClickedUpper:(streamDetails:any) => void;
+
     protected svg!:any;
     protected connection!:QlogConnection;
 
@@ -20,8 +25,9 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
     private dimensions:any = {};
 
-    constructor(containerID:string) {
+    constructor(containerID:string, onStreamClickedUpper:(streamDetails:any) => void) {
         this.containerID = containerID;
+        this.onStreamClickedUpper = onStreamClickedUpper;
     }
    
     public async render(connection:QlogConnection):Promise<boolean> {
@@ -53,7 +59,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 40, right: Math.round(container.clientWidth * 0.05), bottom: 0, left: 20};
+        this.dimensions.margin = {top: 40, right: 40, bottom: 0, left: 20};
 
         // width and height are the INTERNAL widths (so without the margins)
         this.dimensions.width = container.clientWidth - this.dimensions.margin.left - this.dimensions.margin.right;
@@ -113,7 +119,13 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             order:number,
             requestIndex:number,
             startIndex:number,
-            stopIndex:number
+            stopIndex:number,
+
+            startTime:number,
+            endTime:number,
+            requestTime:number,
+            frameCount:number,
+            totalData:number,
         }
 
         let dataFrameCount:number = 0;
@@ -163,7 +175,7 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                         break;
                     }
 
-                    stream = { stream_id: streamID, order: streams.size, requestIndex: dataFrameCount, startIndex: -1, stopIndex: -1 };
+                    stream = { stream_id: streamID, order: streams.size, requestIndex: dataFrameCount, startIndex: -1, stopIndex: -1, requestTime: evt.relativeTime, startTime: -1, endTime: -1, frameCount: 0, totalData: 0 };
                     streams.set( streamID, stream );
                 }
                 else {
@@ -173,14 +185,30 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
                     if ( stream.startIndex === -1 ){
                         stream.startIndex = dataFrameCount;
+                        stream.startTime = evt.relativeTime;
                     }
                     
                     if ( dataFrameCount > stream.stopIndex ){
                         stream.stopIndex = dataFrameCount;
+                        stream.endTime = evt.relativeTime;
                     }
+
+                    stream.frameCount++;
+                    stream.totalData += streamFrame.length;
                 }
             }
         }
+
+        let minBarHeight = 4; // 4px is minimum height. Above that, we start scrolling (at 120 normal height, 4px gives us 30 streams without scrollbar)
+        if ( minBarHeight * streams.size < this.barHeight ) {
+            minBarHeight = (this.barHeight * 0.95) / streams.size;
+        }
+
+
+        this.dimensions.height = Math.ceil(minBarHeight * streams.size) + this.dimensions.margin.top;
+
+        // update the height of the surrounding container
+        d3.select("#" + this.containerID + " svg").attr("height", this.dimensions.height);
 
         // TODO: what if no H3-level stuff found?!
 
@@ -243,26 +271,37 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             .enter()
             .append("g");
 
+        const minWidth = 4; // 4px minimum width
 
         rects2
             // background
             .append("rect")
                 .attr("x", (d:any) => { return xDomain(d.startIndex) - 0.15; } )
-                .attr("y", (d:any) => { return d.order * (this.barHeight / streams.size); } )
+                .attr("y", (d:any) => { return d.order * minBarHeight; } )
                 // .attr("fill", (d:any) => { return "" + colorDomain( "" + d.streamID ); } )
                 .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
                 .style("opacity", 1)
                 .attr("class", "packet")
-                .attr("width", (d:any) => { return xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3; })
-                .attr("height", Math.max((this.barHeight / streams.size) - 1, 0.01))
-                .on("click", (d:any) => { if ( this.onStreamClicked ) { this.onStreamClicked("" + d.stream_id); } });
+                .attr("width", (d:any) => { return Math.max(minWidth, xDomain(d.stopIndex) - xDomain(d.startIndex)  + 0.3); })
+                .attr("height", Math.max(minBarHeight, 0.01))
+                .on("click", (d:any) => { 
+                    if ( this.onStreamClickedUpper ) {
+                        const details:any = {};
+                        details.stream_id = d.stream_id;
+                        details.data = streams.get( d.stream_id );
+                        this.onStreamClickedUpper( details ); // updates stream detail in vue-layer
+                    }
+                    if ( this.onStreamClicked ) { 
+                        this.onStreamClicked("" + d.stream_id); // updates byteRangeRenderer
+                    } 
+                });
 
-        const circleWidth = Math.min(15 ,Math.max(((this.barHeight / streams.size) - 1) / 1.2, 0.01));
+        const circleWidth = Math.min(15 ,Math.max(minBarHeight / 1.2, 0.01));
 
         rects2
             .append("circle")
                 .attr("cx", (d:any) => { return xDomain(d.requestIndex) + circleWidth / 2; } )
-                .attr("cy", (d:any) => { return ((d.order) * (this.barHeight / streams.size)) + (circleWidth / 1.6); } ) // 1.6 should be 2, but 1.6 somehow looks better...
+                .attr("cy", (d:any) => { return ((d.order) * minBarHeight) + (circleWidth / 1.6); } ) // 1.6 should be 2, but 1.6 somehow looks better...
                 .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
                 .attr("stroke", "black" )
                 .attr("stroke-width", (d:any) => { return circleWidth / 5; } )

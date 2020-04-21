@@ -95,7 +95,11 @@ export default class MultiplexingGraphD3CollapsedRenderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 0, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
+
+        console.warn("COLLAPSED clienWidth", container.clientWidth, container, (this.waterfallRenderer as any), (this.waterfallRenderer as any).dimensions.margin.right); 
+
+        this.dimensions.margin = {top: 0, right: 40, bottom: 20, left: 20};
+        // this.dimensions.margin = {top: 0, right: (this.waterfallRenderer as any).dimensions.margin.right, bottom: 20, left: 20};
         if ( this.axisLocation === "top" ){
             this.dimensions.margin.top = 20;
         }

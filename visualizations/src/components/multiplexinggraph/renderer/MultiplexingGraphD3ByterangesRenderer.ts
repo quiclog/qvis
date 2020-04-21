@@ -53,7 +53,7 @@ export default class MultiplexingGraphD3ByterangesRenderer {
 
         const container:HTMLElement = document.getElementById(this.containerID)!;
 
-        this.dimensions.margin = {top: 20, right: Math.round(container.clientWidth * 0.05), bottom: 20, left: 20};
+        this.dimensions.margin = {top: 20, right: 40, bottom: 20, left: 20};
 
         // width and height are the INTERNAL widths (so without the margins)
         this.dimensions.width = container.clientWidth - this.dimensions.margin.left - this.dimensions.margin.right;
