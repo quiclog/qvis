@@ -271,7 +271,9 @@
     import Connection from "@/data/Connection";
 
     interface FCData {
+        connectionDataFCListTimes:Array<number>, // for debugging
         connectionDataFCList:Array<number>,
+        streamDataFCListTimes:Map<string, Array<number>>, // for debugging
         streamDataFCList:Map<string, Array<number>>,
         streamsUniFCList:Array<number>,
         streamsBidiFCList:Array<number>,
@@ -293,14 +295,18 @@
         // These are all from the remote's perspective
         protected flowControlRemote:FCData = {
             connectionDataFCList: new Array<number>(),
+            connectionDataFCListTimes: new Array<number>(),
             streamDataFCList: new Map<string, Array<number>>(),
+            streamDataFCListTimes: new Map<string, Array<number>>(),
             streamsUniFCList: new Array<number>(),
             streamsBidiFCList: new Array<number>(),
         }
 
         protected flowControlLocal:FCData = {
             connectionDataFCList: new Array<number>(),
+            connectionDataFCListTimes: new Array<number>(),
             streamDataFCList: new Map<string, Array<number>>(),
+            streamDataFCListTimes: new Map<string, Array<number>>(),
             streamsUniFCList: new Array<number>(),
             streamsBidiFCList: new Array<number>(),
         }
@@ -364,13 +370,17 @@
 
             this.flowControlRemote = {
                 connectionDataFCList: new Array<number>(),
+                connectionDataFCListTimes: new Array<number>(),
                 streamDataFCList: new Map<string, Array<number>>(),
+                streamDataFCListTimes: new Map<string, Array<number>>(),
                 streamsUniFCList: new Array<number>(),
                 streamsBidiFCList: new Array<number>(),
             }
             this.flowControlLocal = {
                 connectionDataFCList: new Array<number>(),
+                connectionDataFCListTimes: new Array<number>(),
                 streamDataFCList: new Map<string, Array<number>>(),
+                streamDataFCListTimes: new Map<string, Array<number>>(),
                 streamsUniFCList: new Array<number>(),
                 streamsBidiFCList: new Array<number>(),
             }
@@ -456,6 +466,7 @@
                 if ( evt.category === qlog.EventCategory.transport && evt.name === qlog.TransportEventType.parameters_set 
                      && evt.data && evt.data.owner === owner ) {
                          
+                        fc.connectionDataFCListTimes.push( evt.relativeTime );
                         fc.connectionDataFCList.push ( parseInt( evt.data.initial_max_data, 10 ) );
                 }
 
@@ -464,6 +475,7 @@
                     && evt.data && evt.data.frames ) {
                         for ( const frame of evt.data.frames ) {
                             if ( frame.frame_type === qlog.QUICFrameTypeName.max_data ) {
+                                fc.connectionDataFCListTimes.push ( evt.relativeTime );
                                 fc.connectionDataFCList.push ( parseInt( frame.maximum, 10 ) );
                             }
                         }
@@ -498,6 +510,11 @@
                         fc.streamDataFCList.set("bidi_local",  [ parseInt( evt.data.initial_max_stream_data_bidi_local, 10 )])
                         fc.streamDataFCList.set("bidi_remote", [ parseInt( evt.data.initial_max_stream_data_bidi_remote, 10 )] )
                         fc.streamDataFCList.set("uni_remote",  [ parseInt( evt.data.initial_max_stream_data_uni, 10 )] )
+
+
+                        fc.streamDataFCListTimes.set( "bidi_local", [evt.relativeTime] );
+                        fc.streamDataFCListTimes.set( "bidi_remote", [evt.relativeTime] );
+                        fc.streamDataFCListTimes.set( "uni_remote", [evt.relativeTime] );
                 }
 
                 // 2. get updates from MAX_STREAM_DATA frames
@@ -507,6 +524,7 @@
                             if ( frame.frame_type === qlog.QUICFrameTypeName.max_stream_data ) {
 
                                 const streamID = "" + frame.stream_id;
+
                                 let streamFC = fc.streamDataFCList.get( streamID );
                                 if ( !streamFC ) {
                                     streamFC = new Array<number>();
@@ -514,6 +532,14 @@
                                 }
 
                                 streamFC.push( parseInt( frame.maximum, 10 ) );
+
+                                let times = fc.streamDataFCListTimes.get( streamID );
+                                if ( !times ) {
+                                    times = new Array<number>();
+                                    fc.streamDataFCListTimes.set( streamID, times );
+                                }
+
+                                times.push( evt.relativeTime );
                             }
                         }
                 }
@@ -524,7 +550,8 @@
 
             this.fillConnectionDataFC("remote");
 
-            console.log("Connection-level FC for remote viewpoint of Trace " + this.index, this.flowControlRemote.connectionDataFCList.join(","));
+            console.log("Connection-level FC TIMES for remote viewpoint of Trace " + this.index + ": ",    this.flowControlRemote.connectionDataFCListTimes.join(","));
+            console.log("Connection-level FC for remote viewpoint of Trace " + this.index + ": ",          this.flowControlRemote.connectionDataFCList.join(","));
 
             return this.flowControlRemote.connectionDataFCList;
         }
@@ -533,7 +560,8 @@
 
             this.fillConnectionDataFC("local");
 
-            console.log("Connection-level FC for local viewpoint of Trace " + this.index, this.flowControlLocal.connectionDataFCList.join(","));
+            console.log("Connection-level FC TIMES for local viewpoint of Trace " + this.index + ": ", this.flowControlLocal.connectionDataFCListTimes.join(","));
+            console.log("Connection-level FC for local viewpoint of Trace " + this.index + ": ",       this.flowControlLocal.connectionDataFCList.join(","));
 
             return this.flowControlLocal.connectionDataFCList;
         }
@@ -542,7 +570,8 @@
             this.fillStreamDataFC("remote");
 
             for ( const entry of this.flowControlRemote.streamDataFCList.entries() ) {
-                console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0], entry[1].join(","));
+                console.log("Stream-level FC TIMES for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlRemote.streamDataFCListTimes.get(entry[0])!.join(","));
+                console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
             }
 
             return this.flowControlRemote.streamDataFCList;
@@ -552,7 +581,8 @@
             this.fillStreamDataFC("local");
 
             for ( const entry of this.flowControlLocal.streamDataFCList.entries() ) {
-                console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0], entry[1].join(","));
+                console.log("Stream-level FC TIMES for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlLocal.streamDataFCListTimes.get(entry[0])!.join(","));
+                console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
             }
 
             return this.flowControlLocal.streamDataFCList;
