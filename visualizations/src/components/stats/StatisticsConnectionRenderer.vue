@@ -134,6 +134,122 @@
                         None of the events in this trace had data.packet_type set!
                     </b-td>
                 </b-tr>
+                <b-tr>
+                    <b-td>Connection-level Flow Control evolution<br/>(MAX_DATA, initial_max_data)<br/><br/>
+                        Read as: viewpoint allows the other side to send this much data on the entire connection (all streams combined)
+                    </b-td>
+                    <b-td v-if="encryptionLUT.size > 0">
+                        <b-table-simple fixed small borderless responsive style="border-bottom: 0px;">
+                        <colgroup><col width="20%"></colgroup>
+                            <b-tbody>
+                                <b-tr>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                    <b-th>Viewpoint</b-th>
+                                    <b-th>Evolution (bytes)</b-th>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                </b-tr>
+                                
+                                <b-tr>
+                                    <b-td>
+                                    </b-td>
+                                    <b-td>
+                                        Local ({{connection.vantagePoint.type}})
+                                    </b-td>
+                                    <b-td>
+                                        <p v-for="(item,index3) in connectionDataFCLocal" :key="'fcc_' + index3">
+                                            {{item}}
+                                        </p>
+                                    </b-td>
+                                    <b-td>
+                                    </b-td>
+                                </b-tr>
+                                <b-tr>
+                                    <b-td>
+                                    </b-td>
+                                    <b-td>
+                                        Remote ({{connection.vantagePoint.type === qlogns.VantagePointType.client ? "server" : "client"}})
+                                    </b-td>
+                                    <b-td>
+                                        <p v-for="(item,index4) in connectionDataFCRemote" :key="'fcc_' + index4">
+                                            {{item}}
+                                        </p>
+                                    </b-td>
+                                    <b-td>
+                                    </b-td>
+                                </b-tr>
+                                
+                            </b-tbody>
+                        </b-table-simple>
+                    </b-td>
+                    <b-td v-else variant="danger">
+                        None of the events in this trace had data.packet_type set!
+                    </b-td>
+                </b-tr>
+
+
+
+                <b-tr>
+                    <b-td>Stream-level Flow Control evolution<br/>(MAX_STREAM_DATA, initial_max_stream_data_*)<br/><br/>
+                        Read as: viewpoint allows the other side to send this much data on each individual stream
+                    </b-td>
+                    <b-td v-if="streamDataFCRemote.size > 0">
+                        <b-table-simple fixed small borderless responsive style="border-bottom: 0px;">
+                        <colgroup><col width="20%"></colgroup>
+                            <b-tbody>
+
+                                <b-tr>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                    <b-th>Local Streams ({{connection.vantagePoint.type}})</b-th>
+                                    <b-th>Evolution</b-th>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                </b-tr>
+                                
+                                <b-tr v-for="(item,index6) in streamDataFCLocal" :key="'fcsl_' + index6">
+                                    <b-td>
+                                    </b-td>
+                                    <b-td>
+                                        {{item[0]}}
+                                    </b-td>
+                                    <b-td>
+                                        <p v-for="(fcLimit,index66) in item[1]" :key="'fcsl2_' + index66">
+                                            {{fcLimit}}
+                                        </p>
+                                    </b-td>
+                                    <b-td>
+                                    </b-td>
+                                </b-tr>
+
+
+                                <b-tr>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                    <b-th>Remote Streams ({{connection.vantagePoint.type === qlogns.VantagePointType.client ? "server" : "client"}})</b-th>
+                                    <b-th>Evolution</b-th>
+                                    <b-th></b-th> <!-- left empty on purpose to get horizontal alignment with the table above -->
+                                </b-tr>
+                                
+                                <b-tr v-for="(item,index5) in streamDataFCRemote" :key="'fcsr_' + index5">
+                                    <b-td>
+                                    </b-td>
+                                    <b-td>
+                                        {{item[0]}}
+                                    </b-td>
+                                    <b-td>
+                                        <p v-for="(fcLimit,index55) in item[1]" :key="'fcsr2_' + index55">
+                                            {{fcLimit}}
+                                        </p>
+                                    </b-td>
+                                    <b-td>
+                                    </b-td>
+                                </b-tr>
+
+                            </b-tbody>
+                        </b-table-simple>
+                    </b-td>
+                    <b-td v-else variant="danger">
+                        No stream level flow control limits set
+                    </b-td>
+                </b-tr>
+
 
             </b-tbody>
         </b-table-simple>
@@ -154,6 +270,13 @@
     import * as qlog from '@quictools/qlog-schema';
     import Connection from "@/data/Connection";
 
+    interface FCData {
+        connectionDataFCList:Array<number>,
+        streamDataFCList:Map<string, Array<number>>,
+        streamsUniFCList:Array<number>,
+        streamsBidiFCList:Array<number>,
+    }
+
     @Component
     export default class StatisticsConnectionRenderer extends Vue {
         @Prop()
@@ -166,6 +289,23 @@
         protected frameLookupTable:Map<string, number> = new Map<string, number>();
         protected encryptionLookupTable:Map<string, number> = new Map<string, number>(); 
         protected h3Headers:string|undefined = undefined;
+
+        // These are all from the remote's perspective
+        protected flowControlRemote:FCData = {
+            connectionDataFCList: new Array<number>(),
+            streamDataFCList: new Map<string, Array<number>>(),
+            streamsUniFCList: new Array<number>(),
+            streamsBidiFCList: new Array<number>(),
+        }
+
+        protected flowControlLocal:FCData = {
+            connectionDataFCList: new Array<number>(),
+            streamDataFCList: new Map<string, Array<number>>(),
+            streamsUniFCList: new Array<number>(),
+            streamsBidiFCList: new Array<number>(),
+        }
+
+
 
         // vue.js caches computed props, so this is not done again each time, only when data actually changes, see beforeUpdate()
         protected get H3headersSummary() {
@@ -216,11 +356,24 @@
         }
 
         protected beforeUpdate() {
-            console.log("DEBUG Clearing frameLUT");
+            // console.log("DEBUG Clearing frameLUT");
 
             this.frameLookupTable = new Map<string, number>();
             this.encryptionLookupTable = new Map<string, number>(); 
             this.h3Headers = undefined;
+
+            this.flowControlRemote = {
+                connectionDataFCList: new Array<number>(),
+                streamDataFCList: new Map<string, Array<number>>(),
+                streamsUniFCList: new Array<number>(),
+                streamsBidiFCList: new Array<number>(),
+            }
+            this.flowControlLocal = {
+                connectionDataFCList: new Array<number>(),
+                streamDataFCList: new Map<string, Array<number>>(),
+                streamsUniFCList: new Array<number>(),
+                streamsBidiFCList: new Array<number>(),
+            }
         }
 
         protected get totalFrameCount() {
@@ -280,6 +433,136 @@
 
             return this.encryptionLookupTable;
         }
+
+        protected fillConnectionDataFC(owner:string) {
+
+            let fc;
+            let packetEventType;
+            if ( owner === "remote" ) {
+                fc = this.flowControlRemote;
+                packetEventType = qlog.TransportEventType.packet_received;
+            }
+            else { 
+                fc = this.flowControlLocal;
+                packetEventType = qlog.TransportEventType.packet_sent;
+            }
+
+
+            const trace = this.connection;
+            for ( const rawEvt of trace.getEvents() ){
+                const evt = trace.parseEvent( rawEvt );
+
+                // 1. get the initial max from the transport parameters
+                if ( evt.category === qlog.EventCategory.transport && evt.name === qlog.TransportEventType.parameters_set 
+                     && evt.data && evt.data.owner === owner ) {
+                         
+                        fc.connectionDataFCList.push ( parseInt( evt.data.initial_max_data, 10 ) );
+                }
+
+                // 2. get updates from MAX_DATA frames
+                if ( evt.category === qlog.EventCategory.transport && evt.name === packetEventType
+                    && evt.data && evt.data.frames ) {
+                        for ( const frame of evt.data.frames ) {
+                            if ( frame.frame_type === qlog.QUICFrameTypeName.max_data ) {
+                                fc.connectionDataFCList.push ( parseInt( frame.maximum, 10 ) );
+                            }
+                        }
+                }
+            }
+        }
+
+        protected fillStreamDataFC(owner:string) {
+
+            let fc;
+            let packetEventType;
+            if ( owner === "remote" ) {
+                fc = this.flowControlRemote;
+                packetEventType = qlog.TransportEventType.packet_received;
+            }
+            else { 
+                fc = this.flowControlLocal;
+                packetEventType = qlog.TransportEventType.packet_sent;
+            }
+
+
+            const trace = this.connection;
+            for ( const rawEvt of trace.getEvents() ){
+                const evt = trace.parseEvent( rawEvt );
+
+                // 1. get the initial max from the transport parameters
+                if ( evt.category === qlog.EventCategory.transport && evt.name === qlog.TransportEventType.parameters_set 
+                     && evt.data && evt.data.owner === owner ) {
+
+                        // TODO: add these as initial values to the individual streams as well
+                        // however, that requires figuring out which streams are what type, and I'm too lazy for that at the moment
+                        fc.streamDataFCList.set("bidi_local",  [ parseInt( evt.data.initial_max_stream_data_bidi_local, 10 )])
+                        fc.streamDataFCList.set("bidi_remote", [ parseInt( evt.data.initial_max_stream_data_bidi_remote, 10 )] )
+                        fc.streamDataFCList.set("uni_remote",  [ parseInt( evt.data.initial_max_stream_data_uni, 10 )] )
+                }
+
+                // 2. get updates from MAX_STREAM_DATA frames
+                if ( evt.category === qlog.EventCategory.transport && evt.name === packetEventType
+                    && evt.data && evt.data.frames ) {
+                        for ( const frame of evt.data.frames ) {
+                            if ( frame.frame_type === qlog.QUICFrameTypeName.max_stream_data ) {
+
+                                const streamID = "" + frame.stream_id;
+                                let streamFC = fc.streamDataFCList.get( streamID );
+                                if ( !streamFC ) {
+                                    streamFC = new Array<number>();
+                                    fc.streamDataFCList.set( streamID, streamFC );
+                                }
+
+                                streamFC.push( parseInt( frame.maximum, 10 ) );
+                            }
+                        }
+                }
+            }
+        }
+
+        protected get connectionDataFCRemote() {
+
+            this.fillConnectionDataFC("remote");
+
+            console.log("Connection-level FC for remote viewpoint of Trace " + this.index, this.flowControlLocal.connectionDataFCList.join(","));
+
+            return this.flowControlRemote.connectionDataFCList;
+        }
+
+        protected get connectionDataFCLocal() {
+
+            this.fillConnectionDataFC("local");
+
+            console.log("Connection-level FC for local viewpoint of Trace " + this.index, this.flowControlLocal.connectionDataFCList.join(","));
+
+            return this.flowControlLocal.connectionDataFCList;
+        }
+
+        protected get streamDataFCRemote() {
+            this.fillStreamDataFC("remote");
+
+            for ( const entry of this.flowControlRemote.streamDataFCList.entries() ) {
+                console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0], entry[1].join(","));
+            }
+
+            return this.flowControlRemote.streamDataFCList;
+        }
+
+        protected get streamDataFCLocal() {
+            this.fillStreamDataFC("local");
+
+            for ( const entry of this.flowControlRemote.streamDataFCList.entries() ) {
+                console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0], entry[1].join(","));
+            }
+
+            return this.flowControlLocal.streamDataFCList;
+        }
+
+        // TODO: FIXME: not doing the MAX_STREAMS stuff yet because we didn't need it for our research + 
+        // most of that info should be in the transport parameters either way (unless for very long-running conns or constrained hardware)
+
+
+
     }
 
 </script>
