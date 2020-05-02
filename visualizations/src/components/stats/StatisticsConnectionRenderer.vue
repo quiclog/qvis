@@ -524,7 +524,7 @@
 
             this.fillConnectionDataFC("remote");
 
-            console.log("Connection-level FC for remote viewpoint of Trace " + this.index, this.flowControlLocal.connectionDataFCList.join(","));
+            console.log("Connection-level FC for remote viewpoint of Trace " + this.index, this.flowControlRemote.connectionDataFCList.join(","));
 
             return this.flowControlRemote.connectionDataFCList;
         }
@@ -551,7 +551,7 @@
         protected get streamDataFCLocal() {
             this.fillStreamDataFC("local");
 
-            for ( const entry of this.flowControlRemote.streamDataFCList.entries() ) {
+            for ( const entry of this.flowControlLocal.streamDataFCList.entries() ) {
                 console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0], entry[1].join(","));
             }
 
