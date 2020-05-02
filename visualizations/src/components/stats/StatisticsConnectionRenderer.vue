@@ -546,12 +546,46 @@
             }
         }
 
+        protected createStaggeredLines( timesInput:Array<number>, valsInput: Array<number> ) {
+
+            let times = "";
+            let vals = "";
+            let prevVal = null;
+            let prevTime = null;
+
+            for ( let i = 0; i < timesInput.length; ++i ){
+                const time = timesInput[i];
+                const val = valsInput[i];
+
+                if ( prevVal !== null ){
+                    times += ( "" + time).replace(".",",") + ";";
+                    vals += ( "" + prevVal).replace(".",",") + ";";
+                }
+
+                times += ( "" + time).replace(".",",") + ";";
+                vals  += ( "" + val).replace(".",",") + ";";
+
+                prevTime = time;
+                prevVal = val;
+            }
+
+            times += ( "" + (prevTime! + 200)).replace(".",",") + ";";
+            vals  += ( "" + prevVal).replace(".",",") + ";";
+
+            return [ times, vals ];
+        }
+
         protected get connectionDataFCRemote() {
 
             this.fillConnectionDataFC("remote");
 
-            console.log("Connection-level FC TIMES for remote viewpoint of Trace " + this.index + ": ",    this.flowControlRemote.connectionDataFCListTimes.join(","));
-            console.log("Connection-level FC for remote viewpoint of Trace " + this.index + ": ",          this.flowControlRemote.connectionDataFCList.join(","));
+            const staggeredResults = this.createStaggeredLines( this.flowControlRemote.connectionDataFCListTimes, this.flowControlRemote.connectionDataFCList );
+
+
+            console.log("Connection-level FC TIMES for remote viewpoint of Trace " + this.index + ": ", staggeredResults[0]);
+            // console.log("Connection-level FC TIMES for remote viewpoint of Trace " + this.index + ": ",    this.flowControlRemote.connectionDataFCListTimes.join(";"));
+            console.log("Connection-level FC for remote viewpoint of Trace " + this.index + ": ",         staggeredResults[1]);
+            // console.log("Connection-level FC for remote viewpoint of Trace " + this.index + ": ",          this.flowControlRemote.connectionDataFCList.join(";"));
 
             return this.flowControlRemote.connectionDataFCList;
         }
@@ -560,8 +594,12 @@
 
             this.fillConnectionDataFC("local");
 
-            console.log("Connection-level FC TIMES for local viewpoint of Trace " + this.index + ": ", this.flowControlLocal.connectionDataFCListTimes.join(","));
-            console.log("Connection-level FC for local viewpoint of Trace " + this.index + ": ",       this.flowControlLocal.connectionDataFCList.join(","));
+            const staggeredResults = this.createStaggeredLines( this.flowControlLocal.connectionDataFCListTimes, this.flowControlLocal.connectionDataFCList );
+
+            console.log("Connection-level FC TIMES for local viewpoint of Trace " + this.index + ": ", staggeredResults[0] );
+            // console.log("Connection-level FC TIMES for local viewpoint of Trace " + this.index + ": ", this.flowControlLocal.connectionDataFCListTimes.join(";"));
+            console.log("Connection-level FC for local viewpoint of Trace " + this.index + ": ",       staggeredResults[1] );
+            // console.log("Connection-level FC for local viewpoint of Trace " + this.index + ": ",       this.flowControlLocal.connectionDataFCList.join(";"));
 
             return this.flowControlLocal.connectionDataFCList;
         }
@@ -570,8 +608,13 @@
             this.fillStreamDataFC("remote");
 
             for ( const entry of this.flowControlRemote.streamDataFCList.entries() ) {
-                console.log("Stream-level FC TIMES for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlRemote.streamDataFCListTimes.get(entry[0])!.join(","));
-                console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
+
+                const staggeredResults = this.createStaggeredLines( this.flowControlRemote.streamDataFCListTimes.get(entry[0])!, entry[1] );
+
+                console.log("Stream-level FC TIMES for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", staggeredResults[0]);
+                // console.log("Stream-level FC TIMES for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlRemote.streamDataFCListTimes.get(entry[0])!.join(","));
+                console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", staggeredResults[1]);
+                // console.log("Stream-level FC for remote viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
             }
 
             return this.flowControlRemote.streamDataFCList;
@@ -581,8 +624,13 @@
             this.fillStreamDataFC("local");
 
             for ( const entry of this.flowControlLocal.streamDataFCList.entries() ) {
-                console.log("Stream-level FC TIMES for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlLocal.streamDataFCListTimes.get(entry[0])!.join(","));
-                console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
+
+                const staggeredResults = this.createStaggeredLines( this.flowControlLocal.streamDataFCListTimes.get(entry[0])!, entry[1] );
+
+                console.log("Stream-level FC TIMES for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", staggeredResults[0]);
+                // console.log("Stream-level FC TIMES for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", this.flowControlLocal.streamDataFCListTimes.get(entry[0])!.join(","));
+                console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", staggeredResults[1]);
+                // console.log("Stream-level FC for local viewpoint of Trace " + this.index + ", stream " + entry[0] + ": ", entry[1].join(","));
             }
 
             return this.flowControlLocal.streamDataFCList;
