@@ -191,12 +191,14 @@ export default class SequenceDiagramD3Renderer {
             height: 0, // total height, including margin.top and margin.bottom
 
             pixelsPerMillisecond: 20,
-            shortenIntervalsLongerThan: 120,
+            shortenIntervalsLongerThan: 2000, // 120,
         };
 
         this.calculateTimeOffsets( this.traces );
         this.dimensions.height = this.calculateCoordinates( this.traces );
         this.calculateConnections();
+
+        this.calculate0RTTMetrics( this.traces );
 
         // TODO: verify traces are left-to-right : i.e., arrows do not go UP!
 
@@ -679,6 +681,115 @@ export default class SequenceDiagramD3Renderer {
         // so... we also keep the timeoffset in our local data so we can use that when we come back to it
         this.createPrivateNamespace(serverConnection.connection);
         (serverConnection.connection as any).qvis.sequencediagram.manualTimeOffset = latencyOneWay;
+    }
+
+    protected calculate0RTTMetrics(traces:Array<SequenceDiagramConnection>) {
+
+        console.error("calculate0RTTMetrics: traces", traces, traces[0].connection.getLongName() );
+
+        const zeroTrace = traces[0];
+
+        // 1. calculate RTT by looking at the first 1000-ish events and storing highest timestamp difference
+        let RTT = 0;
+        let previousTime = -1;
+        for ( let i = 0; i < Math.min(1000, zeroTrace.connection.getEvents().length); ++i) {
+            const rawEvt = zeroTrace.connection.getEvents()[i];
+            const evt = zeroTrace.connection.parseEvent( rawEvt );
+
+            if ( previousTime < 0 ) {
+                previousTime = evt.absoluteTime;
+            }
+            else {
+                if ( evt.absoluteTime - previousTime > RTT ) {
+                    console.error("Updating RTT estimate", RTT, evt.absoluteTime, previousTime, evt);
+                    RTT = evt.absoluteTime - previousTime;
+                }
+
+                previousTime = evt.absoluteTime;
+            }
+        }
+
+        this.createPrivateNamespace(zeroTrace.connection);
+        (zeroTrace.connection as any).qvis.sequencediagram.zeroRTT = {};
+        (zeroTrace.connection as any).qvis.sequencediagram.zeroRTT.rttEstimate = RTT;
+
+        console.error("0RTT Estimated RTT", RTT);
+
+        // 2. estimate data received in first flight + amplification factor
+        // we look both at 1RTT only and full connection data
+        
+        // approach: offset just the packet sizes between sent and received
+        // stop when we see handshake_done (that one is typically sent as the first one in the server's 2nd flight (as a response to the ClientFinished))
+        // this is not correct for e.g., Facebook when they have to fetch stuff from the origin, but should work well for most others 
+
+        // TODO: look at packet numbers to combat re-ordering when calculating overheads (don't just rely on ordering of events in trace)
+        // simplest option: do two passes: first look for handshake_done, then count up to that PN? 
+
+        // Note: all this only works on client-side traces! 
+        const sentEvent     = qlog.TransportEventType.packet_sent;
+        const receivedEvent = qlog.TransportEventType.packet_received;
+
+        let totalDataSent = 0; // all packets
+        let totalDataReceived = 0;
+        let totalAppDatasent = 0; // only 0-RTT and 1-RTT packets
+        let totalAppDataReceived = 0;
+
+        let totalStreamDataReceived = 0; // only STREAM frames
+
+        let receiveSeen = false;
+
+        for ( const rawEvt of zeroTrace.connection.getEvents() ) {
+
+            const evt = zeroTrace.connection.parseEvent(rawEvt);
+            const data = evt.data as qlog.IEventPacket;
+
+            console.log( evt.relativeTime, evt.name );
+
+            if ( !receiveSeen && evt.name === sentEvent ) { // only want to know about data in our very first flight
+                totalDataSent += data.header.packet_size!;
+
+                if ( data.packet_type === qlog.PacketType.onertt || data.packet_type === qlog.PacketType.zerortt ) {
+                    totalAppDatasent += data.header.packet_size!;
+                }
+            }
+
+            if ( evt.name === receivedEvent ) {
+                receiveSeen = true;
+                totalDataReceived += data.header.packet_size!;
+
+                if ( data.packet_type === qlog.PacketType.onertt || data.packet_type === qlog.PacketType.zerortt ) {
+                    totalAppDataReceived += data.header.packet_size!;
+                }
+
+                if ( data.frames ) {
+                    for ( const frame of data.frames ) {
+                        if ( frame.frame_type === qlog.QUICFrameTypeName.stream ) {
+                            totalStreamDataReceived += parseInt("" + frame.length, 10);
+                        }
+                    }
+                }
+            }
+
+            if ( data.frames ) {
+                let done = false;
+                for ( const frame of data.frames ) {
+                    if ( (frame.frame_type as any) === "handshake_done" ) { // TODO: update this when we have decent draft-02 support in the typescript lib!
+                        console.error("HANDSHAKE DONE FOUND! In packet number ", data.header.packet_number );
+                        done = true;
+                        break;
+                    }
+                }
+
+                if ( done ) {
+                    break;
+                }
+            }
+        }
+
+        console.error("0RTT Data SENT", totalDataSent, totalAppDatasent, " Data RECEIVED", totalDataReceived, totalAppDataReceived, 
+                    " Amplification factor", (totalDataReceived / totalDataSent).toFixed(2), (totalAppDataReceived / totalAppDatasent).toFixed(2), "STREAM data received", totalStreamDataReceived );
+
+
     }
 
     protected calculateCoordinates(traces:Array<SequenceDiagramConnection>):number {
