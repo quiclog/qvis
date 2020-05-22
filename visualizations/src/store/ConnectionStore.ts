@@ -139,40 +139,94 @@ export default class ConnectionStore extends VuexModule {
             text: "Loading files via URL " + urlToLoad + ".<br/>The backend server downloads the files, possibly transforms them into qlog, then sends them back. This can take a while.",
         });
 
-        try{
-            let url = '/loadfiles';
-             // only for local debugging where we run the servers on different ports
-            if ( window.location.toString().indexOf("localhost:8080") >= 0 ){
-                url = "https://localhost/loadfiles";
-            }
-            else if (window.location.toString().indexOf(":8080") >= 0 ){
-                // local testing, but with online service
-                url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
-            }
 
+        // We want to deal with normal plaintext .qlog files, implicitly gzip or brotli encoded .qlog files (server sets Content-Encoding header, browser should decompress before it hits JS) 
+        //      and explicitly encoded files (.qlog.br and .qlog.brotli and .qlog.gzip and .qlog.zip and .qlog.gz)
+        // We also don't want to have to go to our backend server for every file if we don't have to (this is only needed if the server hosting .qlog does not set proper CORS headers)
+
+        // flowchart:
+        // 1. If it's a .qlog, try to download it from the server directly (works if CORS is setup correctly)
+        //      - if plaintext: just works
+        //      - if implicitly encoded with correct Content-Encoding header: works
+        //      - if explicitly encoded with correct Content-Encoding header: works
+        //      - if implicitly or explicitly encoded without Content-Encoding header: download works, but conversion to JSON fails, falling back to the backend server 
+        // 2. If it gives an error (we don't know if it's CORS or not since the browser doesn't expose that), retry again via the backend server
+        //      - server will fetch .qlog files, and process .json and .pcap/.keys files etc. via pcap2qlog
+        //      - if it's a .qlog.br or .qlog.gz or .qlog.zip file, server will simply serve it with correct Content Encoding, triggering the browser's decompression
+        //          - note: if it's an implicitly compressed file, the server will decompress it and send it full-sized over the wire atm... FIXME: should be fixed server-side, but we use wget for downloading, so need to dig deeper there
+
+        let apireturns:any = null;
+        let fileContents:any = null;
+
+        try {
             this.context.commit("adjustOutstandingRequestCount", 1 );
 
-            // for documentation on the expected form of these parameters,
-            // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
-            const apireturns:any = await axios.get(url, { params: queryParameters });
-
-            this.context.commit("adjustOutstandingRequestCount", -1);
-
-
-            if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
-
-                let fileContents:any = {};
-                if ( typeof apireturns.data.qlog === "object" ) {
-                    fileContents = apireturns.data.qlog; // returned json has multiple fields, the actual qlog is inside the .qlog field
+            // 1. try direct download first
+            if ( urlToLoad.indexOf(".qlog") >= 0 ) {
+                apireturns = await fetch( urlToLoad );
+                if ( apireturns.ok ) { // 200-299 status
+                    const txt = await apireturns.text();
+                    console.log("ConnectionStore:loadFilesFromServer: successfully loaded file directly: ", urlToLoad, apireturns, txt);
+                    fileContents = StreamingJSONParser.parseQlogText(txt);
                 }
                 else {
-                    fileContents = StreamingJSONParser.parseQlogText(apireturns.data.qlog);
+                    console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, apireturns);
                 }
+            }
+        }
+        catch (e) {
+            this.context.commit('adjustOutstandingRequestCount', -1);
+            apireturns = null;
 
-                if ( fileContents.traces && fileContents.traces.length > 0 && fileContents.traces[0].error_description ) {
-                    throw Error("Trace had an error: " + JSON.stringify(fileContents));
+            console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, e);
+        }
+
+        try{
+            // 2. if it wasn't a .qlog file or we got a (probable) CORS error
+            if ( apireturns === null ) {
+                let url = '/loadfiles';
+                 // only for local debugging where we run the servers on different ports
+                if ( window.location.toString().indexOf("localhost:8080") >= 0 ){
+                    url = "https://localhost/loadfiles";
                 }
-                
+                else if (window.location.toString().indexOf(":8080") >= 0 ){
+                    // local testing, but with online service
+                    url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
+                }
+    
+                this.context.commit("adjustOutstandingRequestCount", 1 );
+    
+                // for documentation on the expected form of these parameters,
+                // see https://github.com/quiclog/qvis-server/blob/master/src/controllers/FileFetchController.ts
+                apireturns = await axios.get(url, { params: queryParameters });
+    
+                this.context.commit("adjustOutstandingRequestCount", -1);
+
+                if ( apireturns !== null ) {
+
+                    if ( apireturns.qlog_version ) {
+                        // directly downloaded qlog file
+                        fileContents = StreamingJSONParser.parseQlogText(apireturns);
+                    }
+                    else if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
+
+                        if ( typeof apireturns.data.qlog === "object" ) {
+                            fileContents = apireturns.data.qlog; // returned json has multiple fields, the actual qlog is inside the .qlog field
+                        }
+                        else {
+                            fileContents = StreamingJSONParser.parseQlogText(apireturns.data.qlog);
+                        }
+
+                        if ( fileContents.traces && fileContents.traces.length > 0 && fileContents.traces[0].error_description ) {
+                            throw Error("Trace had an error: " + JSON.stringify(fileContents));
+                        }
+                    }
+                }
+            }
+
+            // 3. we actually got some content, can add it to the store! 
+            if ( fileContents !==  null) {
+                        
                 let urlToLoadShort = urlToLoad;
                 if ( urlToLoadShort.length > 50 ){
                     urlToLoadShort = urlToLoadShort.substr(0, 25) + "..." + urlToLoadShort.substr( urlToLoadShort.length - 26, urlToLoadShort.length);
@@ -190,7 +244,7 @@ export default class ConnectionStore extends VuexModule {
                 });
             }
             else{
-                console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", apireturns.error, apireturns.data.error, apireturns.data.qlog.connections);
+                console.error("ConnectionStore:LoadFilesFromServer : ERROR : trace not added to qvis! : ", queryParameters, apireturns);
 
                 Vue.notify({
                     group: "default",
