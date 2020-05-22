@@ -701,7 +701,7 @@ export default class SequenceDiagramD3Renderer {
             }
             else {
                 if ( evt.absoluteTime - previousTime > RTT ) {
-                    console.error("Updating RTT estimate", RTT, evt.absoluteTime, previousTime, evt);
+                    // console.error("Updating RTT estimate", RTT, evt.absoluteTime, previousTime, evt);
                     RTT = evt.absoluteTime - previousTime;
                 }
 
@@ -724,6 +724,7 @@ export default class SequenceDiagramD3Renderer {
 
         // TODO: look at packet numbers to combat re-ordering when calculating overheads (don't just rely on ordering of events in trace)
         // simplest option: do two passes: first look for handshake_done, then count up to that PN? 
+        // update: this only seemed to be a problem in a very select amount of traces, most don't need this? 
 
         // Note: all this only works on client-side traces! 
         const sentEvent     = qlog.TransportEventType.packet_sent;
@@ -742,8 +743,6 @@ export default class SequenceDiagramD3Renderer {
 
             const evt = zeroTrace.connection.parseEvent(rawEvt);
             const data = evt.data as qlog.IEventPacket;
-
-            console.log( evt.relativeTime, evt.name );
 
             if ( !receiveSeen && evt.name === sentEvent ) { // only want to know about data in our very first flight
                 totalDataSent += data.header.packet_size!;
@@ -774,6 +773,7 @@ export default class SequenceDiagramD3Renderer {
                 let done = false;
                 for ( const frame of data.frames ) {
                     if ( (frame.frame_type as any) === "handshake_done" ) { // TODO: update this when we have decent draft-02 support in the typescript lib!
+                        // note: if no handshake_done found (e.g., in our firstFlightOnly tests) we just keep going to the end of the trace (which is intended)
                         console.error("HANDSHAKE DONE FOUND! In packet number ", data.header.packet_number );
                         done = true;
                         break;
@@ -788,7 +788,6 @@ export default class SequenceDiagramD3Renderer {
 
         console.error("0RTT Data SENT", totalDataSent, totalAppDatasent, " Data RECEIVED", totalDataReceived, totalAppDataReceived, 
                     " Amplification factor", (totalDataReceived / totalDataSent).toFixed(2), (totalAppDataReceived / totalAppDatasent).toFixed(2), "STREAM data received", totalStreamDataReceived );
-
 
     }
 
