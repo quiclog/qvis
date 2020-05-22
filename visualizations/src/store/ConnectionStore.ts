@@ -193,6 +193,8 @@ export default class ConnectionStore extends VuexModule {
                     // local testing, but with online service
                     url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
                 }
+
+                // url = "https://192.168.220.132:8089/loadfiles"; 
     
                 this.context.commit("adjustOutstandingRequestCount", 1 );
     
@@ -208,13 +210,18 @@ export default class ConnectionStore extends VuexModule {
                         // directly downloaded qlog file
                         fileContents = StreamingJSONParser.parseQlogText(apireturns);
                     }
-                    else if ( !apireturns.error && !apireturns.data.error && apireturns.data.qlog ){
+                    else if ( !apireturns.error && !apireturns.data.error && (apireturns.data.qlog || apireturns.data.qlog_version) ){
+                        let qlogRoot = apireturns.data.qlog; // pcap2qlog output has 1 more level of indirection
 
-                        if ( typeof apireturns.data.qlog === "object" ) {
-                            fileContents = apireturns.data.qlog; // returned json has multiple fields, the actual qlog is inside the .qlog field
+                        if ( apireturns.data.qlog_version ) {
+                            qlogRoot = apireturns.data; // proxied directly downloaded qlog file (.data is from the response object)
+                        }
+
+                        if ( typeof qlogRoot === "object" ) {
+                            fileContents = qlogRoot; // returned json has multiple fields, the actual qlog is inside the .qlog field
                         }
                         else {
-                            fileContents = StreamingJSONParser.parseQlogText(apireturns.data.qlog);
+                            fileContents = StreamingJSONParser.parseQlogText(qlogRoot);
                         }
 
                         if ( fileContents.traces && fileContents.traces.length > 0 && fileContents.traces[0].error_description ) {
