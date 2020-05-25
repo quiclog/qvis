@@ -210,11 +210,11 @@ export default class ConnectionStore extends VuexModule {
                         // directly downloaded qlog file
                         fileContents = StreamingJSONParser.parseQlogText(apireturns);
                     }
-                    else if ( !apireturns.error && !apireturns.data.error && (apireturns.data.qlog || apireturns.data.qlog_version) ){
-                        let qlogRoot = apireturns.data.qlog; // pcap2qlog output has 1 more level of indirection
+                    else if ( !apireturns.error && !apireturns.data.error && (apireturns.data.qlog || apireturns.data) ){
+                        let qlogRoot = apireturns.data; // proxied directly downloaded qlog file (.data is from the response object)
 
-                        if ( apireturns.data.qlog_version ) {
-                            qlogRoot = apireturns.data; // proxied directly downloaded qlog file (.data is from the response object)
+                        if ( apireturns.data.qlog ) {
+                            qlogRoot = apireturns.data.qlog; // pcap2qlog output has 1 more level of indirection 
                         }
 
                         if ( typeof qlogRoot === "object" ) {
@@ -232,7 +232,7 @@ export default class ConnectionStore extends VuexModule {
             }
 
             // 3. we actually got some content, can add it to the store! 
-            if ( fileContents !==  null) {
+            if ( fileContents !==  null && fileContents.qlog_version !== undefined ) {
                         
                 let urlToLoadShort = urlToLoad;
                 if ( urlToLoadShort.length > 50 ){
