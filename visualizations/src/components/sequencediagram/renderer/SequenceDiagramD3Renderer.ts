@@ -610,14 +610,14 @@ export default class SequenceDiagramD3Renderer {
 
             if ( evt.name === qlog.TransportEventType.packet_sent &&
                     evt.data.packet_type === qlog.PacketType.initial && 
-                    ( "" + evt.data.header.packet_number === "0" ) ) {
+                    evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
                     initialSent = rawEvt;
                     continue;
             }
 
             if ( evt.name === qlog.TransportEventType.packet_received &&
                 evt.data.packet_type === qlog.PacketType.initial && 
-                ( "" + evt.data.header.packet_number === "0" ) ) {
+                evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
                     initialReceived = rawEvt;
             }
 
@@ -631,7 +631,7 @@ export default class SequenceDiagramD3Renderer {
 
             if ( evt.name === qlog.TransportEventType.packet_received &&
                 evt.data.packet_type === qlog.PacketType.initial && 
-                ( "" + evt.data.header.packet_number === "0" ) ) {
+                evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
                     serverInitialReceived = rawEvt;
             }
 
@@ -928,8 +928,8 @@ export default class SequenceDiagramD3Renderer {
                 const evt = startParser.load(rawevt).data as qlog.IEventPacketSent;
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
-                if ( evt.header!.packet_number === undefined ){
-                    if ( evt.packet_type !== qlog.PacketType.version_negotiation && evt.packet_type !== qlog.PacketType.retry ){
+                if ( evt.header === undefined || evt.header.packet_number === undefined ){
+                    if ( evt.packet_type !== qlog.PacketType.version_negotiation && evt.packet_type !== qlog.PacketType.retry && (evt.packet_type as string) !== "stateless_reset" ){ // FIXME: after stateles reset is added to qlog proper
                         console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
                     }
                     continue;
@@ -950,7 +950,8 @@ export default class SequenceDiagramD3Renderer {
                     const candidate = endParser.load( endEvents[c] ).data as qlog.IEventPacket;
                     
                     // need to check for .type as well to deal with different packet number spaces
-                    if (candidate.packet_type === evt.packet_type && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
+                    // some packets (like stateless resets) don't have a header or packet_number, so need to check for that
+                    if (candidate.packet_type === evt.packet_type && (candidate.header && evt.header) && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
                         counterpartFound = true;
@@ -1369,7 +1370,7 @@ export default class SequenceDiagramD3Renderer {
                         }
 
                         const textSpanFront = document.createElement("span");
-                        textSpanFront.textContent = "" + this.packetTypeToString(evt.data.packet_type) + " : " + evt.data.header.packet_number;
+                        textSpanFront.textContent = "" + this.packetTypeToString(evt.data.packet_type) + " : " + ( evt.data.header ? evt.data.header.packet_number : "" );
                         textSpanFront.style.color = "#383d41"; // dark grey
                         textSpanFront.style.backgroundColor = "#d6d8db"; // light grey
                         textSpanFront.style.paddingLeft = "5px";
