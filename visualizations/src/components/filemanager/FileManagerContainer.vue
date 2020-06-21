@@ -13,7 +13,7 @@
                         <b-row>
                             <b-col>
                                 <b-form-input                  v-model="urlToLoad" id="urlInput" type="text" placeholder="https://www.example.com/output.qlog"></b-form-input>
-                                <p v-if="urlIsPcap" style="margin-top: 10px;">For .pcap files, you also need to specify a .keys file so it can be decrypted. We currently do not yet support decrypted pcaps or pcapng files with embedded keys.</p>
+                                <p v-if="urlIsPcap" style="margin-top: 10px;">For .pcap files, you also need to specify a .keys file so it can be decrypted.</p>
                                 <b-form-input v-if="urlIsPcap" v-model="secretsToLoad" id="secretsInput" type="text" placeholder="https://www.example.com/secrets.keys"></b-form-input>
                             </b-col>
                             <b-col cols="1" md="auto"> 
@@ -24,10 +24,11 @@
                 </div>
                 <div>
                     <p style="margin-top: 5px;">
-                        You can load .qlog, .pcap and .pcapng files.<br/>
+                        You can load .qlog, .pcap (alongside separate .keys) and .pcapng (with embedded keys) files.<br/>
                         You can also load a .json file that lists several other files to be fetched (for the format, see <a href="https://github.com/quiclog/pcap2qlog#options">the pcap2qlog documentation</a>. Or try <a href="https://quic-tracker.info.ucl.ac.be/traces/20190820/list/quant.eggert.org:4433?.json">an example</a>).<br/><br/>
                         If you're looking for inspiration, <a href="https://quant.eggert.org/" target="_blank">quant</a> has public qlogs, as does <a href="https://quic.aiortc.org/logs" target="_blank">aioquic</a>.<br/>
-                        <a href="https://quic-tracker.info.ucl.ac.be">QUIC Tracker</a> provides .pcap files for all its tests and has a convenient integration with qvis from its UI.
+                        <a href="https://quic-tracker.info.ucl.ac.be">QUIC Tracker</a> provides .pcap files for all its tests and has a convenient integration with qvis from its UI. <br/>
+                        Many of the tests in the <a href="https://interop.seemann.io/">QUIC Interop Runner</a> also include .qlog and .pcap output.
                     </p>
                 </div>
             </b-col>
@@ -122,11 +123,11 @@
                         You can pass files you want to load via URL parameters to the qvis page.<br/>
                         This method supports the same formats as Option 1.<br/><br/>
 
-                        Format 1: <a href="https://quicvis.edm.uhasselt.be/#?list=x.json">?list=x.json</a><br/>
-                        Format 2: <a href="https://quicvis.edm.uhasselt.be/#?file=x.qlog">?file=x.qlog</a><br/>
-                        Format 3: <a href="https://quicvis.edm.uhasselt.be/#?file=x.pcap&amp;secrets=x.keys">?file=x.pcap&amp;secrets=x.keys</a><br/>
-                        Format 4: <a href="https://quicvis.edm.uhasselt.be/#?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog">?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog</a><br/>
-                        Format 5: <a href="https://quicvis.edm.uhasselt.be/#?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys">?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys</a><br/>
+                        Format 1: <a href="https://qvis.edm.uhasselt.be/#?list=x.json">?list=x.json</a><br/>
+                        Format 2: <a href="https://qvis.edm.uhasselt.be/#?file=x.qlog">?file=x.qlog</a><br/>
+                        Format 3: <a href="https://qvis.edm.uhasselt.be/#?file=x.pcap&amp;secrets=x.keys">?file=x.pcap&amp;secrets=x.keys</a><br/>
+                        Format 4: <a href="https://qvis.edm.uhasselt.be/#?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog">?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog</a><br/>
+                        Format 5: <a href="https://qvis.edm.uhasselt.be/#?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys">?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys</a><br/>
                     </p>
                 </div>
             </b-col>
@@ -370,7 +371,7 @@
         }
 
         protected get urlIsPcap(){
-            return this.urlToLoad.indexOf(".pcap") >= 0;
+            return this.urlToLoad.indexOf(".pcap") >= 0 && this.urlToLoad.indexOf(".pcapng") < 0;
         }
 
         protected get uploadIsPcap(){

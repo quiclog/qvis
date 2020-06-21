@@ -191,7 +191,7 @@ export default class ConnectionStore extends VuexModule {
                 }
                 else if (window.location.toString().indexOf(":8080") >= 0 ){
                     // local testing, but with online service
-                    url = "https://quicvis.edm.uhasselt.be:8443/loadfiles";
+                    url = "https://qvis.edm.uhasselt.be/loadfiles";
                 }
 
                 // url = "https://192.168.220.132:8089/loadfiles"; 
