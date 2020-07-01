@@ -5,7 +5,7 @@ import * as qlog01 from '@quictools/qlog-schema';
 import * as qlogPreSpec from '@quictools/qlog-schema/draft-16/QLog';
 import { QUtil } from '@quictools/qlog-schema/util';
 import QlogConnection from '@/data/Connection';
-import { IQlogEventParser, IQlogRawEvent } from '@/data/QlogEventParser';
+import { IQlogEventParser, IQlogRawEvent, TimeTrackingMethod } from '@/data/QlogEventParser';
 
 
 export class QlogLoader {
@@ -622,12 +622,6 @@ export class QlogLoader {
     }
 }
 
-enum TimeTrackingMethod {
-    ABSOLUTE_TIME,
-    RELATIVE_TIME,
-    DELTA_TIME,
-}
-
 
 // tslint:disable max-classes-per-file
 export class EventFieldsParser implements IQlogEventParser {
@@ -720,6 +714,10 @@ export class EventFieldsParser implements IQlogEventParser {
 
     public timeToMilliseconds(time: number | string): number {
         return parseFloat(time as any) * this.timeMultiplier;
+    }
+
+    public getTimeTrackingMethod():TimeTrackingMethod {
+        return this.timeTrackingMethod;
     }
 
     public init( trace:QlogConnection ) {
@@ -844,6 +842,11 @@ export class EventFieldsParser implements IQlogEventParser {
         this.subtractTime   *= this.timeMultiplier;
     }
 
+    public setReferenceTime( time:number ) : void {
+        this.addTime = time;
+        this.addTime *= this.timeMultiplier;
+    }
+
     public load( evt:IQlogRawEvent ) : IQlogEventParser {
         this.currentEvent = evt;
 
@@ -894,6 +897,14 @@ export class PreSpecEventParser implements IQlogEventParser {
 
     public timeToMilliseconds(time: number | string): number {
         return parseFloat(time as any);
+    }
+
+    public getTimeTrackingMethod():TimeTrackingMethod {
+        return TimeTrackingMethod.RELATIVE_TIME;
+    }
+
+    public setReferenceTime(time:number) {
+        // nothing to set I'm afraid... this type of trace isn't properly supported anyway
     }
 
     public load( evt:IQlogRawEvent ) : IQlogEventParser {

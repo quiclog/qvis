@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import * as qlog from '@quictools/qlog-schema';
 import SequenceDiagramConfig, { SequenceDiagramConnection } from '../data/SequenceDiagramConfig';
 import { VantagePointType, IEventConnectionStateUpdated, QUICFrameTypeName } from '@quictools/qlog-schema';
-import { IQlogRawEvent, IQlogEventParser } from '@/data/QlogEventParser';
+import { IQlogRawEvent, IQlogEventParser, TimeTrackingMethod } from '@/data/QlogEventParser';
 
 interface VerticalRange {
     svgGroup:HTMLOrSVGElement | undefined,
@@ -557,6 +557,24 @@ export default class SequenceDiagramD3Renderer {
             return;
         }
 
+
+        // if one of the traces has relative_time set, but didn't specify a reference_time, we set the reference_time to 0 (because... what else)
+        // now, ref_time of 0 in epoch means 1970... so if we then loaded the opposite trace with correct timestamps... 
+        // we'd have one end sending packets in 1970, the other in 2020. Highest measured latency yet!
+        // So we check for that here and set the reference_time of the "incorrect" trace of the "correct" one
+        if ( clientConnection.connection.getEventParser().getAbsoluteStartTime() === 0 && clientConnection.connection.getEventParser().getTimeTrackingMethod() === TimeTrackingMethod.RELATIVE_TIME ) {
+            console.error("SequenceDiagramD3Renderer:calculateTimeOffsets : Client had no reference_time set, trying to fix by using the server-side reftime. HERE BE DRAGONS!");
+
+            const refTime = serverConnection.connection.getEventParser().getAbsoluteStartTime();
+            clientConnection.connection.getEventParser().setReferenceTime( refTime - 5 ); // -5 because the client should start earlier because it sends the initial
+        }
+        else if ( serverConnection.connection.getEventParser().getAbsoluteStartTime() === 0 && serverConnection.connection.getEventParser().getTimeTrackingMethod() === TimeTrackingMethod.RELATIVE_TIME ) {
+            console.error("SequenceDiagramD3Renderer:calculateTimeOffsets : Server had no reference_time set, trying to fix by using the client-side reftime. HERE BE DRAGONS!");
+
+            const refTime = clientConnection.connection.getEventParser().getAbsoluteStartTime();
+            serverConnection.connection.getEventParser().setReferenceTime( refTime + 5 ); // +5 because the server should start later because it receives the client's initial
+        }
+
         // So, concept: we have 1 trace from the client, 1 from the server
         // both run on different, non-synchronized clocks and were started at different moments in time, so even relative time with offset 0 is not the same time. 
         // the only thing we know, is that the client initiates the connection and needs to wait for an answer from the server to continue 
@@ -566,6 +584,7 @@ export default class SequenceDiagramD3Renderer {
         // However, some implementations might also log metric_update events, containing the rtt! so first look for those!
         let latencyOneWay = Number.MIN_SAFE_INTEGER;
 
+        let smoothedBackup = 0; // only to be used if there are no actual latest_rtt's found (since smoothed isn't always correct from initial settingss)
         const clientMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
         for ( const evt of clientMetricUpdates ){
             const update = clientConnection.connection.parseEvent(evt).data as qlog.IEventMetricsUpdated;
@@ -573,7 +592,7 @@ export default class SequenceDiagramD3Renderer {
                 latencyOneWay = update.latest_rtt / 2;
             }
             else if ( update.smoothed_rtt ){
-                latencyOneWay = update.smoothed_rtt / 2;
+                smoothedBackup = update.smoothed_rtt / 2;
             }
 
             if ( latencyOneWay !== Number.MIN_SAFE_INTEGER ) {
@@ -582,8 +601,13 @@ export default class SequenceDiagramD3Renderer {
             }
         }
 
+        if ( latencyOneWay === Number.MIN_SAFE_INTEGER && smoothedBackup !== 0 ) {
+            latencyOneWay = smoothedBackup;
+        }
+
         if ( latencyOneWay === Number.MIN_SAFE_INTEGER ){
 
+            smoothedBackup = 0;
             const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
             for ( const evt of serverMetricUpdates ){ 
                 const update = serverConnection.connection.parseEvent(evt).data as qlog.IEventMetricsUpdated;
@@ -591,7 +615,7 @@ export default class SequenceDiagramD3Renderer {
                     latencyOneWay = update.latest_rtt / 2;
                 }
                 else if ( update.smoothed_rtt ){
-                    latencyOneWay = update.smoothed_rtt / 2;
+                    smoothedBackup = update.smoothed_rtt / 2;
                 }
 
                 if ( latencyOneWay !== Number.MIN_SAFE_INTEGER ) {
@@ -599,43 +623,57 @@ export default class SequenceDiagramD3Renderer {
                     break;
                 }
             }
+
+            if ( latencyOneWay === Number.MIN_SAFE_INTEGER && smoothedBackup !== 0 ) {
+                latencyOneWay = smoothedBackup;
+            }
         }
+
+        // the metrics-based approach works, but can be flaky if there was loss (e.g., client initial is lost, needs to retransmit but the lost one is in the trace)
+        // then the server's initialReceived would be in between client initial 0 and 1 due to that offset, instead of after initial 1
+        // so, we also check for the actual initials still here
+        // start by looking for the first initial the server got and work backwards from there
 
         let initialSent:IQlogRawEvent|undefined = undefined;
         let initialReceived:IQlogRawEvent|undefined = undefined;
         let serverInitialReceived:IQlogRawEvent|undefined = undefined;
+
+        let firstInitialReceivedPN = "0";
+
+        for ( const rawEvt of serverConnection.connection.getEvents() ) {
+            const evt = serverConnection.connection.parseEvent( rawEvt );
+
+            if ( evt.name === qlog.TransportEventType.packet_received &&
+                evt.data.packet_type === qlog.PacketType.initial && evt.data.header && evt.data.header.packet_number !== undefined ) {
+                    serverInitialReceived = rawEvt;
+
+                    firstInitialReceivedPN = "" + evt.data.header.packet_number; // e.g., if client inital 0 and 1 were lost, this should be 2
+            }
+
+            if ( serverInitialReceived ) {
+                break;
+            }
+        }
 
         for ( const rawEvt of clientConnection.connection.getEvents() ) {
             const evt = clientConnection.connection.parseEvent( rawEvt );
 
             if ( evt.name === qlog.TransportEventType.packet_sent &&
                     evt.data.packet_type === qlog.PacketType.initial && 
-                    evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
+                    evt.data.header && ( "" + evt.data.header.packet_number === firstInitialReceivedPN ) ) {
                     initialSent = rawEvt;
-                    continue;
+                    // continue;
             }
 
+            // the server's initial could also be lost... but then we'd need to look for retransmits of that etc. which is above my level of enthousiasm at the moment
+            // so: just use the first one we've received from the server. Could be too high then: bad luck. 
             if ( evt.name === qlog.TransportEventType.packet_received &&
                 evt.data.packet_type === qlog.PacketType.initial && 
-                evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
+                evt.data.header ) { // && ( "" + evt.data.header.packet_number === "0" ) ) { 
                     initialReceived = rawEvt;
             }
 
             if ( initialSent && initialReceived ) {
-                break;
-            }
-        }
-
-        for ( const rawEvt of serverConnection.connection.getEvents() ) {
-            const evt = serverConnection.connection.parseEvent( rawEvt );
-
-            if ( evt.name === qlog.TransportEventType.packet_received &&
-                evt.data.packet_type === qlog.PacketType.initial && 
-                evt.data.header && ( "" + evt.data.header.packet_number === "0" ) ) {
-                    serverInitialReceived = rawEvt;
-            }
-
-            if ( serverInitialReceived ) {
                 break;
             }
         }
@@ -663,9 +701,10 @@ export default class SequenceDiagramD3Renderer {
                 latencyOneWay = expectedServerReceiveTime - serverReceiveTime;
             }
         }
-        else {
-            // we can't accurately calculate the actual offset just from the metric_updates, so abort
-            latencyOneWay = Number.MIN_SAFE_INTEGER;
+        else if (latencyOneWay !== Number.MIN_SAFE_INTEGER) {
+            // we can't accurately calculate the actual offset just from the metric_updates, but it's all we have in the world...
+            console.log("SequenceDiagramD3Renderer:calculateTimeOffset: calculating probable RTT from metrics_updated events because initials couldn't be properly correlated (was there loss?)", latencyOneWay, initialSent, serverInitialReceived, initialReceived );
+            // latencyOneWay = Number.MIN_SAFE_INTEGER;
         }
 
         if (latencyOneWay === Number.MIN_SAFE_INTEGER ) {
