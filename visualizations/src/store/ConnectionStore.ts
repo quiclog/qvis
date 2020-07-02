@@ -59,20 +59,22 @@ export default class ConnectionStore extends VuexModule {
     // Potentially bigger problem: checking if json adheres to the TypeScript spec... 
     // this could be done with something like https://github.com/typestack/class-transformer
     // but then we would need to add additional annotations to the Schema classes... urgh
-    public async addGroupFromQlogFile( { fileContentsJSON, filename } : { fileContentsJSON:any, filename:string } ){
+    public async addGroupFromQlogFile( { fileContentsJSON, fileInfo } : { fileContentsJSON:any, fileInfo:any } ){
         
         const group:QlogConnectionGroup | undefined = QlogLoader.fromJSON( fileContentsJSON );
 
         if ( group !== undefined ){
-            group.filename = filename;
+            group.filename = fileInfo.filename;
+            group.URL = fileInfo.URL;
+            group.URLshort = fileInfo.URLshort;
             this.context.commit( "addGroup", group );
         }
         else{
-            console.error("ConnectionStore:addGroupFromQlogFile : Qlog file could not be parsed!", fileContentsJSON, filename);
+            console.error("ConnectionStore:addGroupFromQlogFile : Qlog file could not be parsed!", fileContentsJSON, fileInfo);
 
             Vue.notify({
                 group: "default",
-                title: "ERROR parsing qlog file " + filename,
+                title: "ERROR parsing qlog file " + fileInfo.filename,
                 type: "error",
                 duration: 6000,
                 text: "File was successfully loaded but could not be parsed.<br/>Make sure you have a well-formed qlog file.<br/>View the devtools JavaScript console for more information.",
@@ -117,8 +119,11 @@ export default class ConnectionStore extends VuexModule {
         }
 
         let urlToLoad = "";
+        let fullURL = undefined;
+
         if (queryParameters.file){
             urlToLoad = queryParameters.file;
+            fullURL = queryParameters.file;
         }
         else if ( queryParameters.list ){
             urlToLoad = queryParameters.list;
@@ -241,7 +246,19 @@ export default class ConnectionStore extends VuexModule {
 
                 const filename = "Loaded via URL (" + urlToLoadShort + ")";
 
-                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
+                const fileInfo:any = { filename: filename };
+                if ( fullURL ) {
+                    fileInfo.URL = fullURL;
+
+                    if ( fullURL.length > 50 ) {
+                        fileInfo.URLshort = fullURL.substr(0, 25) + "..." + fullURL.substr( fullURL.lastIndexOf("/"), fullURL.length );
+                    }
+                    else {
+                        fileInfo.URLshort = fullURL;
+                    }
+                }
+
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, fileInfo: fileInfo });
 
                 Vue.notify({
                     group: "default",
@@ -319,7 +336,7 @@ export default class ConnectionStore extends VuexModule {
             let fileContents:any = StreamingJSONParser.parseQlogText( fileContentsRaw );
 
             if ( fileContents && !fileContents.error && !fileContents.error_description && fileContents.qlog_version ){
-                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, filename});
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: fileContents, fileInfo: { filename:filename }});
 
                 Vue.notify({
                     group: "default",
@@ -337,7 +354,7 @@ export default class ConnectionStore extends VuexModule {
                 fileContents = StreamingJSONParser.parseJSONWithDeduplication( fileContentsRaw );
 
                 const convertedContents = TCPToQlog.convert( fileContents );
-                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: convertedContents, filename});
+                this.context.dispatch('addGroupFromQlogFile', {fileContentsJSON: convertedContents, fileInfo: {filename: filename}});
 
                 Vue.notify({
                     group: "default",

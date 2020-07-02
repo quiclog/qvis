@@ -263,13 +263,13 @@
 
                         if ( file.name.endsWith(".qlog") ) {
                             const contentsJSON = StreamingJSONParser.parseQlogText( (evt!.target as any).result );
-                            this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, filename: uploadFileName});
+                            this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, fileInfo:{ filename: uploadFileName }});
                         }
                         else if ( file.name.endsWith(".json") ) {
                             const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
 
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
-                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, filename: uploadFileName});
+                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
                         }
                         else { 
                             throw new Error("unsupported file format : " + uploadFileName);

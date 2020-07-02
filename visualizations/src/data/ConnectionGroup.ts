@@ -10,6 +10,9 @@ export default class QlogConnectionGroup {
     public title:string;
     public description:string;
 
+    public URL:string;
+    public URLshort:string;
+
     public summary:any;
 
     private connections:Array<QlogConnection>;
@@ -18,6 +21,8 @@ export default class QlogConnectionGroup {
         this.connections = new Array<QlogConnection>();
         this.version = "";
         this.filename = "";
+        this.URL = "";
+        this.URLshort = "";
         this.title = "";
         this.description = "";
         this.summary = {};
