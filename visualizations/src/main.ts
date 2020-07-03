@@ -66,12 +66,12 @@ import ConnectionStore from "@/store/ConnectionStore";
 
 
 // TODO: REMOVE: only for local testing!
-if (window.location.toString().indexOf(":8080") >= 0 && window.location.toString().indexOf("nodemo") < 0 ){
-    console.log("Autoloading demo files");
-    setTimeout( () => {
-        getModule(ConnectionStore, store).loadExamplesForDemo();
-    }, 500);
-}
+// if (window.location.toString().indexOf(":8080") >= 0 && window.location.toString().indexOf("nodemo") < 0 ){
+//     console.log("Autoloading demo files");
+//     setTimeout( () => {
+//         getModule(ConnectionStore, store).loadExamplesForDemo();
+//     }, 500);
+// }
 
 Vue.config.productionTip = false;
 Vue.use(BootstrapVue);

@@ -9,6 +9,10 @@
             </svg>
         </div>
         <b-modal id="event-modal" hide-footer title="Event detail">
+            <div v-if="this.eventLink !== null">
+                <a :href="this.eventLink" target="_blank">Direct link to this event</a><br/>
+                <hr>
+            </div>
             <pre class="d-block">{{ eventDetail }}</pre>
             <!-- TODO: make this configurable: not all extra data will be recovery-metric related down the line! -->
             <p style="font-weight: bold;" v-if="this.eventDetailExtra !== null">Value of all recovery metrics at this point:</p>
@@ -27,7 +31,7 @@
 <script lang="ts">
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig";
-    import SequenceDiagramD3Renderer from "./renderer/SequenceDiagramD3Renderer";
+    import { SequenceDiagramD3Renderer, EventPointer } from "./renderer/SequenceDiagramD3Renderer";
     import SequenceDiagramCanvasRenderer from "./renderer/SequenceDiagramCanvasRenderer";
 
     @Component
@@ -37,6 +41,9 @@
 
         public eventDetail: string = '';
         public eventDetailExtra: string|null = null; // not undefined, because that would make this propery un-reactive
+        public eventLink: string|null = null;
+
+        protected focusOnNext:EventPointer|null = null;
 
         protected get connections(){
             return this.config.connections;
@@ -47,6 +54,12 @@
         public created(){
             this.renderer = new SequenceDiagramD3Renderer("sequence-diagram", "sequence-diagram-svg", this.showEventModal);
             // this.renderer = new SequenceDiagramCanvasRenderer("sequence-diagram");
+
+            const queryParameters = this.$route.query; // TODO: move this to a Helper if other visualizations start using this
+
+            if ( queryParameters.focusOnConnection && queryParameters.focusOnEvent ) {
+                this.focusOnNext = { connectionIndex: parseInt(queryParameters.focusOnConnection as string, 10), eventIndex: parseInt(queryParameters.focusOnEvent as string, 10) };
+            }
         }
 
         public mounted(){
@@ -68,6 +81,60 @@
             }
             else {
                 this.eventDetailExtra = null;
+            }
+
+            // const metadata = (event as any);
+            let eventNr = undefined;
+            if ( event.qvis && event.qvis.sequencediagram && event.qvis.sequencediagram.focusInfo ) {
+                const focusInfo:EventPointer = event.qvis.sequencediagram.focusInfo as EventPointer;
+                eventNr = focusInfo.eventIndex;
+                
+                const traces = this.renderer!.getTraces();
+
+                const URLs:Array<string> = [];
+
+                for ( const ctrace of traces ) {
+                    if ( ctrace.connection && ctrace.connection.parent && ctrace.connection.parent.URL ) {
+                        if ( URLs.indexOf(ctrace.connection.parent.URL) < 0 ) {
+                            URLs.push( ctrace.connection.parent.URL );
+                        }
+                    }
+                }
+
+                const trace = traces[ focusInfo.connectionIndex ];
+                if ( trace && URLs.length > 0 ) {
+
+                    let fileLinks = "";
+                    if ( URLs.length === 1 ) {
+                        fileLinks = "file=" + URLs[0];
+                    }
+                    else {
+                        for ( let i = 0; i < URLs.length; ++i ) {
+                            fileLinks += "file" + (i + 1) + "=" + URLs[i];
+                            if ( i !== URLs.length - 1 ) {
+                                fileLinks += "&";
+                            }
+                        }
+                    }
+
+                    if ( trace.connection && trace.connection.parent && trace.connection.parent.URL ) {
+                        this.eventLink = "https://qvis.edm.uhasselt.be/?#/sequence?" + fileLinks + "&focusOnConnection=" + focusInfo.connectionIndex + "&focusOnEvent=" + focusInfo.eventIndex;
+                    }
+                    else {
+                        this.eventLink = null;
+                    }
+                }
+                else {
+                    this.eventLink = null;
+                    console.error("SequenceDiagramRenderer:showEventModal : trying to focus on trace, but doesn't exist: ", focusInfo, traces );
+                }
+            }
+            else {
+                this.eventLink = null;
+            }
+
+            if ( eventNr !== undefined ) {
+                this.eventDetail = "Event nr: " + eventNr + "\n" + this.eventDetail;
             }
             
             this.$bvModal.show("event-modal");
@@ -98,8 +165,10 @@
                         await new Promise( (resolve) => setTimeout(resolve, 200));
                     }
 
-                    this.renderer.render( newConfig.connections, newConfig.timeResolution ).then( (rendered) => {
-
+                    this.renderer.render( newConfig.connections, newConfig.timeResolution, this.focusOnNext ).then( (rendered) => {
+                        
+                        this.focusOnNext = null; // don't want to keep focusing on the same thing if we've changed selection
+                        
                         if ( !rendered ) {
                             Vue.notify({
                                 group: "default",

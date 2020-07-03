@@ -29,13 +29,19 @@ interface Interval {
     timeSkipped: number
 }
 
+export interface EventPointer {
+    connectionIndex: number,
+    eventIndex: number
+};
+
 enum arrowTargetProperty {
     left = "leftTarget",
     right = "rightTarget",
     lost = "packetLost",
 };
 
-export default class SequenceDiagramD3Renderer {
+
+export class SequenceDiagramD3Renderer {
 
     public containerID:string;
     public svgID:string;
@@ -61,7 +67,7 @@ export default class SequenceDiagramD3Renderer {
 
     private frameTypeToColorLUT:Map<string, Array<string>> = new Map<string, Array<string>>();
 
-    private onEventClicked: (rawEvt: any, connection:QlogConnection) => void;
+    private onEventClicked: (rawEvt: any, connection:QlogConnection, focusInfo:EventPointer) => void;
 
     private ignoreEventName = "ignoreseq"; // needs to be lowercase!!
 
@@ -69,13 +75,18 @@ export default class SequenceDiagramD3Renderer {
         this.containerID = containerID;
         this.svgID = svgID;
 
-        this.onEventClicked = (rawEvt:any, connection:QlogConnection ) => { 
+        this.onEventClicked = (rawEvt:any, connection:QlogConnection, focusInfo:EventPointer ) => { 
             
             const allEvents = connection.getEvents();
             let evt:IQlogEventParser|undefined = connection.parseEvent( rawEvt );
 
             const metrics:Map<string, any> = new Map<string, any>();
 
+            if ( focusInfo ) {
+                this.createPrivateNamespace( rawEvt );
+                (rawEvt as any).qvis.sequencediagram.focusInfo = focusInfo;
+            }
+            
             if ( evt.name === qlog.RecoveryEventType.metrics_updated ) {
                 // if we have metrics updated, we want to be able to show the state of -all- recovery metrics at that time, not just the updated ones
                 // for this, we start from the start of the events and aggregate all into a dictionary of values to show them 
@@ -103,8 +114,12 @@ export default class SequenceDiagramD3Renderer {
             }
         }
     }
+
+    public getTraces():Array<SequenceDiagramConnection> {
+        return this.traces;
+    }
    
-    public async render(traces:Array<SequenceDiagramConnection>, timeResolution:number):Promise<boolean> {
+    public async render(traces:Array<SequenceDiagramConnection>, timeResolution:number, focusOn:EventPointer|null = null ):Promise<boolean> {
         if ( this.rendering ) {
             return false;
         }
@@ -127,7 +142,7 @@ export default class SequenceDiagramD3Renderer {
             return false;
         }
 
-        await this.renderPartialExtents();
+        await this.renderPartialExtents( focusOn );
         this.rendering = false;
 
         return true;
@@ -1089,7 +1104,7 @@ export default class SequenceDiagramD3Renderer {
         }
     }
 
-    protected async renderPartialExtents(){
+    protected async renderPartialExtents( focusOn:EventPointer|null = null ){
 
         // About rendering performance:
         // - simply using d3 directly and creating all the svg shapes in 1 big loop is very slow for large files (>10s)
@@ -1110,6 +1125,35 @@ export default class SequenceDiagramD3Renderer {
 
         // TODO: add a "save to SVG" option that -does- draw everything at once (at the cost of the user having to wait a while)
 
+        // 0. allow passing in of an even to focus on
+        if ( focusOn ) {
+            if ( this.traces.length > focusOn.connectionIndex ) {
+
+                // a. figure out the y offset for the event (stored in the metadata from calculateCoordinates)
+                const trace = this.traces[ focusOn.connectionIndex ];
+                const events = trace.connection.getEvents();
+                if ( events.length > focusOn.eventIndex ) {
+                    const evt = events[ focusOn.eventIndex ] as any;
+                    if ( evt.qvis && evt.qvis.sequencediagram && evt.qvis.sequencediagram.y ) {
+                        const targetY = evt.qvis.sequencediagram.y - 50; // - 50 to scroll back up a little bit so we are sure the event is "in view"
+                        console.log("SequenceDiagramD3Renderer:renderPartialExtents: focusing on event ", focusOn, targetY);
+
+                        window.scrollTo( 0, targetY ); // this will trigger the scrollHandler, which will again enter this function, so we exit it instead
+
+                        return;
+                    }
+                    else {
+                        console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, y unknown", focusOn, this.traces);
+                    }
+                }
+                else {
+                    console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, eventIndex unknown", focusOn, this.traces);
+                }
+            }
+            else {
+                console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, traceIndex unknown", focusOn, this.traces);
+            }
+        }
 
         // 1. determine which areas to render and which to un-render
         // 2. un-render the proper ranges
@@ -1228,10 +1272,14 @@ export default class SequenceDiagramD3Renderer {
                 
                 let currentY = 0;
                 let currentMetadata = undefined;
+                let currentEventId = 0;
                 for ( const rawEvt of events ){
                     const evt = trace.connection.parseEvent(rawEvt);
                     currentMetadata = (rawEvt as any).qvis.sequencediagram;
                     currentY = currentMetadata.y;
+
+                    const focusInfo = { connectionIndex: i, eventIndex: currentEventId };
+                    currentEventId += 1;
 
                     if ( currentY < extent.start ) {
                         continue;
@@ -1253,7 +1301,7 @@ export default class SequenceDiagramD3Renderer {
                     rect.setAttribute('width', ""  + (rectSize));
                     rect.setAttribute('height', "" + (rectSize));
                     rect.setAttribute('fill', 'green');
-                    rect.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
+                    rect.onclick = (evt_in) => this.onEventClicked( rawEvt, trace.connection, focusInfo );
                     extentContainer.appendChild( rect );
 
                     // timestamp for each event next to the rects
@@ -1444,7 +1492,7 @@ export default class SequenceDiagramD3Renderer {
                         textSpanFront.style.border = "1px white";
                         textSpanFront.style.borderStyle = "none solid";
                         textSpanFront.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                        textSpanFront.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
+                        textSpanFront.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection, focusInfo);
                         textContainer.appendChild(textSpanFront);
 
                         if ( evt.data.frames ){
@@ -1481,7 +1529,7 @@ export default class SequenceDiagramD3Renderer {
                                         textSpan.style.border = "1px white";
                                         textSpan.style.borderStyle = "none solid";
                                         textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
+                                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection, focusInfo);
                                         if ( directionText === ">" ) {
                                             textContainer.prepend(textSpan);
                                         }
@@ -1523,7 +1571,7 @@ export default class SequenceDiagramD3Renderer {
                                     textSpan.style.border = "1px white";
                                     textSpan.style.borderStyle = "none solid";
                                     textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                                    textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
+                                    textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection, focusInfo);
                                     if ( directionText === ">" ) {
                                         textContainer.prepend(textSpan);
                                     }
@@ -1605,7 +1653,7 @@ export default class SequenceDiagramD3Renderer {
                         textSpan.style.borderStyle = "none solid";
                         // textSpan.style.cssFloat = "right";
                         textSpan.style.fontSize = "" + ( Math.floor(textHeight * 0.8) ) + "px";
-                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection);
+                        textSpan.onclick = (evt_in) => this.onEventClicked(rawEvt, trace.connection, focusInfo);
                         // textContainer.appendChild(textSpan);
                         
                         textContainerOuter.appendChild(textSpan);
