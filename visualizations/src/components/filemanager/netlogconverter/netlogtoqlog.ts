@@ -1,6 +1,7 @@
 import * as qlogschema from '@quictools/qlog-schema';
 import * as netlogschema from './netlog';
 import { IEventTransportParametersSet } from '@quictools/qlog-schema';
+import { BreadcrumbPlugin } from 'bootstrap-vue';
 
 function invertMap(map: Map<string, number>): Map<number, string> {
     const result: Map<number, string> = new Map<number, string>();
@@ -13,6 +14,31 @@ function invertMap(map: Map<string, number>): Map<number, string> {
     return result;
 };
 
+class QUICConnection {
+    public title: string;
+    public session: netlogschema.QUIC_SESSION;
+    public sessionId: number;
+    public startTime: number;
+    public qlogEvents: Array<Array<qlogschema.EventField>>;
+    public txQUICFrames: Array<qlogschema.QuicFrame>;
+    public rxQUICFrames: Array<qlogschema.QuicFrame>;
+    // we have to buffer last rx packet in memory to associate rxed frames
+    // with an rxed packet
+    public rxPacket: qlogschema.IEventPacket | undefined;
+
+    constructor(session: netlogschema.QUIC_SESSION, sessionId: number, startTime: number) {
+        this.title = `${session.host}-${session.connection_id}`;
+        this.session = session;
+        this.sessionId = sessionId;
+        this.startTime = startTime;
+        this.qlogEvents = new Array<Array<qlogschema.EventField>>();
+        this.txQUICFrames = new Array<qlogschema.QuicFrame>();
+        this.rxQUICFrames = new Array<qlogschema.QuicFrame>();
+        this.rxPacket = undefined;
+    }
+}
+
+// tslint:disable max-classes-per-file
 export default class NetlogToQlog {
 
     public static convert(netlogJSON: netlogschema.Netlog): qlogschema.IQLog {
@@ -25,19 +51,7 @@ export default class NetlogToQlog {
         const source_types: Map<number, string> = invertMap(constants.logSourceType);
         const phases: Map<number, string> = invertMap(constants.logEventPhase);
 
-        let start_time: number | undefined = undefined;
-        let session_id: number | undefined = undefined;
-
-        let packetSent: number = 0;
-        let frameSent: number = 0;
-        let packetRx: number = 0;
-        let frameRx: number = 0;
-
-        const qlogEvents: Array<Array<qlogschema.EventField>> = new Array<Array<qlogschema.EventField>>();
-        const txQUICFrames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
-        const rxQUICFrames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
-
-        let rxPacket: qlogschema.IEventPacket | undefined = undefined;
+        const connectionMap: Map<number, QUICConnection> = new Map<number, QUICConnection>();
 
         for (const event of events) {
             // source of event
@@ -53,13 +67,6 @@ export default class NetlogToQlog {
 
             // source id of event
             const source_id: number = event.source.id;
-            if (session_id === undefined) {
-                session_id = source_id;
-            } else {
-                if (source_id !== session_id) {
-                    continue;
-                }
-            }
 
             // event_type of event
             const event_type: string | undefined = event_types.get(event.type);
@@ -73,17 +80,37 @@ export default class NetlogToQlog {
                 continue;
             }
 
-            // event time in ms
-            let time: number = +event.time;
-            if (start_time === undefined) {
-                start_time = time;
-                time = 0;
-            } else {
-                time = time - start_time;
+            // event params
+            const params: any = event.params;
+
+            let connection: QUICConnection | undefined = undefined;
+
+            // Connection already exists
+            if (connectionMap.has(source_id)) {
+                connection = connectionMap.get(source_id);
+            }
+            // Connection doesn't exist 
+            else {
+                // Only allow to create connection on type QUIC_SESSION
+                if (event_type !== 'QUIC_SESSION') {
+                    continue;
+                }
+                // Only allow to create connection if phase is begin
+                if (phase !== 'PHASE_BEGIN') {
+                    continue;
+                }
+                // Create new connection
+                const session: netlogschema.QUIC_SESSION = params;
+                connection = new QUICConnection(session, source_id, +event.time)
+                connectionMap.set(source_id, connection);
             }
 
-            // custom params
-            const params: any = event.params;
+            if (connection === undefined) {
+                continue;
+            }
+
+            // event time in ms
+            const time: number = +event.time - connection.startTime;
 
             // Create a new qlog event with relative time
             const qlogEvent: Array<qlogschema.EventField> = new Array<qlogschema.EventField>();
@@ -91,10 +118,7 @@ export default class NetlogToQlog {
 
             switch (event_type) {
                 case 'QUIC_SESSION': {
-                    if (phase === "PHASE_BEGIN") {
-                        const event_params: netlogschema.QUIC_SESSION = params;
-                    }
-                    break;
+                    continue;
                 }
 
                 case 'QUIC_SESSION_TRANSPORT_PARAMETERS_SENT': {
@@ -109,43 +133,39 @@ export default class NetlogToQlog {
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.parameters_set);
                     qlogEvent.push(data as qlogschema.IEventTransportParametersSet);
-                    qlogEvents.push(qlogEvent);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
                 case 'QUIC_SESSION_CRYPTO_FRAME_SENT': {
-                    frameSent++;
                     const event_params: netlogschema.QUIC_SESSION_CRYPTO_FRAME = params;
                     const frame: qlogschema.ICryptoFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.crypto,
                         offset: event_params.offset.toString(),
                         length: event_params.data_length.toString(),
                     }
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_PADDING_FRAME_SENT': {
-                    frameSent++;
                     const event_params: netlogschema.QUIC_SESSION_PADDING_FRAME = params;
                     const frame: qlogschema.IPaddingFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.padding,
                     }
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_PING_FRAME_SENT': {
-                    frameSent++;
                     const frame: qlogschema.IPingFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ping,
                     }
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_STREAM_FRAME_SENT': {
-                    frameSent++;
                     const event_params: netlogschema.QUIC_SESSION_STREAM_FRAME = params;
                     const frame: qlogschema.IStreamFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.stream,
@@ -154,23 +174,21 @@ export default class NetlogToQlog {
                         length: event_params.length.toString(),
                         fin: event_params.fin,
                     }
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_ACK_FRAME_SENT': {
-                    frameSent++;
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
                     // TODO: Populate ack frame
                     const frame: qlogschema.IAckFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ack,
                     }
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_CONNECTION_CLOSE_FRAME_SENT': {
-                    frameSent++;
                     const event_params: netlogschema.QUIC_SESSION_CONNECTION_CLOSE_FRAME_SENT = params;
                     const frame: qlogschema.IConnectionCloseFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.connection_close,
@@ -179,12 +197,11 @@ export default class NetlogToQlog {
                         raw_error_code: event_params.quic_error,
                         reason: event_params.details,
                     };
-                    txQUICFrames.push(frame);
+                    connection.txQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_PACKET_SENT': {
-                    packetSent++;
                     const event_params: netlogschema.QUIC_SESSION_PACKET_SENT = params;
                     const packet_type: qlogschema.PacketType = ((): qlogschema.PacketType => {
                         switch (event_params.encryption_level) {
@@ -202,7 +219,7 @@ export default class NetlogToQlog {
                     qlogEvent.push(qlogschema.TransportEventType.packet_sent);
 
                     const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
-                    txQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
+                    connection.txQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
                     qlogEvent.push({
                         packet_type,
                         header: {
@@ -210,39 +227,16 @@ export default class NetlogToQlog {
                             packet_size: event_params.size,
                         },
                         frames,
-                        is_coalesced: false,
                     } as qlogschema.IEventPacket);
-                    qlogEvents.push(qlogEvent);
+                    connection.qlogEvents.push(qlogEvent);
 
                     // Reset batch QUIC frames
-                    txQUICFrames.length = 0;
+                    connection.txQUICFrames.length = 0;
                     break;
                 }
 
                 case 'QUIC_SESSION_COALESCED_PACKET_SENT': {
                     const event_params: netlogschema.QUIC_SESSION_COALESCED_PACKET_SENT = params;
-                    const infoArr: Array<string> = event_params.info.split(' ');
-                    const infoData: any = {};
-                    for (let i = 0; i < infoArr.length; i += 2) {
-                        infoArr[i] = infoArr[i].replace(':', '');
-                        infoArr[i + 1] = infoArr[i + 1].replace('/[\{\}]/g', '');
-                        infoData[infoArr[i]] = infoArr[i + 1];
-                    }
-
-                    const coalescedPacket: netlogschema.QUIC_SESSION_COALESCED_PACKET = infoData;
-                    const numPackets: number = coalescedPacket.packets.split(",").length;
-                    packetSent += numPackets;
-                    qlogEvent.push(qlogschema.EventCategory.transport);
-                    qlogEvent.push(qlogschema.TransportEventType.packet_sent);
-                    // qlogEvent.push({
-                    //     packet_type: qlogschema.PacketType.,
-                    //     header: {
-                    //         packet_number: coalescedPacket.packet_number,
-                    //         packet_size: coalescedPacket.total_length,
-                    //     },
-                    //     frames: txQUICFrames,
-                    //     is_coalesced: true,
-                    // } as qlogschema.IEventPacket);
                     break;
                 }
 
@@ -252,7 +246,6 @@ export default class NetlogToQlog {
                 }
 
                 case 'QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED': {
-                    packetRx++;
                     const event_params: netlogschema.QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED = params;
                     const packet_type: qlogschema.PacketType = ((): qlogschema.PacketType => {
                         switch (event_params.long_header_type) {
@@ -274,25 +267,25 @@ export default class NetlogToQlog {
                         is_coalesced: false,
                     };
 
-                    if (rxPacket !== undefined) {
+                    if (connection.rxPacket !== undefined) {
                         const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
-                        rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
+                        connection.rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
                         qlogEvent.push(qlogschema.EventCategory.transport);
                         qlogEvent.push(qlogschema.TransportEventType.packet_received);
                         qlogEvent.push({
-                            packet_type: rxPacket.packet_type,
+                            packet_type: connection.rxPacket.packet_type,
                             header: {
-                                packet_number: rxPacket.header.packet_number,
+                                packet_number: connection.rxPacket.header.packet_number,
                             },
                             frames,
                             is_coalesced: false,
                         } as qlogschema.IEventPacket);
-                        qlogEvents.push(qlogEvent);
+                        connection.qlogEvents.push(qlogEvent);
                     }
 
-                    rxPacket = packet;
-                    rxQUICFrames.length = 0;
+                    connection.rxPacket = packet;
+                    connection.rxQUICFrames.length = 0;
                     break;
                 }
 
@@ -308,24 +301,22 @@ export default class NetlogToQlog {
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.parameters_set);
                     qlogEvent.push(data as qlogschema.IEventTransportParametersSet);
-                    qlogEvents.push(qlogEvent);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
                 case 'QUIC_SESSION_HANDSHAKE_DONE_FRAME_RECEIVED': {
-                    frameRx++;
                     // No params
                     break;
                 }
 
                 case 'QUIC_SESSION_ACK_FRAME_RECEIVED': {
-                    frameRx++;
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
                     // TODO: Populate ack frame
                     const frame: qlogschema.IAckFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ack,
                     }
-                    rxQUICFrames.push(frame);
+                    connection.rxQUICFrames.push(frame);
                     break;
                 }
 
@@ -336,22 +327,20 @@ export default class NetlogToQlog {
                         offset: event_params.offset.toString(),
                         length: event_params.data_length.toString(),
                     }
-                    rxQUICFrames.push(frame);
+                    connection.rxQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_PADDING_FRAME_RECEIVED': {
-                    frameRx++;
                     const event_params: netlogschema.QUIC_SESSION_PADDING_FRAME = params;
                     const frame: qlogschema.IPaddingFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.padding,
                     }
-                    rxQUICFrames.push(frame);
+                    connection.rxQUICFrames.push(frame);
                     break;
                 }
 
                 case 'QUIC_SESSION_STREAM_FRAME_RECEIVED': {
-                    frameRx++;
                     const event_params: netlogschema.QUIC_SESSION_STREAM_FRAME = params;
                     const frame: qlogschema.IStreamFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.stream,
@@ -360,7 +349,7 @@ export default class NetlogToQlog {
                         length: event_params.length.toString(),
                         fin: event_params.fin,
                     }
-                    rxQUICFrames.push(frame);
+                    connection.rxQUICFrames.push(frame);
                     break;
                 }
 
@@ -403,26 +392,37 @@ export default class NetlogToQlog {
                 }
 
                 case 'HTTP3_LOCAL_CONTROL_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
                     break;
                 }
 
                 case 'HTTP3_LOCAL_QPACK_DECODER_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+
                     break;
                 }
 
                 case 'HTTP3_LOCAL_QPACK_ENCODER_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+
                     break;
                 }
 
                 case 'HTTP3_PEER_CONTROL_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+
                     break;
                 }
 
                 case 'HTTP3_PEER_QPACK_ENCODER_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+
                     break;
                 }
 
                 case 'HTTP3_PEER_QPACK_DECODER_STREAM_CREATED': {
+                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+
                     break;
                 }
 
@@ -466,29 +466,36 @@ export default class NetlogToQlog {
                     break;
                 }
 
+                case 'QUIC_CHROMIUM_CLIENT_STREAM_SEND_REQUEST_HEADERS': {
+                    break;
+                }
+
+                case 'QUIC_CHROMIUM_CLIENT_STREAM_READ_RESPONSE_HEADERS': {
+                    break;
+                }
+
                 default: {
                     console.log(event_type);
                     break;
                 }
             }
         }
-        console.log(`packets sent: ${packetSent}, frames sent: ${frameSent}`);
-        console.log(`packets rxed: ${packetRx}, frames rxed: ${frameRx}`);
 
-        if (start_time === undefined) {
-            throw new Error("could not find start_time in netlog");
-        }
+        const qlogs: Array<qlogschema.ITrace> = new Array<qlogschema.ITrace>();
 
-        const qlog: qlogschema.ITrace = {
-            vantage_point: { type: qlogschema.VantagePointType.client },
-            event_fields: ["time", "category", "event", "data"],
-            common_fields: { protocol_type: "QUIC_HTTP3", reference_time: start_time.toString() },
-            events: qlogEvents,
-        };
+        connectionMap.forEach((conn: QUICConnection, key: number) => {
+            qlogs.push({
+                title: conn.title,
+                vantage_point: { type: qlogschema.VantagePointType.client },
+                event_fields: ["time", "category", "event", "data"],
+                common_fields: { protocol_type: "QUIC_HTTP3", reference_time: conn.startTime.toString() },
+                events: conn.qlogEvents,
+            })
+        });
 
         const qlogFile: qlogschema.IQLog = {
             qlog_version: "draft-02-wip",
-            traces: [qlog],
+            traces: qlogs,
         };
 
         return qlogFile;
