@@ -37,6 +37,8 @@ export default class NetlogToQlog {
         const txQUICFrames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
         const rxQUICFrames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
 
+        let rxPacket: qlogschema.IEventPacket | undefined = undefined;
+
         for (const event of events) {
             // source of event
             const source_type: string | undefined = source_types.get(event.source.type);
@@ -263,25 +265,33 @@ export default class NetlogToQlog {
                         }
                     })();
 
-                    console.log(`rxQUICFrames length: ${rxQUICFrames.length}`);
-
-                    const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
-                    rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
                     const packet: qlogschema.IEventPacket = {
                         packet_type,
                         header: {
                             packet_number: event_params.packet_number.toString(),
                         },
-                        frames,
                         is_coalesced: false,
                     };
 
-                    qlogEvent.push(qlogschema.EventCategory.transport);
-                    qlogEvent.push(qlogschema.TransportEventType.packet_received);
-                    qlogEvent.push(packet);
-                    qlogEvents.push(qlogEvent);
+                    if (rxPacket !== undefined) {
+                        const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
+                        rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
+                        qlogEvent.push(qlogschema.EventCategory.transport);
+                        qlogEvent.push(qlogschema.TransportEventType.packet_received);
+                        qlogEvent.push({
+                            packet_type: rxPacket.packet_type,
+                            header: {
+                                packet_number: rxPacket.header.packet_number,
+                            },
+                            frames,
+                            is_coalesced: false,
+                        } as qlogschema.IEventPacket);
+                        qlogEvents.push(qlogEvent);
+                    }
+
+                    rxPacket = packet;
                     rxQUICFrames.length = 0;
                     break;
                 }
