@@ -175,6 +175,7 @@
 
     import ConnectionStore from "@/store/ConnectionStore";
     import TCPToQLOG from "./pcapconverter/tcptoqlog";
+    import NetlogToQLOG from "./netlogconverter/netlogtoqlog";
 
     import StreamingJSONParser from "./utils/StreamingJSONParser";
 
@@ -234,7 +235,7 @@
 
             for ( const file of this.filesToUpload ){
 
-                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) ) {
+                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog")) {
                     Vue.notify({
                         group: "default",
                         title: "Provide .qlog file",
@@ -269,6 +270,11 @@
                             const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
 
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
+                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
+                        } else if (file.name.endsWith(".netlog")) {
+                            const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
+                            
+                            const qlogJSON = NetlogToQLOG.convert( contentsJSON );
                             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
                         }
                         else { 
