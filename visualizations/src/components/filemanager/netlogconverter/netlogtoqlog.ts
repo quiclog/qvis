@@ -14,6 +14,22 @@ function invertMap(map: Map<string, number>): Map<number, string> {
     return result;
 };
 
+function calculateAckRanges(largestObserved: number, missing_packets: Array<number>): Array<[number, number]> {
+    const result: Array<[number, number]> = new Array<[number, number]>();
+
+    let curr: number = 1;
+    for (const packetNum of missing_packets) {
+        // curr is a lost packet
+        if (curr !== packetNum) {
+            result.push([curr, packetNum - 1]);
+        }
+        curr = packetNum + 1;
+    }
+    result.push([curr, largestObserved]);
+
+    return result
+}
+
 class QUICConnection {
     public title: string;
     public session: netlogschema.QUIC_SESSION;
@@ -180,10 +196,19 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_ACK_FRAME_SENT': {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
-                    // TODO: Populate ack frame
+                    // TODO: Populate ack frames
+                    const acked_ranges: Array<[number, number]> = calculateAckRanges(
+                        event_params.largest_observed,
+                        event_params.missing_packets,
+                    );
                     const frame: qlogschema.IAckFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ack,
+                        ack_delay: (event_params.delta_time_largest_observed_us * 1000).toString(),
+                        acked_ranges: acked_ranges.map(([ack1, ack2]) => {
+                            return [ack1.toString(), ack2.toString()];
+                        }),
                     }
+
                     connection.txQUICFrames.push(frame);
                     break;
                 }
@@ -313,9 +338,17 @@ export default class NetlogToQlog {
                 case 'QUIC_SESSION_ACK_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
                     // TODO: Populate ack frame
+                    const acked_ranges: Array<[number, number]> = calculateAckRanges(
+                        event_params.largest_observed,
+                        event_params.missing_packets,
+                    );
                     const frame: qlogschema.IAckFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ack,
+                        acked_ranges: acked_ranges.map(([ack1, ack2]) => {
+                            return [ack1.toString(), ack2.toString()];
+                        }),
                     }
+
                     connection.rxQUICFrames.push(frame);
                     break;
                 }
