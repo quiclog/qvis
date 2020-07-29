@@ -48,7 +48,7 @@
                                     :state="Boolean(filesToUpload.length > 0)"
                                     placeholder="Choose files or drop them here..."
                                     drop-placeholder="Drop files here..."
-                                    accept=".qlog,.json"
+                                    accept=".qlog,.json,.netlog"
                                     class="text-nowrap text-truncate"
                                     ></b-form-file>
 
@@ -73,8 +73,9 @@
                 <div>
                     <p>
                         <!--Upload supports the same formats as Option 1. You can only upload a single file at a time.<br/>-->
-                        Upload currently only supports .qlog files directly. No data is transfered to the server.<br/>
-                        Eventually we will also support .json, .pcap, .pcapng and .qtr files.<br/>
+                        Upload currently supports .qlog, .json, and .netlog files. No data is transfered to the server.<br/>
+                        Eventually we will also support .pcap, .pcapng and .qtr files.<br/>
+                        <p style="font-size: 12px">Note: Chrome netlog must be exported as .netlog before uploading to qvis</p>
                     </p>
                 </div>
             </b-col>
@@ -175,6 +176,7 @@
 
     import ConnectionStore from "@/store/ConnectionStore";
     import TCPToQLOG from "./pcapconverter/tcptoqlog";
+    import NetlogToQLOG from "./netlogconverter/netlogtoqlog";
 
     import StreamingJSONParser from "./utils/StreamingJSONParser";
 
@@ -234,7 +236,7 @@
 
             for ( const file of this.filesToUpload ){
 
-                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) ) {
+                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog")) {
                     Vue.notify({
                         group: "default",
                         title: "Provide .qlog file",
@@ -269,6 +271,11 @@
                             const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
 
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
+                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
+                        } else if (file.name.endsWith(".netlog")) {
+                            const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
+                            
+                            const qlogJSON = NetlogToQLOG.convert( contentsJSON );
                             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
                         }
                         else { 
