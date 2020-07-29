@@ -401,7 +401,6 @@ export default class NetlogToQlog {
 
                         // Must pop qlogEvent to remove time
                         qlogEvent.pop();
-                        console.log("rxPacket time:", connection.rxPacket.time);
 
                         qlogEvent.push(connection.rxPacket.time);
                         qlogEvent.push(qlogschema.EventCategory.transport);
