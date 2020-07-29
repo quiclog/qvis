@@ -74,8 +74,8 @@
                     <p>
                         <!--Upload supports the same formats as Option 1. You can only upload a single file at a time.<br/>-->
                         Upload currently supports .qlog, .json, and .netlog files. No data is transfered to the server.<br/>
-                        Chrome netlog must be exported as .netlog before uploading to qvis.<br/>
                         Eventually we will also support .pcap, .pcapng and .qtr files.<br/>
+                        <p style="font-size: 12px">Note: Chrome netlog must be exported as .netlog before uploading to qvis</p>
                     </p>
                 </div>
             </b-col>
