@@ -48,7 +48,7 @@
                                     :state="Boolean(filesToUpload.length > 0)"
                                     placeholder="Choose files or drop them here..."
                                     drop-placeholder="Drop files here..."
-                                    accept=".qlog,.json"
+                                    accept=".qlog,.json,.netlog"
                                     class="text-nowrap text-truncate"
                                     ></b-form-file>
 
@@ -73,8 +73,9 @@
                 <div>
                     <p>
                         <!--Upload supports the same formats as Option 1. You can only upload a single file at a time.<br/>-->
-                        Upload currently only supports .qlog files directly. No data is transfered to the server.<br/>
-                        Eventually we will also support .json, .pcap, .pcapng and .qtr files.<br/>
+                        Upload currently supports .qlog, .json, and .netlog files. No data is transfered to the server.<br/>
+                        Chrome netlog must be exported as .netlog before uploading to qvis.<br/>
+                        Eventually we will also support .pcap, .pcapng and .qtr files.<br/>
                     </p>
                 </div>
             </b-col>

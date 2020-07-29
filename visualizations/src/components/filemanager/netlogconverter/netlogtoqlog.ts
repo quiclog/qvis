@@ -1,8 +1,73 @@
 import * as qlogschema from '@quictools/qlog-schema';
 import * as netlogschema from './netlog';
-import { IEventTransportParametersSet } from '@quictools/qlog-schema';
-import { BreadcrumbPlugin } from 'bootstrap-vue';
 
+/* Netlog example:
+{
+    "constants": {
+        "logEventTypes": {
+            "QUIC_SESSION": 234,
+            "QUIC_SESSION_ACK_FRAME_SENT": 249,
+            ...
+        },
+        "logSourceType": {
+            "QUIC_SESSION": 11,
+            ...
+        },
+        ...
+    },
+    "events": [
+        {
+            "params": {
+                "cert_verify_flags": 0,
+                "connection_id": "712d0120daf2c0be",
+                "host": "accounts.google.com",
+                "network_isolation_key": "null null",
+                "port": 443,
+                "privacy_mode": "disabled",
+                "require_confirmation": false,
+                "versions": "ff00001d"
+            },
+            "phase": 1,
+            "source": {
+                "id": 16,
+                "start_time": "300131887",
+                "type": 11
+            },
+            "time": "300131887",
+            "type": 234
+        },
+        ...,
+        {
+            "params": {
+                "delta_time_largest_observed_us": 9688,
+                "largest_observed": 11,
+                "missing_packets": [
+                    1,
+                    3,
+                    6,
+                    9
+                ],
+                "received_packet_times": []
+            },
+            "phase": 0,
+            "source": {
+                "id": 28,
+                "start_time": "300131911",
+                "type": 11
+            },
+            "time": "300132616",
+            "type": 249
+        },
+        ...
+    ]
+}
+ */
+
+/** invertMap is used to invert mappings of netlog constants because netlog stores
+ *  constants as <string, number> while events use <number> to represent constants.
+ *  See netlog example above.
+ * @param map 
+ */
 function invertMap(map: Map<string, number>): Map<number, string> {
     const result: Map<number, string> = new Map<number, string>();
 
@@ -14,12 +79,17 @@ function invertMap(map: Map<string, number>): Map<number, string> {
     return result;
 };
 
+/** calculateAckRanges is used to generate ACK ranges given the largestObserved
+ * packet number and an array of missing packets. See netlog example above.
+ * 
+ * @param largestObserved 
+ * @param missing_packets 
+ */
 function calculateAckRanges(largestObserved: number, missing_packets: Array<number>): Array<[number, number]> {
     const result: Array<[number, number]> = new Array<[number, number]>();
 
     let curr: number = 1;
     for (const packetNum of missing_packets) {
-        // curr is a lost packet
         if (curr !== packetNum) {
             result.push([curr, packetNum - 1]);
         }
@@ -38,18 +108,35 @@ class QUICConnection {
     public qlogEvents: Array<Array<qlogschema.EventField>>;
     public txQUICFrames: Array<qlogschema.QuicFrame>;
     public rxQUICFrames: Array<qlogschema.QuicFrame>;
-    // we have to buffer last rx packet in memory to associate rxed frames
-    // with an rxed packet
-    public rxPacket: qlogschema.IEventPacket | undefined;
+    public rxPacket: any | undefined;
 
-    constructor(session: netlogschema.QUIC_SESSION, sessionId: number, startTime: number) {
+    constructor(
+        session: netlogschema.QUIC_SESSION,
+        sessionId: number,
+        startTime: number,
+    ) {
         this.title = `${session.host}-${session.connection_id}`;
         this.session = session;
         this.sessionId = sessionId;
         this.startTime = startTime;
         this.qlogEvents = new Array<Array<qlogschema.EventField>>();
+
+        // txQUICFrames is used to buffer frames that correspond with a sent packet.
+        // This is done because netlog first logs FRAME_SENT before it logs
+        // PACKET_SENT, the latter of which contains the packet number. As a result,
+        // we must keep track of current frames sent until we encounter a PACKET_SENT event
+        // to accurately assign frames to a specific packet
         this.txQUICFrames = new Array<qlogschema.QuicFrame>();
+
+        // rxQUICFrames is used to buffer frames that correspond with a received packet.
+        // This is done because netlog first logs PACKET_HEADER_RECEIVED before it logs
+        // FRAME_RECEIVED, the former of which contains the packet number. As a result,
+        // we must keep track of current frames received after we encounter a 
+        // PACKET_HEADER_RECEIVED event to accurately assign frames to a specific packet.
         this.rxQUICFrames = new Array<qlogschema.QuicFrame>();
+        // This is to keep track of the last received packet. We need to keep track
+        // because we can only log a received packet to QLOG until we encounter the
+        // next received packet due to frame buffering nature.
         this.rxPacket = undefined;
     }
 }
@@ -63,9 +150,13 @@ export default class NetlogToQlog {
         const constants: netlogschema.Constants = netlogJSON.constants;
         const events: Array<netlogschema.Event> = netlogJSON.events;
 
+        // TODO: Use this timeTickOffset for accurate absolute start time
+        const timeTickOffset: number = constants.timeTickOffset;
+
         const event_types: Map<number, string> = invertMap(constants.logEventTypes);
         const source_types: Map<number, string> = invertMap(constants.logSourceType);
         const phases: Map<number, string> = invertMap(constants.logEventPhase);
+
 
         const connectionMap: Map<number, QUICConnection> = new Map<number, QUICConnection>();
 
@@ -138,7 +229,10 @@ export default class NetlogToQlog {
                 }
 
                 case 'QUIC_SESSION_TRANSPORT_PARAMETERS_SENT': {
-                    const event_params: Array<string> = (params as netlogschema.QUIC_SESSION_TRANSPORT_PARAMETERS).quic_transport_parameters.split(" ").slice(1);
+                    const event_params: Array<string> = (params as netlogschema.QUIC_SESSION_TRANSPORT_PARAMETERS)
+                        .quic_transport_parameters
+                        .split(" ")
+                        .slice(1);
                     const data: any = { owner: 'local' };
                     for (let i = 0; i < event_params.length; i += 2) {
                         const key: string = event_params[i];
@@ -196,19 +290,17 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_ACK_FRAME_SENT': {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
-                    // TODO: Populate ack frames
                     const acked_ranges: Array<[number, number]> = calculateAckRanges(
                         event_params.largest_observed,
                         event_params.missing_packets,
                     );
+                    // TODO: Use delta_time_largest_observed_us to calculate ack delay 
                     const frame: qlogschema.IAckFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ack,
-                        ack_delay: (event_params.delta_time_largest_observed_us * 1000).toString(),
                         acked_ranges: acked_ranges.map(([ack1, ack2]) => {
                             return [ack1.toString(), ack2.toString()];
                         }),
                     }
-
                     connection.txQUICFrames.push(frame);
                     break;
                 }
@@ -240,11 +332,13 @@ export default class NetlogToQlog {
                                 throw new Error(`could not process packet type: ${event_params.encryption_level}`);
                         }
                     })();
-                    qlogEvent.push(qlogschema.EventCategory.transport);
-                    qlogEvent.push(qlogschema.TransportEventType.packet_sent);
 
+                    // Deep-copy txQUICFrames to put in qlogEvent.
                     const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
                     connection.txQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
+
+                    qlogEvent.push(qlogschema.EventCategory.transport);
+                    qlogEvent.push(qlogschema.TransportEventType.packet_sent);
                     qlogEvent.push({
                         packet_type,
                         header: {
@@ -255,7 +349,7 @@ export default class NetlogToQlog {
                     } as qlogschema.IEventPacket);
                     connection.qlogEvents.push(qlogEvent);
 
-                    // Reset batch QUIC frames
+                    // Reset txQUICFrames
                     connection.txQUICFrames.length = 0;
                     break;
                 }
@@ -284,7 +378,8 @@ export default class NetlogToQlog {
                     })();
 
 
-                    const packet: qlogschema.IEventPacket = {
+                    const packet: any = {
+                        time,
                         packet_type,
                         header: {
                             packet_number: event_params.packet_number.toString(),
@@ -292,10 +387,23 @@ export default class NetlogToQlog {
                         is_coalesced: false,
                     };
 
+                    // if rxPacket is not undefined, then we have frames buffered
+                    // to correlate with the last rxPacket. This is done because
+                    // netlog first logs HEADER_RECEIVED (which contains the packet 
+                    // number) before logging any frames that correspond with the packet.
+                    // As a result, we must save rxPacket in memory and buffer frames we
+                    // encounter after the HEADER_RECEIVED event to correctly correlate
+                    // frames with packet.
                     if (connection.rxPacket !== undefined) {
+                        // Deep-copy frames to put into qlogEvent
                         const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
                         connection.rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
+                        // Must pop qlogEvent to remove time
+                        qlogEvent.pop();
+                        console.log("rxPacket time:", connection.rxPacket.time);
+
+                        qlogEvent.push(connection.rxPacket.time);
                         qlogEvent.push(qlogschema.EventCategory.transport);
                         qlogEvent.push(qlogschema.TransportEventType.packet_received);
                         qlogEvent.push({
@@ -306,9 +414,20 @@ export default class NetlogToQlog {
                             frames,
                             is_coalesced: false,
                         } as qlogschema.IEventPacket);
-                        connection.qlogEvents.push(qlogEvent);
+
+                        // Since we are inserting a packet from the past, we must insert it
+                        // into the correct index
+                        for (let i = connection.qlogEvents.length - 1; i >= 0; i--) {
+                            const temp: Array<qlogschema.EventField> = connection.qlogEvents[i];
+                            // If we found an event before packet, insert rxPacket after this packet
+                            if (temp[0] < connection.rxPacket.time) {
+                                connection.qlogEvents.splice(i + 1, 0, qlogEvent);
+                                break;
+                            }
+                        }
                     }
 
+                    // Set rxPacket to current packet and reset rxQUICFrames
                     connection.rxPacket = packet;
                     connection.rxQUICFrames.length = 0;
                     break;
@@ -337,7 +456,7 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_ACK_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
-                    // TODO: Populate ack frame
+                    // TODO: Use delta_time_largest_observed_us to calculate ack delay 
                     const acked_ranges: Array<[number, number]> = calculateAckRanges(
                         event_params.largest_observed,
                         event_params.missing_packets,
@@ -388,7 +507,6 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_CLOSED': {
                     const event_params: netlogschema.QUIC_SESSION_CLOSED = params;
-                    qlogEvent.push(qlogschema.EventCategory.transport);
                     break;
                 }
 
@@ -508,7 +626,7 @@ export default class NetlogToQlog {
                 }
 
                 default: {
-                    console.log(event_type);
+                    // Netlog event types not yet covered
                     break;
                 }
             }

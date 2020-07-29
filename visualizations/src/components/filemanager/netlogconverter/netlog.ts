@@ -15,6 +15,7 @@ export interface Constants {
     logEventTypes: any,
     logSourceType: any,
     logEventPhase: any,
+    timeTickOffset: number,
 }
 
 export interface Event {
