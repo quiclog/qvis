@@ -73,9 +73,11 @@
                 <div>
                     <p>
                         <!--Upload supports the same formats as Option 1. You can only upload a single file at a time.<br/>-->
-                        Upload currently supports .qlog, .json, and .netlog files. No data is transfered to the server.<br/>
+                        Upload currently supports .qlog, .json, and <a href="https://www.chromium.org/for-testers/providing-network-details">.netlog</a> files. No data is transfered to the server.<br/>
                         Eventually we will also support .pcap, .pcapng and .qtr files.<br/>
-                        <p style="font-size: 12px">Note: Chrome netlog must be exported as .netlog before uploading to qvis</p>
+                        <span style="font-size: 12px;">
+                            Note: Chrome netlog must be explicitly given the .netlog extension before uploading to qvis.
+                        </span>
                     </p>
                 </div>
             </b-col>
@@ -272,8 +274,9 @@
 
                             const qlogJSON = TCPToQLOG.convert( contentsJSON );
                             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
-                        } else if (file.name.endsWith(".netlog")) {
-                            const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
+                        } 
+                        else if (file.name.endsWith(".netlog")) {
+                            const contentsJSON = JSON.parse( (evt!.target as any).result );
                             
                             const qlogJSON = NetlogToQLOG.convert( contentsJSON );
                             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});

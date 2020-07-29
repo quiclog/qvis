@@ -637,7 +637,7 @@ export default class NetlogToQlog {
             qlogs.push({
                 title: conn.title,
                 vantage_point: { type: qlogschema.VantagePointType.client },
-                event_fields: ["time", "category", "event", "data"],
+                event_fields: ["relative_time", "category", "event", "data"],
                 common_fields: { protocol_type: "QUIC_HTTP3", reference_time: conn.startTime.toString() },
                 events: conn.qlogEvents,
             })
