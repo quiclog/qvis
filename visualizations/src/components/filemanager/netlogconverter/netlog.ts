@@ -90,6 +90,11 @@ export interface QUIC_SESSION_STREAM_FRAME {
     stream_id: number
 }
 
+export interface QUIC_SESSION_WINDOW_UPDATE_FRAME {
+    byte_offset: number,
+    stream_id: number
+}
+
 export interface QUIC_SESSION_CONNECTION_CLOSE_FRAME_SENT {
     details: string,
     quic_error: number
@@ -120,5 +125,37 @@ export interface QUIC_SESSION_CLOSED {
 }
 
 export interface HTTP3_STREAM_CREATED {
+    stream_id: number,
+}
+
+export interface HTTP3_MAX_PUSH_ID {
+    push_id: number,
+}
+
+export interface HTTP3_PRIORITY_UPDATE {
+    prioritized_element_id: number,
+    priority_field_value: string,
+    type: string
+}
+
+export interface HTTP3_DATA_FRAME {
+    payload_length: number,
+    stream_id: number
+}
+
+export interface HTTP3_UNKNOWN_FRAME {
+    frame_type: number,
+    payload_length: number,
+    stream_id: number
+}
+
+export interface HTTP3_SETTINGS {
+    SETTINGS_MAX_HEADER_LIST_SIZE: number,
+    SETTINGS_QPACK_BLOCKED_STREAMS: number,
+    SETTINGS_QPACK_MAX_TABLE_CAPACITY: number,
+}
+
+export interface HTTP3_HEADERS {
+    headers: any,
     stream_id: number,
 }

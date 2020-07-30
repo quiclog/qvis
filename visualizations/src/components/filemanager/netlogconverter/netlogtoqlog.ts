@@ -139,6 +139,14 @@ class QUICConnection {
         // next received packet due to frame buffering nature.
         this.rxPacket = undefined;
     }
+
+    public pushFrame(event_type: string, frame: qlogschema.QuicFrame) {
+        if (event_type.indexOf('SENT') >= 0) {
+            this.txQUICFrames.push(frame);
+        } else {
+            this.rxQUICFrames.push(frame);
+        }
+    }
 }
 
 // tslint:disable max-classes-per-file
@@ -247,35 +255,39 @@ export default class NetlogToQlog {
                     break;
                 }
 
-                case 'QUIC_SESSION_CRYPTO_FRAME_SENT': {
+                case 'QUIC_SESSION_CRYPTO_FRAME_SENT':
+                case 'QUIC_SESSION_CRYPTO_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_CRYPTO_FRAME = params;
                     const frame: qlogschema.ICryptoFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.crypto,
                         offset: event_params.offset.toString(),
                         length: event_params.data_length.toString(),
                     }
-                    connection.txQUICFrames.push(frame);
+                    connection.pushFrame(event_type, frame);
                     break;
                 }
 
-                case 'QUIC_SESSION_PADDING_FRAME_SENT': {
+                case 'QUIC_SESSION_PADDING_FRAME_SENT':
+                case 'QUIC_SESSION_PADDING_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_PADDING_FRAME = params;
                     const frame: qlogschema.IPaddingFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.padding,
                     }
-                    connection.txQUICFrames.push(frame);
+                    connection.pushFrame(event_type, frame);
                     break;
                 }
 
-                case 'QUIC_SESSION_PING_FRAME_SENT': {
+                case 'QUIC_SESSION_PING_FRAME_SENT':
+                case 'QUIC_SESSION_PING_FRAME_RECEIVED': {
                     const frame: qlogschema.IPingFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.ping,
                     }
-                    connection.txQUICFrames.push(frame);
+                    connection.pushFrame(event_type, frame);
                     break;
                 }
 
-                case 'QUIC_SESSION_STREAM_FRAME_SENT': {
+                case 'QUIC_SESSION_STREAM_FRAME_SENT':
+                case 'QUIC_SESSION_STREAM_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_STREAM_FRAME = params;
                     const frame: qlogschema.IStreamFrame = {
                         frame_type: qlogschema.QUICFrameTypeName.stream,
@@ -284,11 +296,12 @@ export default class NetlogToQlog {
                         length: event_params.length.toString(),
                         fin: event_params.fin,
                     }
-                    connection.txQUICFrames.push(frame);
+                    connection.pushFrame(event_type, frame);
                     break;
                 }
 
-                case 'QUIC_SESSION_ACK_FRAME_SENT': {
+                case 'QUIC_SESSION_ACK_FRAME_SENT':
+                case 'QUIC_SESSION_ACK_FRAME_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
                     const acked_ranges: Array<[number, number]> = calculateAckRanges(
                         event_params.largest_observed,
@@ -301,7 +314,27 @@ export default class NetlogToQlog {
                             return [ack1.toString(), ack2.toString()];
                         }),
                     }
-                    connection.txQUICFrames.push(frame);
+                    connection.pushFrame(event_type, frame);
+                    break;
+                }
+
+                case 'QUIC_SESSION_WINDOW_UPDATE_FRAME_SENT':
+                case 'QUIC_SESSION_WINDOW_UPDATE_FRAME_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_WINDOW_UPDATE_FRAME = params;
+                    if (event_params.stream_id === -1) {
+                        const frame: qlogschema.IMaxDataFrame = {
+                            frame_type: qlogschema.QUICFrameTypeName.max_data,
+                            maximum: event_params.byte_offset.toString(),
+                        };
+                        connection.pushFrame(event_type, frame);
+                    } else {
+                        const frame: qlogschema.IMaxStreamDataFrame = {
+                            frame_type: qlogschema.QUICFrameTypeName.max_stream_data,
+                            stream_id: event_params.stream_id.toString(),
+                            maximum: event_params.byte_offset.toString(),
+                        };
+                        connection.pushFrame(event_type, frame);
+                    }
                     break;
                 }
 
@@ -378,14 +411,19 @@ export default class NetlogToQlog {
                     })();
 
 
-                    const packet: any = {
-                        time,
+                    const packet: qlogschema.IEventPacket = {
                         packet_type,
                         header: {
                             packet_number: event_params.packet_number.toString(),
                         },
                         is_coalesced: false,
                     };
+
+                    // Push placeholder qlogEvent into the trace
+                    qlogEvent.push(qlogschema.EventCategory.transport);
+                    qlogEvent.push(qlogschema.TransportEventType.packet_received);
+                    qlogEvent.push(packet);
+                    connection.qlogEvents.push(qlogEvent);
 
                     // if rxPacket is not undefined, then we have frames buffered
                     // to correlate with the last rxPacket. This is done because
@@ -399,31 +437,7 @@ export default class NetlogToQlog {
                         const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
                         connection.rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
-                        // Must pop qlogEvent to remove time
-                        qlogEvent.pop();
-
-                        qlogEvent.push(connection.rxPacket.time);
-                        qlogEvent.push(qlogschema.EventCategory.transport);
-                        qlogEvent.push(qlogschema.TransportEventType.packet_received);
-                        qlogEvent.push({
-                            packet_type: connection.rxPacket.packet_type,
-                            header: {
-                                packet_number: connection.rxPacket.header.packet_number,
-                            },
-                            frames,
-                            is_coalesced: false,
-                        } as qlogschema.IEventPacket);
-
-                        // Since we are inserting a packet from the past, we must insert it
-                        // into the correct index
-                        for (let i = connection.qlogEvents.length - 1; i >= 0; i--) {
-                            const temp: Array<qlogschema.EventField> = connection.qlogEvents[i];
-                            // If we found an event before packet, insert rxPacket after this packet
-                            if (temp[0] < connection.rxPacket.time) {
-                                connection.qlogEvents.splice(i + 1, 0, qlogEvent);
-                                break;
-                            }
-                        }
+                        connection.rxPacket.frames = frames;
                     }
 
                     // Set rxPacket to current packet and reset rxQUICFrames
@@ -450,57 +464,6 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_HANDSHAKE_DONE_FRAME_RECEIVED': {
                     // No params
-                    break;
-                }
-
-                case 'QUIC_SESSION_ACK_FRAME_RECEIVED': {
-                    const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
-                    // TODO: Use delta_time_largest_observed_us to calculate ack delay 
-                    const acked_ranges: Array<[number, number]> = calculateAckRanges(
-                        event_params.largest_observed,
-                        event_params.missing_packets,
-                    );
-                    const frame: qlogschema.IAckFrame = {
-                        frame_type: qlogschema.QUICFrameTypeName.ack,
-                        acked_ranges: acked_ranges.map(([ack1, ack2]) => {
-                            return [ack1.toString(), ack2.toString()];
-                        }),
-                    }
-
-                    connection.rxQUICFrames.push(frame);
-                    break;
-                }
-
-                case 'QUIC_SESSION_CRYPTO_FRAME_RECEIVED': {
-                    const event_params: netlogschema.QUIC_SESSION_CRYPTO_FRAME = params;
-                    const frame: qlogschema.ICryptoFrame = {
-                        frame_type: qlogschema.QUICFrameTypeName.crypto,
-                        offset: event_params.offset.toString(),
-                        length: event_params.data_length.toString(),
-                    }
-                    connection.rxQUICFrames.push(frame);
-                    break;
-                }
-
-                case 'QUIC_SESSION_PADDING_FRAME_RECEIVED': {
-                    const event_params: netlogschema.QUIC_SESSION_PADDING_FRAME = params;
-                    const frame: qlogschema.IPaddingFrame = {
-                        frame_type: qlogschema.QUICFrameTypeName.padding,
-                    }
-                    connection.rxQUICFrames.push(frame);
-                    break;
-                }
-
-                case 'QUIC_SESSION_STREAM_FRAME_RECEIVED': {
-                    const event_params: netlogschema.QUIC_SESSION_STREAM_FRAME = params;
-                    const frame: qlogschema.IStreamFrame = {
-                        frame_type: qlogschema.QUICFrameTypeName.stream,
-                        stream_id: event_params.stream_id.toString(),
-                        offset: event_params.offset.toString(),
-                        length: event_params.length.toString(),
-                        fin: event_params.fin,
-                    }
-                    connection.rxQUICFrames.push(frame);
                     break;
                 }
 
@@ -584,11 +547,12 @@ export default class NetlogToQlog {
                     break;
                 }
 
-                case 'HTTP3_HEADERS_SENT': {
+                case 'HTTP3_HEADERS_RECEIVED': {
                     break;
                 }
 
-                case 'HTTP3_DATA_SENT': {
+                case 'HTTP3_HEADERS_DECODED':
+                case 'HTTP3_HEADERS_SENT': {
                     break;
                 }
 
@@ -597,14 +561,38 @@ export default class NetlogToQlog {
                 }
 
                 case 'HTTP3_SETTINGS_RECEIVED': {
+                    const event_params: netlogschema.HTTP3_SETTINGS = params;
+                    // qlogEvent.push(qlogschema.EventCategory.http);
+                    // qlogEvent.push(qlogschema.HTTP3EventType.datagram_received)
+                    // qlogEvent.push({
+                    //     stream_id: 'asfda',
+                    //     frame: {
+                    //         frame_type: qlogschema.HTTP3FrameTypeName.settings,
+                    //         settings: [],
+                    //     },
+                    // } as qlogschema.IEventH3FrameParsed);
+                    // connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
-                case 'HTTP3_HEADERS_RECEIVED': {
+
+
+                case 'HTTP3_DATA_SENT': {
                     break;
                 }
 
                 case 'HTTP3_DATA_FRAME_RECEIVED': {
+                    const event_params: netlogschema.HTTP3_DATA_FRAME = params;
+                    qlogEvent.push(qlogschema.EventCategory.http);
+                    qlogEvent.push(qlogschema.HTTP3EventType.datagram_received)
+                    qlogEvent.push({
+                        stream_id: event_params.stream_id.toString(),
+                        byte_length: event_params.payload_length.toString(),
+                        frame: {
+                            frame_type: qlogschema.HTTP3FrameTypeName.data,
+                        },
+                    } as qlogschema.IEventH3FrameParsed);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
