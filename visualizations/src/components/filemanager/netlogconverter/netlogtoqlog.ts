@@ -422,13 +422,7 @@ export default class NetlogToQlog {
                     // Push placeholder qlogEvent into the trace
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.packet_received);
-                    qlogEvent.push({
-                        packet_type,
-                        header: {
-                            packet_number: event_params.packet_number.toString(),
-                        },
-                        is_coalesced: false,
-                    } as qlogschema.IEventPacket);
+                    qlogEvent.push(packet);
                     connection.qlogEvents.push(qlogEvent);
 
                     // if rxPacket is not undefined, then we have frames buffered
@@ -443,20 +437,7 @@ export default class NetlogToQlog {
                         const frames: Array<qlogschema.QuicFrame> = new Array<qlogschema.QuicFrame>();
                         connection.rxQUICFrames.forEach((frame) => frames.push(Object.assign({}, frame)));
 
-                        // Since we are dealing with a packet from the past, we must find its
-                        // correct placeholder packet
-                        for (let i = connection.qlogEvents.length - 1; i >= 0; i--) {
-                            const temp_type: qlogschema.TransportEventType = connection.qlogEvents[i][2] as qlogschema.TransportEventType;
-                            const temp_data: qlogschema.IEventPacket = connection.qlogEvents[i][3] as qlogschema.IEventPacket;
-                            // If we found an event that matches packet, fill in its frames
-                            if (
-                                temp_type === qlogschema.TransportEventType.packet_received &&
-                                packet.header.packet_number === connection.rxPacket.header.packet_number
-                            ) {
-                                temp_data.frames = frames;
-                                break;
-                            }
-                        }
+                        connection.rxPacket.frames = frames;
                     }
 
                     // Set rxPacket to current packet and reset rxQUICFrames
