@@ -106,6 +106,7 @@ class QUICConnection {
     public sessionId: number;
     public startTime: number;
     public qlogEvents: Array<Array<qlogschema.EventField>>;
+
     public txQUICFrames: Array<qlogschema.QuicFrame>;
     public rxQUICFrames: Array<qlogschema.QuicFrame>;
     public rxPacket: any | undefined;
@@ -142,10 +143,27 @@ class QUICConnection {
 
     public pushFrame(event_type: string, frame: qlogschema.QuicFrame) {
         if (event_type.indexOf('SENT') >= 0) {
-            this.txQUICFrames.push(frame);
+            this.txQUICFrames.push(frame as qlogschema.QuicFrame);
         } else {
-            this.rxQUICFrames.push(frame);
+            this.rxQUICFrames.push(frame as qlogschema.QuicFrame);
         }
+    }
+
+    public pushH3Frame(
+        event_type: string,
+        frame: qlogschema.HTTP3EventData,
+        qlogEvent: Array<qlogschema.EventField>,
+    ) {
+        qlogEvent.push(qlogschema.EventCategory.http);
+
+        if (event_type.indexOf('SENT') >= 0) {
+            qlogEvent.push(qlogschema.HTTP3EventType.frame_created);
+        } else {
+            qlogEvent.push(qlogschema.HTTP3EventType.frame_parsed);
+        }
+
+        qlogEvent.push(frame);
+        this.qlogEvents.push(qlogEvent);
     }
 }
 
@@ -504,78 +522,130 @@ export default class NetlogToQlog {
                     break;
                 }
 
+                case 'HTTP3_PEER_CONTROL_STREAM_CREATED':
                 case 'HTTP3_LOCAL_CONTROL_STREAM_CREATED': {
                     const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+                    const owner: 'remote' | 'local' = ((): 'remote' | 'local' => {
+                        if (event_type.indexOf('PEER') >= 0) {
+                            return 'remote';
+                        } else {
+                            return 'local';
+                        }
+                    })();
+                    const frame: qlogschema.IEventH3StreamTypeSet = {
+                        stream_id: event_params.stream_id.toString(),
+                        owner,
+                        new: qlogschema.H3StreamType.control,
+                    }
+                    qlogEvent.push(qlogschema.EventCategory.http);
+                    qlogEvent.push(qlogschema.HTTP3EventType.stream_type_set);
+                    qlogEvent.push(frame);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
+                case 'HTTP3_PEER_QPACK_DECODER_STREAM_CREATED':
                 case 'HTTP3_LOCAL_QPACK_DECODER_STREAM_CREATED': {
                     const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
-
+                    const owner: 'remote' | 'local' = ((): 'remote' | 'local' => {
+                        if (event_type.indexOf('PEER') >= 0) {
+                            return 'remote';
+                        } else {
+                            return 'local';
+                        }
+                    })();
+                    const frame: qlogschema.IEventH3StreamTypeSet = {
+                        stream_id: event_params.stream_id.toString(),
+                        owner,
+                        new: qlogschema.H3StreamType.qpack_decode,
+                    }
+                    qlogEvent.push(qlogschema.EventCategory.http);
+                    qlogEvent.push(qlogschema.HTTP3EventType.stream_type_set);
+                    qlogEvent.push(frame);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
+                case 'HTTP3_PEER_QPACK_ENCODER_STREAM_CREATED':
                 case 'HTTP3_LOCAL_QPACK_ENCODER_STREAM_CREATED': {
                     const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
+                    const owner: 'remote' | 'local' = ((): 'remote' | 'local' => {
+                        if (event_type.indexOf('PEER') >= 0) {
+                            return 'remote';
+                        } else {
+                            return 'local';
+                        }
+                    })();
+                    const frame: qlogschema.IEventH3StreamTypeSet = {
+                        stream_id: event_params.stream_id.toString(),
+                        owner,
+                        new: qlogschema.H3StreamType.qpack_encode,
+                    }
+                    qlogEvent.push(qlogschema.EventCategory.http);
+                    qlogEvent.push(qlogschema.HTTP3EventType.stream_type_set);
+                    qlogEvent.push(frame);
+                    connection.qlogEvents.push(qlogEvent);
+                    break;
 
                     break;
                 }
 
-                case 'HTTP3_PEER_CONTROL_STREAM_CREATED': {
-                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
-
-                    break;
-                }
-
-                case 'HTTP3_PEER_QPACK_ENCODER_STREAM_CREATED': {
-                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
-
-                    break;
-                }
-
-                case 'HTTP3_PEER_QPACK_DECODER_STREAM_CREATED': {
-                    const event_params: netlogschema.HTTP3_STREAM_CREATED = params;
-
-                    break;
-                }
-
+                case 'HTTP3_SETTINGS_RECEIVED':
                 case 'HTTP3_SETTINGS_SENT': {
+                    const event_params: netlogschema.HTTP3_SETTINGS = params;
+                    const owner: 'remote' | 'local' = ((): 'remote' | 'local' => {
+                        if (event_type.indexOf('SENT') >= 0) {
+                            return 'local';
+                        } else {
+                            return 'remote';
+                        }
+                    })();
+                    const frame: qlogschema.IEventH3ParametersSet = {
+                        owner,
+                        max_header_list_size: event_params.SETTINGS_MAX_HEADER_LIST_SIZE,
+                        max_table_capacity: event_params.SETTINGS_QPACK_MAX_TABLE_CAPACITY,
+                        blocked_streams_count: event_params.SETTINGS_QPACK_BLOCKED_STREAMS,
+                    };
+                    qlogEvent.push(qlogschema.EventCategory.http);
+                    qlogEvent.push(qlogschema.HTTP3EventType.parameters_set);
+                    qlogEvent.push(frame);
+                    connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
+                case 'HTTP3_MAX_PUSH_ID_RECEIVED':
                 case 'HTTP3_MAX_PUSH_ID_SENT': {
-                    break;
-                }
-
-                case 'HTTP3_HEADERS_RECEIVED': {
+                    const event_params: netlogschema.HTTP3_MAX_PUSH_ID = params;
+                    const frame: qlogschema.IMaxPushIDFrame = {
+                        frame_type: qlogschema.HTTP3FrameTypeName.max_push_id,
+                        push_id: event_params.push_id.toString(),
+                    };
                     break;
                 }
 
                 case 'HTTP3_HEADERS_DECODED':
                 case 'HTTP3_HEADERS_SENT': {
+                    const event_params: netlogschema.HTTP3_HEADERS = params;
+                    const headers: Array<qlogschema.IHTTPHeader> = Object.entries(event_params.headers).map(([key, value]) => {
+                        return { name: key, value };
+                    });
+                    const frame: qlogschema.IEventH3FrameCreated = {
+                        stream_id: event_params.stream_id.toString(),
+                        frame: {
+                            frame_type: qlogschema.HTTP3FrameTypeName.headers,
+                            headers,
+                        },
+                    };
+                    connection.pushH3Frame(event_type, frame, qlogEvent)
                     break;
                 }
 
+                case 'HTTP3_PRIORITY_UPDATE_RECEIVED':
                 case 'HTTP3_PRIORITY_UPDATE_SENT': {
+                    const event_params: netlogschema.HTTP3_PRIORITY_UPDATE = params;
+                    // Not supported yet
                     break;
                 }
-
-                case 'HTTP3_SETTINGS_RECEIVED': {
-                    const event_params: netlogschema.HTTP3_SETTINGS = params;
-                    // qlogEvent.push(qlogschema.EventCategory.http);
-                    // qlogEvent.push(qlogschema.HTTP3EventType.datagram_received)
-                    // qlogEvent.push({
-                    //     stream_id: 'asfda',
-                    //     frame: {
-                    //         frame_type: qlogschema.HTTP3FrameTypeName.settings,
-                    //         settings: [],
-                    //     },
-                    // } as qlogschema.IEventH3FrameParsed);
-                    // connection.qlogEvents.push(qlogEvent);
-                    break;
-                }
-
-
 
                 case 'HTTP3_DATA_SENT': {
                     break;
@@ -583,32 +653,18 @@ export default class NetlogToQlog {
 
                 case 'HTTP3_DATA_FRAME_RECEIVED': {
                     const event_params: netlogschema.HTTP3_DATA_FRAME = params;
-                    qlogEvent.push(qlogschema.EventCategory.http);
-                    qlogEvent.push(qlogschema.HTTP3EventType.datagram_received)
-                    qlogEvent.push({
+                    const frame: qlogschema.IEventH3FrameParsed = {
                         stream_id: event_params.stream_id.toString(),
-                        byte_length: event_params.payload_length.toString(),
                         frame: {
                             frame_type: qlogschema.HTTP3FrameTypeName.data,
                         },
-                    } as qlogschema.IEventH3FrameParsed);
-                    connection.qlogEvents.push(qlogEvent);
+                        byte_length: event_params.payload_length.toString(),
+                    };
+                    connection.pushH3Frame(event_type, frame, qlogEvent);
                     break;
                 }
 
                 case 'HTTP3_UNKNOWN_FRAME_RECEIVED': {
-                    break;
-                }
-
-                case 'HTTP3_HEADERS_DECODED': {
-                    break;
-                }
-
-                case 'QUIC_CHROMIUM_CLIENT_STREAM_SEND_REQUEST_HEADERS': {
-                    break;
-                }
-
-                case 'QUIC_CHROMIUM_CLIENT_STREAM_READ_RESPONSE_HEADERS': {
                     break;
                 }
 
