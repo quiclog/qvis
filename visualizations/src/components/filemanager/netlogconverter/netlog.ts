@@ -149,13 +149,13 @@ export interface HTTP3_UNKNOWN_FRAME {
     stream_id: number
 }
 
+export interface HTTP3_HEADERS {
+    headers: Map<string, string>,
+    stream_id: number,
+}
+
 export interface HTTP3_SETTINGS {
     SETTINGS_MAX_HEADER_LIST_SIZE: number,
     SETTINGS_QPACK_BLOCKED_STREAMS: number,
     SETTINGS_QPACK_MAX_TABLE_CAPACITY: number,
-}
-
-export interface HTTP3_HEADERS {
-    headers: any,
-    stream_id: number,
 }
