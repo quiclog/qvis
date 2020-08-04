@@ -82,22 +82,59 @@ function invertMap(map: Map<string, number>): Map<number, string> {
 /** calculateAckRanges is used to generate ACK ranges given the largestObserved
  * packet number and an array of missing packets. See netlog example above.
  * 
+ * There are some problems with this though, since the netlog doesn't include when the acks actually start...
+ * So for example, if they would send/receive and ACK frame for 5-10, it would just say "largest_acknowledged: 10", which is exactly the same as for 1-10...
+ * 
+ * For example, this is the netlog entry for 1778-2055,2115 (note that 1778 is never mentioned) :
+ * QUIC_SESSION_ACK_FRAME_RECEIVED
+ *  --> delta_time_largest_observed_us = 128
+ *  --> largest_observed = 2115
+ *  --> missing_packets = [2056,2057,2058,2059,2060,2061,2062,2063,2064,2065,2066,2067,2068,2069,2070,2071,2072,2073,2074,2075,2076,2077,2078,2079,2080,2081,2082,2083,2084,2085,2086,2087,2088,2089,2090,2091,2092,2093,2094,2095,2096,2097,2098,2099,2100,2101,2102,2103,2104,2105,2106,2107,2108,2109,2110,2111,2112,2113,2114]
+ *  --> received_packet_times = []
+ * 
  * @param largestObserved 
  * @param missing_packets 
  */
 function calculateAckRanges(largestObserved: number, missing_packets: Array<number>): Array<[number, number]> {
     const result: Array<[number, number]> = new Array<[number, number]>();
 
-    let curr: number = 1;
-    for (const packetNum of missing_packets) {
-        if (curr !== packetNum) {
-            result.push([curr, packetNum - 1]);
-        }
-        curr = packetNum + 1;
-    }
-    result.push([curr, largestObserved]);
+    // so... we don't know the actual starting/lowest PN of the ACK
+    // however, we can assume it is at least the lowest missing PN - 1, so let's go with that. 
+    // algorithm:
+    // 1. sort the missing_packets
+    // 2. start from smallest-missing - 1
+    // 3. discover "acked" ranges in the sorted missing_packets (reverse logic of finding gaps: if the next missing isn't an increment of 1 to the current one, we have an "acked range" that we need to add to the result)
 
-    return result
+    if ( missing_packets.length === 0 ) {
+         // no missing packets, cannot assume anything but the largest has been ACKed. To do better, we'd have to track the largest from the previous ACK...
+         // That wouldn't be perfect, but better than this (now, most acks will seem to just ack a single packet, which makes little sense)  TODO FIXME
+        return [ [ largestObserved, largestObserved ] ];
+    }
+    else {
+        missing_packets.sort((a, b) => a - b ); // sort ascending in-place (this *should not* be needed, but hey, let's make sure, shall we)
+    
+        result.push([missing_packets[0] - 1, missing_packets[0] - 1]); // TODO: what if missing_packets' first entry is PN 0? is that even possible? 
+
+        let missingIndex:number = 0;
+
+        // example: largestObserved is 20, missing_packets is [6,7,8,11] -> should result in [5,5], [9,10] and [12,20] as a acked ranges
+        while ( missingIndex < missing_packets.length - 1 ) {
+            // as long as missing packets are consecutive, we keep continuing
+            // the moment there is a gap in the missing packets ( index + 1's value is not index's value + 1 ), we know we have an ack range
+            // in the example, this happens as soon as missingIndex is 2 (value 8), because the value at missingIndex 3 is 11
+            if ( missing_packets[ missingIndex + 1 ] !== missing_packets[ missingIndex ] + 1 ) {
+                const from = missing_packets[ missingIndex     ] + 1; // example: 9
+                const to   = missing_packets[ missingIndex + 1 ] - 1; // example: 10
+                result.push( [from, to] );
+            }   
+
+            missingIndex += 1;
+        }
+        
+        result.push( [missing_packets[missingIndex] + 1, largestObserved] ); // missingIndex is now at the end of the array, so that value + 1 to the largestObserved gives 12,20
+    
+        return result;
+    }
 }
 
 class QUICConnection {
@@ -173,6 +210,13 @@ export default class NetlogToQlog {
     public static convert(netlogJSON: netlogschema.Netlog): qlogschema.IQLog {
         console.log("NetlogToQlog: converting file with " + netlogJSON.events.length + " events");
 
+        // unit tests would be nice for this type of thing...
+        // console.error("Calculate ack ranges", calculateAckRanges( 2115, [2056,2057,2058,2059,2060,2061,2062,2063,2064,2065,2066,2067,2068,2069,2070,2071,2072,2073,2074,2075,2076,2077,2078,2079,2080,2081,2082,2083,2084,2085,2086,2087,2088,2089,2090,2091,2092,2093,2094,2095,2096,2097,2098,2099,2100,2101,2102,2103,2104,2105,2106,2107,2108,2109,2110,2111,2112,2113,2114] )); // should be [2055,2055],[2155,2155]
+        // console.error("Calculate ack ranges 2", calculateAckRanges(20, [6,7,8,11]) ); // should be [5,5],[9-10],[12-20]
+        // console.error("Calculate ack ranges 3", calculateAckRanges(20, [12]) ); // should be [11,11],[13-20]
+        // console.error("Calculate ack ranges 4", calculateAckRanges(20, []) ); // should be [20,20]
+        // console.error("Calculate ack ranges 5", calculateAckRanges(20, [5,7]) ); // should be [4,4],[6,6],[8,20]
+
         const constants: netlogschema.Constants = netlogJSON.constants;
         const events: Array<netlogschema.Event> = netlogJSON.events;
 
@@ -190,11 +234,13 @@ export default class NetlogToQlog {
             // source of event
             const source_type: string | undefined = source_types.get(event.source.type);
             if (source_type === undefined) {
+                console.error("netlog2qlog:convert : unknown source type!", event, source_type);
                 continue;
             }
 
             // Right now only support events part of a QUIC session
             if (source_type !== 'QUIC_SESSION') {
+                // console.error("netlog2qlog:convert : unsupported source type!", event, source_type);
                 continue;
             }
 
@@ -204,12 +250,14 @@ export default class NetlogToQlog {
             // event_type of event
             const event_type: string | undefined = event_types.get(event.type);
             if (event_type === undefined) {
+                console.error("netlog2qlog:convert : unknown event type!", event, event_type);
                 continue;
             }
 
             // phase of event
             const phase: string | undefined = phases.get(event.phase);
             if (phase === undefined) {
+                console.error("netlog2qlog:convert : unknown event phase!", event, phase);
                 continue;
             }
 
@@ -226,10 +274,12 @@ export default class NetlogToQlog {
             else {
                 // Only allow to create connection on type QUIC_SESSION
                 if (event_type !== 'QUIC_SESSION') {
+                    console.error("netlog2qlog:convert : source_type is QUIC_SESSION but first event_type is not, shouldn't happen!", event, event_type, source_type);
                     continue;
                 }
                 // Only allow to create connection if phase is begin
                 if (phase !== 'PHASE_BEGIN') {
+                    console.error("netlog2qlog:convert : could not create connection because phase is not PHASE_BEGIN", event, event_type, phase);
                     continue;
                 }
                 // Create new connection
@@ -239,6 +289,7 @@ export default class NetlogToQlog {
             }
 
             if (connection === undefined) {
+                console.error("netlog2qlog:convert : could not match event to connection", event, event_type, source_id);
                 continue;
             }
 
@@ -693,6 +744,7 @@ export default class NetlogToQlog {
 
                 default: {
                     // Netlog event types not yet covered
+                    console.warn("netlog2qlog:convert : unknown QUIC event, not supported yet!", event, event_type);
                     break;
                 }
             }
