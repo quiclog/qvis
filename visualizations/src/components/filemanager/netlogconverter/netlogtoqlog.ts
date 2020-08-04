@@ -109,7 +109,7 @@ class QUICConnection {
 
     public txQUICFrames: Array<qlogschema.QuicFrame>;
     public rxQUICFrames: Array<qlogschema.QuicFrame>;
-    public rxPacket: any | undefined;
+    public rxPacket: qlogschema.IEventPacket | undefined;
 
     constructor(
         session: netlogschema.QUIC_SESSION,
@@ -412,30 +412,14 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_PACKET_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_PACKET_RECEIVED = params;
-                    break;
-                }
-
-                case 'QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED': {
-                    const event_params: netlogschema.QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED = params;
-                    const packet_type: qlogschema.PacketType = ((): qlogschema.PacketType => {
-                        switch (event_params.long_header_type) {
-                            case netlogschema.LONG_HEADER_TYPE.handshake:
-                                return qlogschema.PacketType.handshake;
-                            case netlogschema.LONG_HEADER_TYPE.initial:
-                                return qlogschema.PacketType.initial;
-                            default:
-                                return qlogschema.PacketType.onertt;
-                        }
-                    })();
-
-
                     const packet: qlogschema.IEventPacket = {
-                        packet_type,
+                        packet_type: qlogschema.PacketType.unknown, // placeholder
                         header: {
-                            packet_number: event_params.packet_number.toString(),
+                            packet_number: '', // placeholder
+                            packet_size: event_params.size,
                         },
                         is_coalesced: false,
-                    };
+                    }
 
                     // Push placeholder qlogEvent into the trace
                     qlogEvent.push(qlogschema.EventCategory.transport);
@@ -461,6 +445,38 @@ export default class NetlogToQlog {
                     // Set rxPacket to current packet and reset rxQUICFrames
                     connection.rxPacket = packet;
                     connection.rxQUICFrames.length = 0;
+
+                    break;
+                }
+
+                case 'QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED = params;
+                    const packet_type: qlogschema.PacketType = ((): qlogschema.PacketType => {
+                        switch (event_params.long_header_type) {
+                            case netlogschema.LONG_HEADER_TYPE.handshake:
+                                return qlogschema.PacketType.handshake;
+                            case netlogschema.LONG_HEADER_TYPE.initial:
+                                return qlogschema.PacketType.initial;
+                            default:
+                                return qlogschema.PacketType.onertt;
+                        }
+                    })();
+
+                    // In case we encounter packet_header_received before packet_received
+                    // Caveat: Will not have packet length
+                    if (connection.rxPacket === undefined) {
+                        connection.rxPacket = {
+                            packet_type,
+                            header: {
+                                packet_number: event_params.packet_number.toString(),
+                            },
+                            is_coalesced: false,
+                        };
+                    }
+
+                    connection.rxPacket.packet_type = packet_type;
+                    connection.rxPacket.header.packet_number = event_params.packet_number.toString();
+
                     break;
                 }
 
@@ -495,6 +511,13 @@ export default class NetlogToQlog {
                 }
 
                 case 'QUIC_SESSION_BUFFERED_UNDECRYPTABLE_PACKET': {
+                    // const frame: qlogschema.IEventPacketBuffered = {
+                    //     packet_type: qlogschema.PacketType.onertt,
+                    // }
+                    // qlogEvent.push(qlogschema.EventCategory.transport);
+                    // qlogEvent.push(qlogschema.TransportEventType.packet_buffered);
+                    // qlogEvent.push(frame);
+                    // connection.qlogEvents.push(qlogEvent);
                     break;
                 }
 
