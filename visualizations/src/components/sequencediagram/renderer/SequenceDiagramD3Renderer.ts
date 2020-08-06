@@ -1975,6 +1975,29 @@ export class SequenceDiagramD3Renderer {
                 return pnSpaceString + " " + (evt.data.timer_type !== undefined ? ( "" + evt.data.timer_type).toUpperCase() + " " : " ") + "timer " + evt.data.event_type + timeString;
                 break;
 
+            case qlog.RecoveryEventType.packet_lost:
+                if ( evt.data !== undefined && evt.data.packet_number !== undefined ) {
+                    let packetType = "";
+                    if ( evt.data.packet_type !== undefined ) {
+                        packetType = this.packetTypeToString( evt.data.packet_type ) + " ";
+                    }
+
+                    return packetType + "packet lost #" + evt.data.packet_number;
+                }
+                else {
+                    return evt.name;
+                }
+                break;
+
+            case qlog.RecoveryEventType.congestion_state_updated:
+                if ( evt.data && evt.data.new !== undefined ) {
+                    return "Congestion state: " + ("" + evt.data.new).replace("_", " ");
+                }
+                else {
+                    return evt.name;
+                }
+                break;
+            
             case qlog.HTTP3EventType.frame_parsed:
             case qlog.HTTP3EventType.frame_created:
 
