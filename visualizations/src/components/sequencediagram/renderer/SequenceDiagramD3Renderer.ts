@@ -1615,7 +1615,7 @@ export class SequenceDiagramD3Renderer {
                         // extentContainer.appendChild( text );
 
                         let x = (currentX + (pixelsPerMillisecond / 2) + sideOffset);
-                        let width = ((this.bandWidth / 2) * 0.9);
+                        let width = ((this.bandWidth / 2) * 0.9) * 0.9; // without 0.9, was still too wide in some cases
                         let align = "left";
 
                         if ( i === 0 ){
@@ -1755,6 +1755,62 @@ export class SequenceDiagramD3Renderer {
                 return output;
                 break;
 
+            case qlog.QUICFrameTypeName.max_stream_data:
+                if ( frame.maximum && frame.stream_id ) {
+                    return "max data " + frame.maximum + " (stream " + frame.stream_id + ")";
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.max_stream_data;
+                }
+                break;
+            
+
+            case qlog.QUICFrameTypeName.max_data:
+                if ( frame.maximum ) {
+                    return "max data " + frame.maximum;
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.max_data;
+                }
+                break;
+
+
+            case qlog.QUICFrameTypeName.max_streams:
+                if ( frame.maximum && frame.stream_type ) {
+                    return "max " + frame.maximum + " " + frame.stream_type + " streams";
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.max_streams;
+                }
+                break;
+            
+            case qlog.QUICFrameTypeName.streams_blocked:
+                if ( frame.limit && frame.stream_type ) {
+                    return "blocked at " + frame.limit + " " + frame.stream_type + " streams";
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.streams_blocked;
+                }
+                break;
+            
+            case qlog.QUICFrameTypeName.stream_data_blocked:
+                if ( frame.limit && frame.stream_id ) {
+                    return "stream " + frame.stream_id + "blocked at " + frame.limit;
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.stream_data_blocked;
+                }
+                break;
+            
+            case qlog.QUICFrameTypeName.data_blocked:
+                if ( frame.limit ) {
+                    return "connection blocked at " + frame.limit;
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.data_blocked;
+                }
+                break;
+
             default:
                 return frame.frame_type;
                 break;
@@ -1790,6 +1846,15 @@ export class SequenceDiagramD3Renderer {
         else if ( evt.name === qlog.TransportEventType.datagrams_sent ||
                   evt.name === qlog.TransportEventType.datagrams_received ){
             return ["#FFFFFF", "#000000"];
+        }
+        else if ( evt.category === "error" ) {
+            return ["#FF0000", "#000000"];
+        }
+        else if ( evt.category === "warning" || evt.category === "simulation" ) {
+            return ["#FFA500", "#000000"]; // orange
+        }
+        else if ( evt.category === "debug" || evt.category === "info" || evt.category === "verbose" ) {
+            return ["#D3D3D3", "#000000"]; // lightgrey
         }
         
         return ["#FF0000", "#FFFFFF"];
@@ -1908,6 +1973,65 @@ export class SequenceDiagramD3Renderer {
                 }
 
                 return pnSpaceString + " " + (evt.data.timer_type !== undefined ? ( "" + evt.data.timer_type).toUpperCase() + " " : " ") + "timer " + evt.data.event_type + timeString;
+                break;
+
+            case qlog.HTTP3EventType.frame_parsed:
+            case qlog.HTTP3EventType.frame_created:
+
+                let streamID = "";
+                if ( evt.data.stream_id !== undefined) {
+                    streamID = " (stream " + evt.data.stream_id + ")";
+                }
+
+                // TRY to return something like   GET /index.html if possible
+                if ( evt.data && evt.data.frame && evt.data.frame.headers ) {
+                    let method = undefined;
+                    let path = undefined;
+                    for ( const header of evt.data.frame.headers ) {
+                        if ( header.name === ":method" || header.name === "method" ) {
+                            method = header.value;
+                        }
+                        else if ( header.name === ":path" || header.name === "path" ) {
+                            path = header.value;
+                        }
+                    }
+
+                    if ( method && path ) {
+                        return method + " " + path + streamID;
+                    }
+                }
+
+                let frameType = "";
+                if ( evt.data.frame && evt.data.frame.frame_type ) {
+                    frameType = evt.data.frame.frame_type + " ";
+                }
+
+                let verb = "parsed";
+                if ( evt.name ===  qlog.HTTP3EventType.frame_created ) {
+                    verb = "created";
+                }
+
+                return frameType + " " + verb + streamID;
+                break;
+
+
+            case "info":
+            case "debug":
+            case "warning":
+            case "error":
+            case "verbose":
+            case "connection_error":
+            case "internal_error":
+            case "application_error":
+            case "internal_warning":
+            case "marker":
+            case "message":
+                if ( evt.data === undefined || evt.data.message === undefined ) {
+                    return evt.name;
+                }
+
+                return evt.category + ": " + evt.data.message;
+
                 break;
 
             default:
