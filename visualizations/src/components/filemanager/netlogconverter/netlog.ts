@@ -3,6 +3,7 @@ import * as qlogschema from '@quictools/qlog-schema';
 export enum PacketType {
     initial = "ENCRYPTION_INITIAL",
     handshake = "ENCRYPTION_HANDSHAKE",
+    zerortt = "ENCRYPTION_ZERO_RTT",
     onertt = "ENCRYPTION_FORWARD_SECURE",
 }
 
@@ -109,6 +110,10 @@ export interface QUIC_SESSION_PACKET_RECEIVED {
 export enum LONG_HEADER_TYPE {
     initial = "INITIAL",
     handshake = "HANDSHAKE",
+    zerortt = "ZERO_RTT_PROTECTED",
+    version_negotiation = "VERSION_NEGOTIATION",
+    retry = "RETRY",
+    invalid = "INVALID_PACKET_TYPE",
 }
 
 export interface QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED {

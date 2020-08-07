@@ -428,10 +428,14 @@ export default class NetlogToQlog {
                                 return qlogschema.PacketType.handshake;
                             case netlogschema.PacketType.initial:
                                 return qlogschema.PacketType.initial;
+                            case netlogschema.PacketType.zerortt:
+                                return qlogschema.PacketType.zerortt;
                             case netlogschema.PacketType.onertt:
                                 return qlogschema.PacketType.onertt;
                             default:
-                                throw new Error(`could not process packet type: ${event_params.encryption_level}`);
+                                console.error("netlog2qlog:convert: unknown packet type sent", event_params.encryption_level);
+
+                                return qlogschema.PacketType.unknown;
                         }
                     })();
 
@@ -508,6 +512,14 @@ export default class NetlogToQlog {
                                 return qlogschema.PacketType.handshake;
                             case netlogschema.LONG_HEADER_TYPE.initial:
                                 return qlogschema.PacketType.initial;
+                            case netlogschema.LONG_HEADER_TYPE.zerortt:
+                                return qlogschema.PacketType.zerortt;
+                            case netlogschema.LONG_HEADER_TYPE.retry:
+                                return qlogschema.PacketType.retry;
+                            case netlogschema.LONG_HEADER_TYPE.version_negotiation:
+                                return qlogschema.PacketType.version_negotiation;
+                            case netlogschema.LONG_HEADER_TYPE.invalid:
+                                return qlogschema.PacketType.unknown; 
                             default:
                                 return qlogschema.PacketType.onertt;
                         }
