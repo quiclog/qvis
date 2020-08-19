@@ -751,6 +751,9 @@ export class EventFieldsParser implements IQlogEventParser {
         this.dataIndex      = eventFieldNames.indexOf( "data" );
 
 
+        if ( trace.configuration && trace.configuration.time_units && trace.configuration.time_units === "us" ){
+            this.timeMultiplier = 0.001; // timestamps are in microseconds, we want to view everything in milliseconds
+        }
 
         // We have two main time representations: relative or absolute
         // We want to convert between the two to give outside users their choice of both
@@ -789,7 +792,7 @@ export class EventFieldsParser implements IQlogEventParser {
                         // allow both a start time in commonFields.reference_time AND as the first event element
                         if ( trace.commonFields && trace.commonFields.reference_time !== undefined ){
                             this.addTime = 0;
-                            this.subtractTime = parseFloat(trace.commonFields.reference_time);
+                            this.subtractTime = this.parseReferenceTime( trace.commonFields.reference_time, this.timeMultiplier );
                             allEvents[0][this.timeIndex] += this.subtractTime; // so we can start from event 1 below
                             // note: it's not just = this.subtractTime: the ref_time could be set when the process starts and stay the same for many connections that start later 
                             // put differently: first timestamp isn't always 0
@@ -816,7 +819,7 @@ export class EventFieldsParser implements IQlogEventParser {
                 this.timeTrackingMethod = TimeTrackingMethod.RELATIVE_TIME;
 
                 if ( trace.commonFields && trace.commonFields.reference_time !== undefined ){
-                    this.addTime = parseFloat(trace.commonFields.reference_time);
+                    this.addTime = this.parseReferenceTime( trace.commonFields.reference_time, this.timeMultiplier );
                     this.subtractTime = 0;
                 }
                 else {
@@ -831,10 +834,6 @@ export class EventFieldsParser implements IQlogEventParser {
             this.timeTrackingMethod = TimeTrackingMethod.ABSOLUTE_TIME;
             this.addTime = 0;
             this.subtractTime = parseFloat( trace.getEvents()[0][this.timeIndex] );
-        }
-
-        if ( trace.configuration && trace.configuration.time_units && trace.configuration.time_units === "us" ){
-            this.timeMultiplier = 0.001; // timestamps are in microseconds, we want to view everything in milliseconds
         }
 
         if ( trace.configuration && trace.configuration.time_offset ){
@@ -854,6 +853,30 @@ export class EventFieldsParser implements IQlogEventParser {
         this.currentEvent = evt;
 
         return this;
+    }
+
+    protected parseReferenceTime(refTimeIn:string, multiplier:number) : number {
+        // normally, we expect reference time to be in milliseconds or microseconds since the unix epoch
+        // in this case, parseFloat() gives us the value we need and we later adjust it to milliseconds
+        // however, we also want to support time strings like "2020-08-16T20:53:56.582164977+00:00"
+        // for this, we can use Date.parse and hope things go right.
+
+        if ( typeof refTimeIn === "string" && 
+             (  
+                refTimeIn.indexOf(":") >= 0 ||
+                refTimeIn.indexOf("-") >= 0 
+             ) ) {
+                // we assume we have a timestring, let's try
+                console.warn("QlogLoader:parseReferenceTime: We think reference_time is not in 'milliseconds since epoch' as a number, but rather as a time string. That is not really supported, though we'll try to parse it here!", refTimeIn);
+                
+                if ( multiplier === 1 ) { // Date.parse is always in ms accuracy
+                    return Date.parse( refTimeIn );
+                } else {
+                    return Date.parse( refTimeIn ) * 1000; // only other option is us, so need to do ms * 1000 to get that (small loss of accuracy here)
+                }
+        }
+
+        return parseFloat( refTimeIn );
     }
 }
 
