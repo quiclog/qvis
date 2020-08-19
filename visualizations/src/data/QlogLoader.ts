@@ -256,9 +256,11 @@ export class QlogLoader {
                     if ( data && data.type ){
                         needsUpgrade = true;
                         data.packet_type = data.type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
+                        data.packet_type = data.packet_type.replace("rtt","RTT");
                     }
                     else if ( data && data.packet_type ){
                         data.type = data.packet_type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
+                        data.packet_type = data.type.replace("rtt","RTT");
                     }
                 }
 
@@ -549,6 +551,7 @@ export class QlogLoader {
                     
                     if ( data.packet_type ){
                         data.packet_type = data.packet_type.toLowerCase();
+                        data.packet_type = data.packet_type.replace("rtt","RTT");
                         data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                     }
 
