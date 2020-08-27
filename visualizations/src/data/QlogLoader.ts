@@ -7,6 +7,7 @@ import { QUtil } from '@quictools/qlog-schema/util';
 import QlogConnection from '@/data/Connection';
 import { IQlogEventParser, IQlogRawEvent, TimeTrackingMethod } from '@/data/QlogEventParser';
 
+import { QlogLoaderV2 } from "./QlogLoaderV2";
 
 export class QlogLoader {
 
@@ -25,6 +26,9 @@ export class QlogLoader {
             }
             else if ( version === "draft-02-wip" ){
                 return QlogLoader.fromDraft02(json);
+            }
+            else if ( version === "draft-02-RC1" || version === "draft-02" ) {
+                return QlogLoaderV2.fromJSON( json );
             }
             else {
                 console.error("QlogLoader: Unknown qlog version! Only draft-00, draft-01 and draft-02-wip are supported!", version, json);

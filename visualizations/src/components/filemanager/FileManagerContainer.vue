@@ -175,10 +175,11 @@
 <script lang="ts">
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue } from "vue-property-decorator";
-
     import ConnectionStore from "@/store/ConnectionStore";
+
     import TCPToQLOG from "./pcapconverter/tcptoqlog";
     import NetlogToQLOG from "./netlogconverter/netlogtoqlog";
+    import FileLoader, { FileResult } from "./data/FileLoader";
 
     import StreamingJSONParser from "./utils/StreamingJSONParser";
 
@@ -238,7 +239,7 @@
 
             for ( const file of this.filesToUpload ){
 
-                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog")) {
+                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog") && !file.name.endsWith(".qlognd")) {
                     Vue.notify({
                         group: "default",
                         title: "Provide .qlog file",
@@ -260,52 +261,161 @@
                     text: "Loading uploaded file " + uploadFileName + ".<br/>The file is not sent to a server.",
                 });
 
-                const reader = new FileReader();
+                // const reader = new FileReader();
 
-                reader.onload = (evt) => {
-                    try{
+                // reader.onload = (evt) => {
+                //     try{
 
-                        if ( file.name.endsWith(".qlog") ) {
-                            const contentsJSON = StreamingJSONParser.parseQlogText( (evt!.target as any).result );
-                            this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, fileInfo:{ filename: uploadFileName }});
-                        }
-                        else if ( file.name.endsWith(".json") ) {
-                            const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
+                //         if ( file.name.endsWith(".qlog") ) {
+                //             const contentsJSON = StreamingJSONParser.parseQlogText( (evt!.target as any).result );
+                //             this.store.addGroupFromQlogFile({fileContentsJSON: contentsJSON, fileInfo:{ filename: uploadFileName }});
+                //         }
+                //         else if ( file.name.endsWith(".json") ) {
+                //             const contentsJSON = StreamingJSONParser.parseJSONWithDeduplication( (evt!.target as any).result );
 
-                            const qlogJSON = TCPToQLOG.convert( contentsJSON );
-                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
-                        } 
-                        else if (file.name.endsWith(".netlog")) {
-                            const contentsJSON = JSON.parse( (evt!.target as any).result );
+                //             const qlogJSON = TCPToQLOG.convert( contentsJSON );
+                //             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
+                //         } 
+                //         else if (file.name.endsWith(".netlog")) {
+                //             const contentsJSON = JSON.parse( (evt!.target as any).result );
                             
-                            const qlogJSON = NetlogToQLOG.convert( contentsJSON );
-                            this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
-                        }
-                        else { 
-                            throw new Error("unsupported file format : " + uploadFileName);
-                        }
+                //             const qlogJSON = NetlogToQLOG.convert( contentsJSON );
+                //             this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
+                //         }
+                //         else if (file.name.endsWith(".qlognd")) {
+                //             // const contentsJSON = JSON.parse( (evt!.target as any).result );
+                            
+                //             // const qlogJSON = NetlogToQLOG.convert( contentsJSON );
+                //             // this.store.addGroupFromQlogFile({fileContentsJSON: qlogJSON, fileInfo:{ filename: uploadFileName }});
+                //             let countedEvents = 0;
+                //             let events:any = [];
+                            
 
-                        Vue.notify({
-                            group: "default",
-                            title: "Uploaded file",
-                            type: "success",
-                            text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
-                        });
-                    }
-                    catch (e){
+                //             // const fileContents = new Response( (evt!.target as any).result );
+
+                //             // ndjsonStream( fileContents ).then ( (jsonStream:any) => {
+
+                //             // console.log( file );
+                //             // console.log( Object.keys(file) );
+
+                //             // ref: https://stackoverflow.com/questions/14438187/javascript-filereader-parsing-long-file-in-chunks
+                //             // let blob = new Blob([(evt!.target as any).result]);
+                //             // let resp = new Response(blob).body;
+                //             let resp = new Response(file).body;
+
+
+                //             let countTheStuff:any = () => {
+                //                 countedEvents++;
+                //             };
+
+                //             let jsonStream = ndjsonStream( resp );
+                //             console.log("NDSTREAM ", jsonStream);
+
+                //             // ndstream.then ( (jsonStream:any) => {
+                //                 const streamReader = jsonStream.getReader(); 
+                //                 let read:any = undefined;
+
+                //                 streamReader.read().then( read = ( result:any ) => {
+                //                     if ( result.done ) {
+                //                         let endTime = performance.now();
+                //                         console.log("NDJSON ALL DONE!", endTime - startTime, countedEvents, events.length);
+                //                         return;
+                //                     }
+
+                //                     countTheStuff();
+                //                     console.log( result.value.length, result.value );
+
+                //                     streamReader.read().then( read );
+                //                 } );
+                //             // });
+
+                //             // const input = Readable.from( [(evt!.target as any).result] );
+
+                //             // robin: need to switch to something that uses JS streams isntead of NodeJS streams because this ecosystem sucks
+                //             // this seems to have potential: https://canjs.com/doc/can-ndjson-stream.html
+
+                //             // let self = this;
+
+                //             // input.on("end", function() {
+                //             //     self.store.addGroupFromQlogFile({fileContentsJSON: {}, fileInfo:{ filename: uploadFileName }});
+
+                //             //     console.log("Total events read: ", countedEvents, events.length );
+                //             // });
+                            
+                //             // input.on("error", function(e:any) { 
+                //             //     console.error("qlogFullToQlogND:validate : error during reading filecontents!", e);
+                //             //     // resolver();
+                //             // });
+                            
+                //             // input.pipe(ndjson.parse())
+                //             // .on('data', function(obj:any) {
+                //             //     ++countedEvents;
+                //             //     // console.log( "COUNTED", countedEvents, obj );
+
+                //             //     events.push( obj );
+                //             // })
+
+                //         }
+                //         else { 
+                //             throw new Error("unsupported file format : " + uploadFileName);
+                //         }
+
+                //         Vue.notify({
+                //             group: "default",
+                //             title: "Uploaded file",
+                //             type: "success",
+                //             text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
+                //         });
+                //     }
+                //     catch (e){
                         
-                        console.error("FileManagerContainer:uploadFile : ", e);
-                        Vue.notify({
-                            group: "default",
-                            title: "Error uploading file",
-                            type: "error",
-                            duration: 6000,
-                            text: "Something went wrong. " + uploadFileName + ". For more information, view the devtools console.",
-                        });
-                    }
-                };
-                
-                reader.readAsText(file);
+                //         console.error("FileManagerContainer:uploadFile : ", e);
+                //         Vue.notify({
+                //             group: "default",
+                //             title: "Error uploading file",
+                //             type: "error",
+                //             duration: 6000,
+                //             text: "Something went wrong. " + uploadFileName + ". For more information, view the devtools console.",
+                //         });
+                //     }
+                // };
+
+                // let identifier = new FileReader();
+
+                // let firstFewBytes = file.slice(0, 1024); // first 1000 bytes should contain qlog_version
+
+                // identifier.onload = (evt) => { 
+                //     let firstFewCharacters = (evt!.target as any).result;
+
+                //     console.log("FIRST FEW CHARACTERS ARE: ", firstFewCharacters, firstFewCharacters.indexOf("qlog_version") >= 0 ); 
+
+                //     reader.readAsText(file);
+                // };
+
+                // identifier.readAsText(firstFewBytes);
+
+                FileLoader.Load( file, file.name ).then( (result:FileResult) => {
+                    
+                    this.store.addGroupFromQlogFile({fileContentsJSON: result.qlogJSON, fileInfo:{ filename: uploadFileName }});
+
+                    Vue.notify({
+                        group: "default",
+                        title: "Uploaded file",
+                        type: "success",
+                        text: "The uploaded file is now available for visualization " + uploadFileName + ".<br/>Use the menu above to switch views.",
+                    });
+                })
+                .catch( (reason:any) => {
+                    console.error("FileManagerContainer:uploadFile : ", reason);
+
+                    Vue.notify({
+                        group: "default",
+                        title: "Error uploading file",
+                        type: "error",
+                        duration: 6000,
+                        text: "Something went wrong. " + uploadFileName + ". For more information, view the devtools console.",
+                    });
+                });
             }
 
 

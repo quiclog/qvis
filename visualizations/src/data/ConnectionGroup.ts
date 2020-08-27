@@ -6,6 +6,8 @@ import QlogConnection from "@/data/Connection"
 export default class QlogConnectionGroup {
     
     public version:string;
+    public format:string;
+
     public filename:string;
     public title:string;
     public description:string;
@@ -20,6 +22,7 @@ export default class QlogConnectionGroup {
     public constructor() {
         this.connections = new Array<QlogConnection>();
         this.version = "";
+        this.format = "JSON";
         this.filename = "";
         this.URL = "";
         this.URLshort = "";
