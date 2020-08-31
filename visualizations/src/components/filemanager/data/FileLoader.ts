@@ -215,6 +215,11 @@ export default class FileLoader {
         else if ( firstFewCharacters.indexOf("_source") >= 0 && firstFewCharacters.indexOf("layers") >= 0 ) {
             return FileType.pcap_json;
         }
+        // old style qlog files sometimes do not have qlog_version on top, be backwards compatible
+        else if ( firstFewCharacters.indexOf("traces") >= 0         || firstFewCharacters.indexOf("event_fields") >= 0 || 
+                  firstFewCharacters.indexOf("vantage_point") >= 0  || firstFewCharacters.indexOf("common_fields") >= 0 ) {
+            return FileType.qlog_normal;
+        }
 
         return FileType.unsupported;
     }
