@@ -848,9 +848,11 @@ export class EventFieldsParser implements IQlogEventParser {
         this.subtractTime   *= this.timeMultiplier;
     }
 
-    public setReferenceTime( time:number ) : void {
-        this.addTime = time;
-        this.addTime *= this.timeMultiplier;
+    public setReferenceTime( time_ms:number ) : void {
+        this.addTime = time_ms;
+        // incoming time MUST BE IN MILLISECONDS for this to work!
+        // as such, the next line isn't needed (and was removed because it led to bugs)
+        // this.addTime *= this.timeMultiplier;
     }
 
     public load( evt:IQlogRawEvent ) : IQlogEventParser {

@@ -649,7 +649,7 @@ export class SequenceDiagramD3Renderer {
         if ( latencyOneWay === Number.MIN_SAFE_INTEGER ){
 
             smoothedBackup = 0;
-            const serverMetricUpdates = clientConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
+            const serverMetricUpdates = serverConnection.connection.lookup( qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated );
             for ( const evt of serverMetricUpdates ){ 
                 const update = serverConnection.connection.parseEvent(evt).data as qlog.IEventMetricsUpdated;
                 if ( update.latest_rtt ){
