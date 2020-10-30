@@ -272,6 +272,14 @@ export default class NetlogToQlog {
             }
             // Connection doesn't exist 
             else {
+                
+                if ( event_type !== "QUIC_SESSION" ) {
+                    console.warn("netlogtoqlog:convert : new connection found, but first event was not QUIC_SESSION! Not sure this will work...", event, event_type, source_type, connectionMap);
+                }
+                if ( phase !== "PHASE_BEGIN" ) {
+                    console.warn("netlogtoqlog:convert : connection starting in phase other than PHASE_BEGIN! Not sure this will work...", event, event_type, phase);
+                }
+
                 // Create new connection
                 const session: netlogschema.QUIC_SESSION = params;
                 connection = new QUICConnection(session, source_id, +event.time)
@@ -868,6 +876,9 @@ export default class NetlogToQlog {
                     common_fields: { protocol_type: "QUIC_HTTP3", reference_time: conn.startTime.toString() },
                     events: conn.qlogEvents,
                 });
+            }
+            else {
+                console.warn("netlogtoqlog:convert : QUIC connection found but not events logged for this one for some reason... netlog sometimes has QUIC_SESSION_CLOSED events due to timeouts and those are not linked to the real original connection at this time, which is the likely source of this warning.", conn);
             }
         });
 
