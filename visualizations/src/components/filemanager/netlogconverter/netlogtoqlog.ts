@@ -272,16 +272,6 @@ export default class NetlogToQlog {
             }
             // Connection doesn't exist 
             else {
-                // Only allow to create connection on type QUIC_SESSION
-                if (event_type !== 'QUIC_SESSION') {
-                    console.error("netlog2qlog:convert : source_type is QUIC_SESSION but first event_type is not, shouldn't happen!", event, event_type, source_type);
-                    continue;
-                }
-                // Only allow to create connection if phase is begin
-                if (phase !== 'PHASE_BEGIN') {
-                    console.error("netlog2qlog:convert : could not create connection because phase is not PHASE_BEGIN", event, event_type, phase);
-                    continue;
-                }
                 // Create new connection
                 const session: netlogschema.QUIC_SESSION = params;
                 connection = new QUICConnection(session, source_id, +event.time)
@@ -302,6 +292,18 @@ export default class NetlogToQlog {
 
             switch (event_type) {
                 case 'QUIC_SESSION': {
+                    const event_params: netlogschema.QUIC_SESSION = params;
+                    // const data: qlogschema.IEventConnectionStarted = {
+                    //     ip_version: string;
+                    //     src_ip: string;
+                    //     dst_ip: string;
+                    //     protocol?: string;
+                    //     src_port: number;
+                    //     dst_port: number;
+                    //     quic_version?: string;
+                    //     src_cid?: string;
+                    //     dst_cid?: string;
+                    // };
                     continue;
                 }
 
@@ -404,6 +406,38 @@ export default class NetlogToQlog {
                         };
                         connection.pushFrame(event_type, frame);
                     }
+                    break;
+                }
+
+                case 'QUIC_SESSION_RST_STREAM_FRAME_SENT':
+                case 'QUIC_SESSION_RST_STREAM_FRAME_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_RST_STREAM_FRAME = params;
+                    const frame: qlogschema.IResetStreamFrame = {
+                        frame_type: qlogschema.QUICFrameTypeName.reset_stream,
+                        stream_id: event_params.stream_id.toString(),
+                        error_code: event_params.quic_rst_stream_error,
+                        final_size: event_params.offset.toString(),
+                    };
+                    connection.pushFrame(event_type, frame);
+                    break;
+                }
+
+                case 'QUIC_SESSION_STOP_SENDING_FRAME_SENT':
+                case 'QUIC_SESSION_STOP_SENDING_FRAME_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_STOP_SENDING_FRAME = params;
+                    const frame: qlogschema.IStopSendingFrame = {
+                        frame_type: qlogschema.QUICFrameTypeName.stop_sending,
+                        stream_id: event_params.stream_id.toString(),
+                        error_code: event_params.application_error_code,
+                    };
+                    connection.pushFrame(event_type, frame);
+                    break;
+                }
+
+                case 'QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE_SENT':
+                case 'QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE = params;
+                    // Don't know what qlogschema frame to use here
                     break;
                 }
 
@@ -519,7 +553,7 @@ export default class NetlogToQlog {
                             case netlogschema.LONG_HEADER_TYPE.version_negotiation:
                                 return qlogschema.PacketType.version_negotiation;
                             case netlogschema.LONG_HEADER_TYPE.invalid:
-                                return qlogschema.PacketType.unknown; 
+                                return qlogschema.PacketType.unknown;
                             default:
                                 return qlogschema.PacketType.onertt;
                         }
@@ -564,6 +598,25 @@ export default class NetlogToQlog {
                     break;
                 }
 
+                case 'QUIC_SESSION_PACKET_LOST': {
+                    const event_params: netlogschema.QUIC_SESSION_PACKET_LOST = params;
+                    const packet_type: qlogschema.PacketType = (() => {
+                        switch (event_params.transmission_type) {
+                            default:
+                                return qlogschema.PacketType.unknown;
+                        }
+                    })();
+                    const packet: qlogschema.IEventPacketLost = {
+                        packet_type,
+                        packet_number: event_params.packet_number.toString(),
+                    }
+                    qlogEvent.push(qlogschema.EventCategory.recovery);
+                    qlogEvent.push(qlogschema.RecoveryEventType.packet_lost);
+                    qlogEvent.push(packet);
+                    connection.qlogEvents.push(qlogEvent);
+                    break;
+                }
+
                 case 'QUIC_SESSION_CLOSED': {
                     const event_params: netlogschema.QUIC_SESSION_CLOSED = params;
                     break;
@@ -581,6 +634,31 @@ export default class NetlogToQlog {
                     // qlogEvent.push(qlogschema.TransportEventType.packet_buffered);
                     // qlogEvent.push(frame);
                     // connection.qlogEvents.push(qlogEvent);
+                    break;
+                }
+
+                case 'QUIC_SESSION_DROPPED_UNDECRYPTABLE_PACKET': {
+                    const event_params: netlogschema.QUIC_SESSION_DROPPED_UNDECRYPTABLE_PACKET = params;
+                    const packet_type : qlogschema.PacketType = (() => {
+                        switch (event_params.encryption_level) {
+                            case "ENCRYPTION_HANDSHAKE":
+                                return qlogschema.PacketType.handshake;                        
+                            default:
+                                return qlogschema.PacketType.unknown;
+                        }
+                    })();
+                    const frame: qlogschema.IEventPacketDropped = {
+                        packet_type,
+                    }
+                    qlogEvent.push(qlogschema.EventCategory.transport);
+                    qlogEvent.push(qlogschema.TransportEventType.packet_dropped);
+                    qlogEvent.push(frame);
+                    connection.qlogEvents.push(qlogEvent);
+                    break;
+                }
+
+                case 'QUIC_CHROMIUM_CLIENT_STREAM_SEND_REQUEST_HEADERS':
+                case 'QUIC_CHROMIUM_CLIENT_STREAM_READ_RESPONSE_HEADERS': {
                     break;
                 }
 
@@ -671,7 +749,6 @@ export default class NetlogToQlog {
                     qlogEvent.push(qlogschema.HTTP3EventType.stream_type_set);
                     qlogEvent.push(frame);
                     connection.qlogEvents.push(qlogEvent);
-                    break;
 
                     break;
                 }
@@ -754,6 +831,24 @@ export default class NetlogToQlog {
                     break;
                 }
 
+                case 'HTTP3_HEADERS_RECEIVED': {
+                    // Not in use
+                    break;
+                }
+
+                case 'CERT_VERIFIER_REQUEST': {
+                    qlogEvent.push(qlogschema.EventCategory.info);
+                    qlogEvent.push(qlogschema.GenericEventType.marker);
+
+                    if (phase === 'PHASE_BEGIN') {
+                        qlogEvent.push('CERT_VERIFIER_REQUEST BEGIN')
+                    } else {
+                        qlogEvent.push('CERT_VERIFIER_REQUEST END')
+                    }
+                    connection.qlogEvents.push(qlogEvent);
+                    break;
+                }
+
                 default: {
                     // Netlog event types not yet covered
                     console.warn("netlog2qlog:convert : unknown QUIC event, not supported yet!", event, event_type);
@@ -765,13 +860,15 @@ export default class NetlogToQlog {
         const qlogs: Array<qlogschema.ITrace> = new Array<qlogschema.ITrace>();
 
         connectionMap.forEach((conn: QUICConnection, key: number) => {
-            qlogs.push({
-                title: conn.title,
-                vantage_point: { type: qlogschema.VantagePointType.client },
-                event_fields: ["relative_time", "category", "event", "data"],
-                common_fields: { protocol_type: "QUIC_HTTP3", reference_time: conn.startTime.toString() },
-                events: conn.qlogEvents,
-            })
+            if (conn.qlogEvents.length > 0) {
+                qlogs.push({
+                    title: conn.title,
+                    vantage_point: { type: qlogschema.VantagePointType.client },
+                    event_fields: ["relative_time", "category", "event", "data"],
+                    common_fields: { protocol_type: "QUIC_HTTP3", reference_time: conn.startTime.toString() },
+                    events: conn.qlogEvents,
+                });
+            }
         });
 
         const qlogFile: qlogschema.IQLog = {
