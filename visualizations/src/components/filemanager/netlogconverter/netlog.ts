@@ -34,14 +34,14 @@ export interface EventSource {
 }
 
 export interface QUIC_SESSION {
-    cert_verify_flags: number,
-    connection_id: string,
+    cert_verify_flags?: number,
+    connection_id?: string,
     host: string,
-    network_isolation_key: string,
-    port: number,
-    privacy_mode: string,
-    require_confirmation: boolean,
-    versions: string,
+    network_isolation_key?: string,
+    port?: number,
+    privacy_mode?: string,
+    require_confirmation?: boolean,
+    versions?: string,
 }
 
 export interface QUIC_SESSION_PACKET_SENT {
@@ -84,6 +84,17 @@ export interface QUIC_SESSION_ACK_FRAME {
     received_packet_times: Array<any>
 }
 
+export interface QUIC_SESSION_RST_STREAM_FRAME {
+    offset: number,
+    quic_rst_stream_error: number,
+    stream_id: number
+}
+
+export interface QUIC_SESSION_STOP_SENDING_FRAME {
+    application_error_code: number,
+    stream_id: number
+}
+
 export interface QUIC_SESSION_STREAM_FRAME {
     fin: boolean,
     length: number,
@@ -96,6 +107,10 @@ export interface QUIC_SESSION_WINDOW_UPDATE_FRAME {
     stream_id: number
 }
 
+export interface QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE {
+    quic_crypto_handshake_message: string,
+}
+
 export interface QUIC_SESSION_CONNECTION_CLOSE_FRAME_SENT {
     details: string,
     quic_error: number
@@ -105,6 +120,12 @@ export interface QUIC_SESSION_PACKET_RECEIVED {
     peer_address: string,
     self_address: string,
     size: number
+}
+
+export interface QUIC_SESSION_PACKET_LOST {
+    detection_time_us: number,
+    packet_number: number,
+    transmission_type: string,
 }
 
 export enum LONG_HEADER_TYPE {
@@ -121,6 +142,10 @@ export interface QUIC_SESSION_UNAUTHENTICATED_PACKET_HEADER_RECEIVED {
     header_format: string,
     long_header_type?: LONG_HEADER_TYPE,
     packet_number: number
+}
+
+export interface QUIC_SESSION_DROPPED_UNDECRYPTABLE_PACKET {
+    encryption_level: string
 }
 
 export interface QUIC_SESSION_CLOSED {
