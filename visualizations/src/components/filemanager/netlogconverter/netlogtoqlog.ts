@@ -41,6 +41,7 @@ import * as netlogschema from './netlog';
             "params": {
                 "delta_time_largest_observed_us": 9688,
                 "largest_observed": 11,
+                "smallest_observed": 0,
                 "missing_packets": [
                     1,
                     3,
@@ -79,45 +80,33 @@ function invertMap(map: Map<string, number>): Map<number, string> {
     return result;
 };
 
-/** calculateAckRanges is used to generate ACK ranges given the largestObserved
+/** calculateAckRanges is used to generate ACK ranges given the largestObserved and smallestObserved
  * packet number and an array of missing packets. See netlog example above.
  * 
- * There are some problems with this though, since the netlog doesn't include when the acks actually start...
- * So for example, if they would send/receive and ACK frame for 5-10, it would just say "largest_acknowledged: 10", which is exactly the same as for 1-10...
- * 
- * For example, this is the netlog entry for 1778-2055,2115 (note that 1778 is never mentioned) :
- * QUIC_SESSION_ACK_FRAME_RECEIVED
- *  --> delta_time_largest_observed_us = 128
- *  --> largest_observed = 2115
- *  --> missing_packets = [2056,2057,2058,2059,2060,2061,2062,2063,2064,2065,2066,2067,2068,2069,2070,2071,2072,2073,2074,2075,2076,2077,2078,2079,2080,2081,2082,2083,2084,2085,2086,2087,2088,2089,2090,2091,2092,2093,2094,2095,2096,2097,2098,2099,2100,2101,2102,2103,2104,2105,2106,2107,2108,2109,2110,2111,2112,2113,2114]
- *  --> received_packet_times = []
- * 
  * @param largestObserved 
+ * @param smallestObserved 
  * @param missing_packets 
  */
-function calculateAckRanges(largestObserved: number, missing_packets: Array<number>): Array<[number, number]> {
+function calculateAckRanges(largestObserved: number, smallestObserved: number, missing_packets: Array<number>): Array<[number, number]> {
     const result: Array<[number, number]> = new Array<[number, number]>();
 
-    // so... we don't know the actual starting/lowest PN of the ACK
-    // however, we can assume it is at least the lowest missing PN - 1, so let's go with that. 
-    // algorithm:
-    // 1. sort the missing_packets
-    // 2. start from smallest-missing - 1
-    // 3. discover "acked" ranges in the sorted missing_packets (reverse logic of finding gaps: if the next missing isn't an increment of 1 to the current one, we have an "acked range" that we need to add to the result)
-
     if ( missing_packets.length === 0 ) {
-         // no missing packets, cannot assume anything but the largest has been ACKed. To do better, we'd have to track the largest from the previous ACK...
-         // That wouldn't be perfect, but better than this (now, most acks will seem to just ack a single packet, which makes little sense)  TODO FIXME
-        return [ [ largestObserved, largestObserved ] ];
+         // no missing packets, everything between smallest and largest is acked
+        return [ [ smallestObserved, largestObserved ] ];
     }
     else {
         missing_packets.sort((a, b) => a - b ); // sort ascending in-place (this *should not* be needed, but hey, let's make sure, shall we)
     
-        result.push([missing_packets[0] - 1, missing_packets[0] - 1]); // TODO: what if missing_packets' first entry is PN 0? is that even possible? 
+        // You might wonder: what if missing_packets' first entry is PN 0? 
+        // Say you have an ACK frame that wishes to ACK packets 5-10, because 0-4 were lost
+        // then smallestObserved would be 5, missing_packets would be empty and largestObserved would be 10, so we wouldn't even get in this situation
+        // if we have an ACK frame of 0, 5-10 (so 1-4 are in missing_packets)
+        // we'd get [0,0] here, which is what we want
+        result.push([smallestObserved, missing_packets[0] - 1]); 
 
         let missingIndex:number = 0;
 
-        // example: largestObserved is 20, missing_packets is [6,7,8,11] -> should result in [5,5], [9,10] and [12,20] as a acked ranges
+        // example: largestObserved is 20, missing_packets is [6,7,8,11], smallestObserved is 3 -> should result in [3,5], [9,10] and [12,20] as a acked ranges
         while ( missingIndex < missing_packets.length - 1 ) {
             // as long as missing packets are consecutive, we keep continuing
             // the moment there is a gap in the missing packets ( index + 1's value is not index's value + 1 ), we know we have an ack range
@@ -211,11 +200,11 @@ export default class NetlogToQlog {
         console.log("NetlogToQlog: converting file with " + netlogJSON.events.length + " events");
 
         // unit tests would be nice for this type of thing...
-        // console.error("Calculate ack ranges", calculateAckRanges( 2115, [2056,2057,2058,2059,2060,2061,2062,2063,2064,2065,2066,2067,2068,2069,2070,2071,2072,2073,2074,2075,2076,2077,2078,2079,2080,2081,2082,2083,2084,2085,2086,2087,2088,2089,2090,2091,2092,2093,2094,2095,2096,2097,2098,2099,2100,2101,2102,2103,2104,2105,2106,2107,2108,2109,2110,2111,2112,2113,2114] )); // should be [2055,2055],[2155,2155]
-        // console.error("Calculate ack ranges 2", calculateAckRanges(20, [6,7,8,11]) ); // should be [5,5],[9-10],[12-20]
-        // console.error("Calculate ack ranges 3", calculateAckRanges(20, [12]) ); // should be [11,11],[13-20]
-        // console.error("Calculate ack ranges 4", calculateAckRanges(20, []) ); // should be [20,20]
-        // console.error("Calculate ack ranges 5", calculateAckRanges(20, [5,7]) ); // should be [4,4],[6,6],[8,20]
+        // console.error("Calculate ack ranges", calculateAckRanges( 2115, 2050, [2056,2057,2058,2059,2060,2061,2062,2063,2064,2065,2066,2067,2068,2069,2070,2071,2072,2073,2074,2075,2076,2077,2078,2079,2080,2081,2082,2083,2084,2085,2086,2087,2088,2089,2090,2091,2092,2093,2094,2095,2096,2097,2098,2099,2100,2101,2102,2103,2104,2105,2106,2107,2108,2109,2110,2111,2112,2113,2114] )); // should be [2050,2055],[2155,2155]
+        // console.error("Calculate ack ranges 2", calculateAckRanges(20, 3, [6,7,8,11]) ); // should be [3,5],[9-10],[12-20]
+        // console.error("Calculate ack ranges 3", calculateAckRanges(20, 11, [12]) ); // should be [11,11],[13-20]
+        // console.error("Calculate ack ranges 4", calculateAckRanges(20, 20, []) ); // should be [20,20]
+        // console.error("Calculate ack ranges 5", calculateAckRanges(20, 3, [5,7]) ); // should be [3,4],[6,6],[8,20]
 
         const constants: netlogschema.Constants = netlogJSON.constants;
         const events: Array<netlogschema.Event> = netlogJSON.events;
@@ -384,6 +373,7 @@ export default class NetlogToQlog {
                     const event_params: netlogschema.QUIC_SESSION_ACK_FRAME = params;
                     const acked_ranges: Array<[number, number]> = calculateAckRanges(
                         event_params.largest_observed,
+                        event_params.smallest_observed,
                         event_params.missing_packets,
                     );
                     // TODO: Use delta_time_largest_observed_us to calculate ack delay 

@@ -80,6 +80,7 @@ export interface QUIC_SESSION_CRYPTO_FRAME {
 export interface QUIC_SESSION_ACK_FRAME {
     delta_time_largest_observed_us: number,
     largest_observed: number,
+    smallest_observed: number, // see also: https://bugs.chromium.org/p/chromium/issues/detail?id=1112925
     missing_packets: Array<number>,
     received_packet_times: Array<any>
 }
