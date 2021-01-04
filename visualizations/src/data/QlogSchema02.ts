@@ -89,6 +89,15 @@ export type EventType = ConnectivityEventType | TransportEventType | SecurityEve
 // FIXME: TODO: add something for the DATA definitions!
 export type EventField = EventCategory | EventType | EventData | number | string; // number = for the time values, string = for unknown, user-specified fields
 
+export type quint64 = number | string;
+export type qbytes = string;
+
+export interface IRawInfo {
+    length?: quint64,
+    payload_length?: quint64,
+
+    data?: qbytes
+}
 
 // ================================================================== //
 // Based on QUIC draft 23
@@ -316,48 +325,42 @@ export interface IEventDatagramDropped {
 // (which are 100% the same at the time of writing)
 // so it's easier to handle both types of events in the same way (which is often needed)
 export interface IEventPacket {
-    packet_type: PacketType,
     header: IPacketHeader,
     frames?: Array<QuicFrame>,
 
     is_coalesced?:boolean,
 
-    raw_encrypted?: string,
-    raw_decrypted?: string,
+    raw?:IRawInfo
 }
 
 export interface IEventPacketReceived {
-    packet_type: PacketType,
     header: IPacketHeader,
     frames?: Array<QuicFrame>,
 
     is_coalesced?:boolean,
 
-    raw_encrypted?: string,
-    raw_decrypted?: string,
+    raw?:IRawInfo
 }
 
 export interface IEventPacketSent {
-    packet_type: PacketType,
     header: IPacketHeader,
     frames?: Array<QuicFrame>
 
     is_coalesced?:boolean,
 
-    raw_encrypted?: string,
-    raw_decrypted?: string,
+    raw?:IRawInfo
 }
 
 export interface IEventPacketDropped {
-    packet_type?:PacketType,
-    packet_size?:number,
+    header?:IPacketHeader,
 
-    raw?:string, // hex encoded
+    raw?:IRawInfo, // hex encoded
 }
 
 export interface IEventPacketBuffered {
-    packet_type: PacketType,
-    packet_number?: string
+    header: IPacketHeader,
+    
+    raw?:IRawInfo
 }
 
 export enum PacketType {
@@ -468,11 +471,8 @@ export interface IEventLossTimerExpired {
 }
 
 export interface IEventPacketLost {
-    packet_type:PacketType,
-    packet_number:string,
-
-    // not all implementations will keep track of full packets, so these are optional
     header?:IPacketHeader,
+
     frames?:Array<QuicFrame>, // see appendix for the definitions
 }
 
@@ -726,8 +726,9 @@ export enum QUICFrameTypeName {
 
 // TODO: potentially split in LongHeader and ShortHeader explicitly?
 export interface IPacketHeader {
+    packet_type: PacketType;
     packet_number: string;
-    packet_size?: number;
+    
     payload_length?: number;
 
     // only if present in the header
