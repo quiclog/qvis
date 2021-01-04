@@ -1,3 +1,4 @@
+import * as qlogschema from "@/data/QlogSchema";
 
 export enum EventCategory {
     tcp = "transport",
@@ -15,35 +16,46 @@ export enum TLSEventType {
     record_parsed = "record_parsed",
 }
 
+export type quint64 = number | string;
+export type qbytes = string;
+
+export interface IRawInfo {
+    length?: quint64,
+    payload_length?: quint64,
+
+    data?: qbytes
+}
+
 export enum HTTP2EventType {
     frame_created = "frame_created",
     frame_parsed = "frame_parsed",
 }
 
 export interface IEventPacketSent {
-    header: IPacketHeader,
-    raw?: string,
+    header: ITCPPacketHeader,
+    raw?: IRawInfo,
 
     details?: Array<IPacketDetail>,
 }
 
 export interface IEventPacketReceived{
-    header: IPacketHeader,
-    raw?: string,
+    header: ITCPPacketHeader,
+    raw?: IRawInfo,
 
     details?: Array<IPacketDetail>,
 
     // TODO: add : options?; Array<IPacketOptions>,
 }
 
-export interface IPacketHeader {
+export interface ITCPPacketHeader {
     sequence_number: number;
     packet_size?: number;
     payload_length?: number;
     header_length?:number;
 
-    // quic-compatibility
-    packet_number: number;
+    // QUIC qlogschema compatibility, not actually used here
+    packet_type: qlogschema.PacketType; // TCP can be considered as always QUIC's 1RTT equivalent. Need to keep parity with QUIC-based qlog atm
+    packet_number: qlogschema.quint64;
 }
 
 export type IPacketDetail = IPacketAcks | IPacketFlowControl;
@@ -91,6 +103,10 @@ export interface IRecordHeader {
     trailer_length?:number,
 
     DEBUG_wiresharkFrameNumber?:number,
+
+    // QUIC qlogschema compatibility, not actually used here
+    packet_type:qlogschema.PacketType, // QUIC qlog compat mode
+    packet_number:quint64, // QUIC qlog compat mode
 }
 
 

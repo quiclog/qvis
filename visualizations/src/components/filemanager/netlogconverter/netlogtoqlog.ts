@@ -479,12 +479,14 @@ export default class NetlogToQlog {
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.packet_sent);
                     qlogEvent.push({
-                        packet_type,
                         header: {
+                            packet_type,
                             packet_number: event_params.packet_number.toString(),
-                            packet_size: event_params.size,
                         },
                         frames,
+                        raw: {
+                            length: event_params.size,
+                        },
                     } as qlogschema.IEventPacket);
                     connection.qlogEvents.push(qlogEvent);
 
@@ -501,12 +503,14 @@ export default class NetlogToQlog {
                 case 'QUIC_SESSION_PACKET_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_PACKET_RECEIVED = params;
                     const packet: qlogschema.IEventPacket = {
-                        packet_type: qlogschema.PacketType.unknown, // placeholder
                         header: {
-                            packet_number: '', // placeholder
-                            packet_size: event_params.size,
+                            packet_type: qlogschema.PacketType.unknown, // placeholder, filled in below
+                            packet_number: '', // placeholder, filled in below
                         },
                         is_coalesced: false,
+                        raw: {
+                            length: event_params.size,
+                        },
                     }
 
                     // Push placeholder qlogEvent into the trace
@@ -562,15 +566,15 @@ export default class NetlogToQlog {
                     // Caveat: Will not have packet length
                     if (connection.rxPacket === undefined) {
                         connection.rxPacket = {
-                            packet_type,
                             header: {
+                                packet_type: packet_type,
                                 packet_number: event_params.packet_number.toString(),
                             },
                             is_coalesced: false,
                         };
                     }
 
-                    connection.rxPacket.packet_type = packet_type;
+                    connection.rxPacket.header.packet_type = packet_type;
                     connection.rxPacket.header.packet_number = event_params.packet_number.toString();
 
                     break;
@@ -606,8 +610,10 @@ export default class NetlogToQlog {
                         }
                     })();
                     const packet: qlogschema.IEventPacketLost = {
-                        packet_type,
-                        packet_number: event_params.packet_number.toString(),
+                        header: {
+                            packet_type,
+                            packet_number: event_params.packet_number.toString(),
+                        },
                     }
                     qlogEvent.push(qlogschema.EventCategory.recovery);
                     qlogEvent.push(qlogschema.RecoveryEventType.packet_lost);
@@ -647,7 +653,10 @@ export default class NetlogToQlog {
                         }
                     })();
                     const frame: qlogschema.IEventPacketDropped = {
-                        packet_type,
+                        header: {
+                            packet_type,
+                            packet_number: "", // not always known
+                        },
                     }
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.packet_dropped);

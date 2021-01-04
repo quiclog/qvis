@@ -478,8 +478,8 @@ export class SequenceDiagramD3Renderer {
                 const evt = originalTrace.parseEvent(rawEvt);
                 const data = evt.data as qlog.IEventPacket;
 
-                if ( data.packet_type === qlog.PacketType.initial && 
-                     data.header && ( "" + data.header.packet_number === "0" ) ) {
+                if ( data.header && data.header.packet_type === qlog.PacketType.initial && 
+                     ( "" + data.header.packet_number === "0" ) ) {
                         firstInitialSent = evt;
                         break;
                 }
@@ -489,8 +489,8 @@ export class SequenceDiagramD3Renderer {
                 const evt = originalTrace.parseEvent(rawEvt);
                 const data = evt.data as qlog.IEventPacket;
                 
-                if ( data.packet_type === qlog.PacketType.initial && 
-                     data.header &&  ( "" + data.header.packet_number === "0" ) ) {
+                if ( data.header && data.header.packet_type === qlog.PacketType.initial && 
+                     ( "" + data.header.packet_number === "0" ) ) {
                         firstInitialReceived = evt;
                         break;
                 }
@@ -684,8 +684,8 @@ export class SequenceDiagramD3Renderer {
         for ( const rawEvt of serverConnection.connection.getEvents() ) {
             const evt = serverConnection.connection.parseEvent( rawEvt );
 
-            if ( evt.name === qlog.TransportEventType.packet_received &&
-                evt.data.packet_type === qlog.PacketType.initial && evt.data.header && evt.data.header.packet_number !== undefined ) {
+            if ( evt.name === qlog.TransportEventType.packet_received && evt.data.header &&
+                evt.data.header.packet_type === qlog.PacketType.initial && evt.data.header.packet_number !== undefined ) {
                     serverInitialReceived = rawEvt;
 
                     firstInitialReceivedPN = "" + evt.data.header.packet_number; // e.g., if client inital 0 and 1 were lost, this should be 2
@@ -699,18 +699,17 @@ export class SequenceDiagramD3Renderer {
         for ( const rawEvt of clientConnection.connection.getEvents() ) {
             const evt = clientConnection.connection.parseEvent( rawEvt );
 
-            if ( evt.name === qlog.TransportEventType.packet_sent &&
-                    evt.data.packet_type === qlog.PacketType.initial && 
-                    evt.data.header && ( "" + evt.data.header.packet_number === firstInitialReceivedPN ) ) {
+            if ( evt.name === qlog.TransportEventType.packet_sent && evt.data.header &&
+                    evt.data.header.packet_type === qlog.PacketType.initial && 
+                    ( "" + evt.data.header.packet_number === firstInitialReceivedPN ) ) {
                     initialSent = rawEvt;
                     // continue;
             }
 
             // the server's initial could also be lost... but then we'd need to look for retransmits of that etc. which is above my level of enthousiasm at the moment
             // so: just use the first one we've received from the server. Could be too high then: bad luck. 
-            if ( evt.name === qlog.TransportEventType.packet_received &&
-                evt.data.packet_type === qlog.PacketType.initial && 
-                evt.data.header ) { // && ( "" + evt.data.header.packet_number === "0" ) ) { 
+            if ( evt.name === qlog.TransportEventType.packet_received && evt.data.header &&
+                 evt.data.header.packet_type === qlog.PacketType.initial ) { // && ( "" + evt.data.header.packet_number === "0" ) ) { 
                     initialReceived = rawEvt;
             }
 
@@ -1009,9 +1008,16 @@ export class SequenceDiagramD3Renderer {
                 const evt = startParser.load(rawevt).data as qlog.IEventPacketSent;
                 const metadata = (rawevt as any).qvis.sequencediagram; 
 
-                if ( evt.header === undefined || evt.header.packet_number === undefined ){
-                    if ( evt.packet_type !== qlog.PacketType.version_negotiation && evt.packet_type !== qlog.PacketType.retry && (evt.packet_type as string) !== "stateless_reset" ){ // FIXME: after stateles reset is added to qlog proper
-                        console.error("SequenceDiagram:calculateConnections : event does not have the header.packet_number field, which is required", evt);
+                if ( evt.header === undefined ) {
+                    console.error("SequenceDiagram:calculateConnections : event data does not have the header field, which is required", evt);
+                    continue;
+                }
+
+                if ( evt.header.packet_number === undefined ){
+                    if ( evt.header.packet_type !== qlog.PacketType.version_negotiation && 
+                         evt.header.packet_type !== qlog.PacketType.retry && 
+                         evt.header.packet_type !== qlog.PacketType.stateless_reset ){
+                        console.error("SequenceDiagram:calculateConnections : event data does not have the header.packet_number field, which is required", evt);
                     }
                     continue;
                 }
@@ -1032,7 +1038,7 @@ export class SequenceDiagramD3Renderer {
                     
                     // need to check for .type as well to deal with different packet number spaces
                     // some packets (like stateless resets) don't have a header or packet_number, so need to check for that
-                    if (candidate.packet_type === evt.packet_type && (candidate.header && evt.header) && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
+                    if (candidate.header && evt.header && candidate.header.packet_type === evt.header.packet_type && ("" + candidate.header!.packet_number) === ("" + evt.header!.packet_number) ){
                         metadata[metadataTargetProperty] = endEvents[c];
                         lastFoundTargetIndex = c;
                         counterpartFound = true;
@@ -1484,7 +1490,7 @@ export class SequenceDiagramD3Renderer {
                         }
 
                         const textSpanFront = document.createElement("span");
-                        textSpanFront.textContent = "" + this.packetTypeToString(evt.data.packet_type) + " : " + ( evt.data.header ? evt.data.header.packet_number : "" );
+                        textSpanFront.textContent = "" + ( evt.data.header ? this.packetTypeToString(evt.data.header.packet_type) : "" ) + " : " + ( evt.data.header ? evt.data.header.packet_number : "" );
                         textSpanFront.style.color = "#383d41"; // dark grey
                         textSpanFront.style.backgroundColor = "#d6d8db"; // light grey
                         textSpanFront.style.paddingLeft = "5px";
@@ -1978,8 +1984,8 @@ export class SequenceDiagramD3Renderer {
             case qlog.RecoveryEventType.packet_lost:
                 if ( evt.data !== undefined && evt.data.packet_number !== undefined ) {
                     let packetType = "";
-                    if ( evt.data.packet_type !== undefined ) {
-                        packetType = this.packetTypeToString( evt.data.packet_type ) + " ";
+                    if ( evt.data.header !== undefined && evt.data.header.packet_type !== undefined ) {
+                        packetType = this.packetTypeToString( evt.data.header.packet_type ) + " ";
                     }
 
                     return packetType + "packet lost #" + evt.data.packet_number;

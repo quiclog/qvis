@@ -69,7 +69,7 @@
                 <p>
                     The visualization currently looks mainly at the following qlog events and attributes to figure out packet and frame sizes:
                     <ul>
-                        <li>packet_sent/packet_received : header : packet_size</li>
+                        <li>packet_sent/packet_received : raw : length</li>
                         <li>packet_sent/packet_received : frames[ StreamFrame ] : length</li>
                         <li>frame_parsed/frame_created : byte_length</li>
                     </ul>

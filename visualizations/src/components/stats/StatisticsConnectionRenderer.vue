@@ -131,7 +131,7 @@
                         </b-table-simple>
                     </b-td>
                     <b-td v-else variant="danger">
-                        None of the events in this trace had data.packet_type set!
+                        None of the events in this trace had data.header.packet_type set!
                     </b-td>
                 </b-tr>
                 <b-tr>
@@ -182,7 +182,7 @@
                         </b-table-simple>
                     </b-td>
                     <b-td v-else variant="danger">
-                        None of the events in this trace had data.packet_type set!
+                        None of the events in this trace had data.header.packet_type set!
                     </b-td>
                 </b-tr>
 
@@ -435,9 +435,9 @@
             for ( const rawEvt of trace.getEvents() ){
                 const evt = trace.parseEvent( rawEvt );
 
-                if ( evt.data && evt.data.packet_type ){
-                    const count = this.encryptionLookupTable.get( evt.data.packet_type ) || 0;
-                    this.encryptionLookupTable.set( evt.data.packet_type, count + 1 );
+                if ( evt.data && evt.data.header && evt.data.header.packet_type ){
+                    const count = this.encryptionLookupTable.get( evt.data.header.packet_type ) || 0;
+                    this.encryptionLookupTable.set( evt.data.header.packet_type, count + 1 );
                 }
             }
 

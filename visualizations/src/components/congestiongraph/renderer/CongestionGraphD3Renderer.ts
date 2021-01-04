@@ -1056,26 +1056,26 @@ export default class CongestionGraphD3Renderer {
         let DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsSent) {
             const parsedPacket = this.config.connection!.parseEvent(packet)
-            const data = parsedPacket.data;
+            const data = parsedPacket.data as qlog.IEventPacket;
             const timestamp = this.transformTime( parsedPacket.relativeTime );
 
             // Create a private namespace where we can plug in additional data -> corresponding acks, losses and from-to range
             this.createPrivateNamespace(packet);
             const extraData = ((packet as any) as IEventExtension).qvis.congestion;
 
-            if (!data.header.packet_size || data.header.packet_size === 0) {
+            if ( !data.raw || !data.raw.length || data.raw.length === 0 ) {
                 ++DEBUG_packetsWithInvalidSize;
                 continue;
             }
 
             const packetOffsetStart = totalSentByteCount + 1;
-            totalSentByteCount += data.header.packet_size;
+            totalSentByteCount += data.raw.length;
 
             extraData.from = packetOffsetStart;
             extraData.to = totalSentByteCount;
 
             // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
-            packetSentList[ parseInt( data.header.packet_number, 10 ) ] = packet;
+            packetSentList[ parseInt( "" + data.header.packet_number, 10 ) ] = packet;
 
             // Update extrema
             sent.xMin = sent.xMin > timestamp ? timestamp : sent.xMin;
@@ -1095,21 +1095,22 @@ export default class CongestionGraphD3Renderer {
         DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsReceived) {
             const parsedPacket = this.config.connection!.parseEvent(packet)
-            const data = parsedPacket.data;
+            const data = parsedPacket.data as qlog.IEventPacket;
             const timestamp = this.transformTime( parsedPacket.relativeTime );
 
             // Create a private namespace where we can plug in additional data -> corresponding acks, losses and from-to range
             this.createPrivateNamespace(packet);
             const extraData = ((packet as any) as IEventExtension).qvis.congestion;
 
-            if (data.header.packet_size && data.header.packet_size !== 0) {
+
+            if ( data.raw !== undefined && data.raw.length !== undefined && data.raw.length !== 0 ) {
                 const packetOffsetStart = totalReceivedByteCount + 1;
-                totalReceivedByteCount += data.header.packet_size;
+                totalReceivedByteCount += data.raw.length;
 
                 extraData.from = packetOffsetStart;
                 extraData.to = totalReceivedByteCount;
 
-                packetReceivedList[ parseInt( data.header.packet_number, 10 ) ] = packet; // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
+                packetReceivedList[ parseInt( "" + data.header.packet_number, 10 ) ] = packet; // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
 
                 // Update extrema
                 received.xMin = received.xMin > timestamp ? timestamp : received.xMin;
@@ -1515,9 +1516,8 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedPacketTime);
                     this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedPacketData.header.packet_number);
-                    // this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedPacketData.header.packet_size);
                     
-                    let packetText = "PacketSize: " + parsedPacketData.header.packet_size;
+                    let packetText = "PacketSize: " + parsedPacketData.raw.length;
 
                     for ( let i = 0; i < this.mainGraphState.metricUpdateLines.cwnd.length - 2; ++i ){
                         const a = this.mainGraphState.metricUpdateLines.cwnd[i];
@@ -1606,7 +1606,7 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + this.transformTime(parsedLostPacket.relativeTime));
                         this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedLostPacket.data.header.packet_number);
-                        this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.header.packet_size);
+                        this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.raw.length);
 
                         return;
                 }

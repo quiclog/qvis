@@ -93,8 +93,8 @@ export type quint64 = number | string;
 export type qbytes = string;
 
 export interface IRawInfo {
-    length?: quint64,
-    payload_length?: quint64,
+    length?: number, // TODO should be quint64, but this makes parsing a lot more tedious in a lot of places
+    payload_length?: number, // TODO should be quint64, but this makes parsing a lot more tedious in a lot of places
 
     data?: qbytes
 }
@@ -370,6 +370,7 @@ export enum PacketType {
     onertt = "1RTT",
     retry = "retry",
     version_negotiation = "version_negotiation",
+    stateless_reset = "stateless_reset",
     unknown = "unknown",
 }
 
@@ -531,6 +532,18 @@ export enum H3StreamType {
     reserved = "reserved",
     qpack_encode = "qpack_encode",
     qpack_decode = "qpack_decode",
+}
+
+// this is not really specified in the spec
+// it represents shared fields between IEventH3FrameCreated and IEventH3FrameParsed
+// (which are 100% the same at the time of writing)
+// so it's easier to handle both types of events in the same way (which is sometimes needed)
+export interface IEventH3Frame {
+    stream_id:string,
+    frame:HTTP3Frame // see appendix for the definitions,
+    byte_length?:string,
+
+    raw?:string
 }
 
 export interface IEventH3FrameCreated {
@@ -727,7 +740,7 @@ export enum QUICFrameTypeName {
 // TODO: potentially split in LongHeader and ShortHeader explicitly?
 export interface IPacketHeader {
     packet_type: PacketType;
-    packet_number: string;
+    packet_number: quint64;
     
     payload_length?: number;
 

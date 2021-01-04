@@ -208,12 +208,15 @@ export default class TCPToQlog {
             // packetSent and Received are basically the same, just use Sent here
             const packetSent:tcpschema.IEventPacketSent = {
                 header: {
+                    packet_type:     qlogschema.PacketType.onertt, // TCP can be considered as always QUIC's 1RTT equivalent
                     packet_number:   parseInt(entry.frame["frame.number"], 10),
                     sequence_number: parseInt(TCP["tcp.seq"], 10),
                     payload_length:  parseInt(TCP["tcp.len"], 10),
                     header_length:   parseInt(TCP["tcp.hdr_len"], 10),
-                    
-                    packet_size:     parseInt(TCP["tcp.hdr_len"], 10) + parseInt(TCP["tcp.len"], 10),
+                },
+
+                raw: {
+                    length:     parseInt(TCP["tcp.hdr_len"], 10) + parseInt(TCP["tcp.len"], 10),
                 },
             }
     
@@ -509,6 +512,9 @@ export default class TCPToQlog {
                 // recordCreated and recordParsed are basically the same, just use Sent here
                 const packetSent:tcpschema.IEventRecordCreated = {
                     header: {
+                        packet_type: qlogschema.PacketType.onertt, // QUIC qlog compat mode, not needed
+                        packet_number: "", // QUIC qlog compat mode, not needed
+
                         content_type:   content_type,
                         header_length: 5, // TLS record header length is always 5
                         trailer_length: trailerSize, 

@@ -208,26 +208,42 @@ export default class PacketizationQUICPreProcessor {
         for ( const eventRaw of connection.getEvents() ) {
 
             const event = connection.parseEvent( eventRaw );
-            const data = event.data;
+            const rawdata = event.data;
 
             if ( event.name === QUICEventType ){ // packet_sent or _received
 
-                if ( !data.header.packet_size ) {
-                    console.error("PacketizationQUICPreProcessor: packet without header.packet_size set... ignoring", QUICEventType, eventRaw);
+                const data = rawdata as qlog.IEventPacket;
+
+                if ( !data.raw ) {
                     continue;
                 }
 
-                const totalPacketLength = parseInt( data.header.packet_size, 10 );
+                if ( !data.header || !data.header.packet_type ) {
+                    console.error("PacketizationQUICPreProcessor: packet without header.packet_type set... ignoring", QUICEventType, eventRaw);
+                    continue;
+                }
+
+                if ( !data.raw.length ) {
+                    if ( data.raw.data !== undefined ) {
+                        data.raw.length = data.raw.data.length;
+                    }
+                    else {
+                        console.error("PacketizationQUICPreProcessor: packet without raw.length set... ignoring", QUICEventType, eventRaw);
+                        continue;
+                    }
+                }
+
+                const totalPacketLength = parseInt( "" + data.raw.length, 10 );
                 const trailerLength = 16; // default authentication tag size is 16 bytes // TODO: support GCM8?
-                let payloadLength = data.header.payload_length - trailerLength;
+                let payloadLength = (data.raw.payload_length ? data.raw.payload_length : 0) - trailerLength;
                 let headerLength = totalPacketLength - payloadLength;
 
                 // lane 1 : QUIC packets
 
                 // if not set/known explicitly: try to derive from header type
-                if ( !data.header.payload_length ) {
+                if ( !data.raw.payload_length ) {
 
-                    if ( data.packet_type === qlog.PacketType.onertt ) {
+                    if ( data.header.packet_type === qlog.PacketType.onertt ) {
                         headerLength = Math.min(4, totalPacketLength); // TODO: actually calculate
                     }
                     else {
@@ -247,7 +263,7 @@ export default class PacketizationQUICPreProcessor {
 
                     color: ( QUICPacketIndex % 2 === 0 ) ? "black" : "grey",
 
-                    contentType: data.packet_type,
+                    contentType: data.header.packet_type,
 
                     lowerLayerIndex: -1,
                     rawPacket: data,
@@ -263,7 +279,7 @@ export default class PacketizationQUICPreProcessor {
 
                     color: ( QUICPacketIndex % 2 === 0 ) ? "black" : "grey",
 
-                    contentType: data.packet_type,
+                    contentType: data.header.packet_type,
 
                     lowerLayerIndex: -1,
                     rawPacket: data,
@@ -279,7 +295,7 @@ export default class PacketizationQUICPreProcessor {
 
                     color: ( QUICPacketIndex % 2 === 0 ) ? "black" : "grey",
 
-                    contentType: data.packet_type,
+                    contentType: data.header.packet_type,
 
                     lowerLayerIndex: -1,
                     rawPacket: data,
@@ -295,7 +311,7 @@ export default class PacketizationQUICPreProcessor {
                     // if offset != 0, we've guesstimated wrong
                     // deal with this by adding a bogus frame
                     if ( offset !== 0 ) {
-                        const bogus = {
+                        const bogus:any = {
                             header_size: offset,
                             payload_size: 0,
 
@@ -304,12 +320,14 @@ export default class PacketizationQUICPreProcessor {
                             qvis: { sequence: { hide: true } }, // make sure these don't show up in the sequence diagram
                         };
 
-                        data.frames.unshift( bogus );
+                        data.frames.unshift( bogus as qlog.QuicFrame );
  
                         // frameStart += offset; // no longer needed now we add the bogus frame
                     }
 
-                    for ( const frame of data.frames ) {
+                    for ( const rawframe of data.frames ) {
+
+                        const frame = rawframe as any;
                         
                         if ( frame.header_size > 0 ){
                             // QUIC frame header
@@ -389,6 +407,8 @@ export default class PacketizationQUICPreProcessor {
 
             else if ( event.name === HTTPEventType ) { // frame_created or _parsed
                 
+                const data = rawdata as qlog.IEventH3Frame;
+
                 if ( !data.byte_length ) {
                     console.error("H3 frame didn't have byte_length set! skipping...", data);
                     continue;
@@ -429,7 +449,8 @@ export default class PacketizationQUICPreProcessor {
             } // end checking for HTTP3 events
 
             
-            if ( event.name === HTTPHeadersSentEventType && event.data.frame.frame_type === qlog.HTTP3FrameTypeName.headers ) {
+            if ( event.name === HTTPHeadersSentEventType && event.data && event.data.frame && event.data.frame.frame_type === qlog.HTTP3FrameTypeName.headers ) {
+
                 // want to link HTTP stream IDs to resource URLs that are transported over the stream
                 const streamID = parseInt( event.data.stream_id, 10 );
                 if ( !HTTPStreamInfo.has(streamID) ) {
@@ -441,6 +462,9 @@ export default class PacketizationQUICPreProcessor {
             }
 
             if ( event.name === qlog.TransportEventType.parameters_set ) {
+
+                const data = rawdata as qlog.IEventTransportParametersSet;
+
                 if ( data.owner && data.owner === "local" ) {
                     if ( data.max_packet_size ) {
                         max_packet_size_local = data.max_packet_size;
