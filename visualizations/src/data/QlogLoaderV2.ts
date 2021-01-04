@@ -183,13 +183,58 @@ export class QlogLoaderV2 {
 
                     alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down and isn't guaranteed to be stable if the timestamps aren't unique! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
                 }
+
+                // TODO: remove eventually. Mainly sanity checks to make sure draft-02 is properly followed, since there were breaking changes between -01 and -02
+                const O2errors = [];
+                let incorrectSize = false;
+                let incorrectType = false;
+                for ( const evt of connection.getEvents() ){
+                    const parsedEvt = connection.parseEvent(evt);
+                    
+                    const data = parsedEvt.data;
+
+                    if ( data && data.header && data.header.packet_size ) {
+                        if ( !incorrectSize ) {
+                            O2errors.push( "events had data.header.packet_size set, use data.raw.length instead " + JSON.stringify(data) );
+                            incorrectSize = true;
+                        }
+
+                        if ( !data.raw ) {
+                            data.raw = {};
+                        }
+
+                        data.raw.length = data.header.packet_size;
+                        delete data.header.packet_size;
+                    }
+
+                    if ( data && data.packet_type ) {
+                        if ( !incorrectType ) {
+                            O2errors.push( "events had data.packet_type set: use data.header.packet_type instead "  + JSON.stringify(data));
+                            incorrectType = true;
+                        }
+
+                        if ( !data.header ) {
+                            data.header = {};
+                        }
+
+                        data.header.packet_type = data.packet_type;
+                        delete data.packet_type;
+                    }
+                }
+
+                if ( O2errors.length !== 0 ) {
+                    console.error("QlogLoaderV2:fromDraft02: ERROR: non-compliant qlog draft-02 trace:");
+                    for ( const err of O2errors ) {
+                        console.error( err );
+                    }
+
+                    alert( " ERROR: non-compliant qlog draft-02 trace! \n\n" + O2errors.join("\n\n") );
+                }
             }
         }
 
         return group;
     }
-
-
 }
 
 // tslint:disable max-classes-per-file

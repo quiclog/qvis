@@ -266,6 +266,29 @@ export class QlogLoader {
                         data.type = data.packet_type.toLowerCase(); // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
                         data.packet_type = data.type.replace("rtt","RTT");
                     }
+
+                    // to be compatible with draft-02: packet_type was moved to header.packet_type
+                    if ( data && data.packet_type ) {
+                        if ( !data.header ) {
+                            data.header = {};
+                        }
+
+                        data.header.packet_type = data.packet_type;
+                        delete data.packet_type; // to enforce proper draft-02 structure
+                        if ( data.type ) {
+                            delete data.type; // to enforce proper draft-02 structure
+                        }
+                    }
+
+                    // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
+                    if ( data && data.header && data.header.packet_size ) {
+                        if ( !data.raw ) {
+                            data.raw = {};
+                        }
+
+                        data.raw.length = data.header.packet_size;
+                        delete data.header.packet_size; // to enforce proper draft-02 structure
+                    }
                 }
 
                 // we had a version in between draft-00 and draft-01 that was also using the "draft-01" version...
@@ -303,11 +326,11 @@ export class QlogLoader {
                                 break;
                             }
                         }
-                        else if ( parsedEvt.data.packet_type === "onertt" ) {
+                        else if ( parsedEvt.data.header && parsedEvt.data.header.packet_type === "onertt" ) {
                             needsUpgrade = true;
                             break;
                         }
-                        else if ( parsedEvt.data.packet_type === "zerortt" ) {
+                        else if ( parsedEvt.data.header && parsedEvt.data.header.packet_type === "zerortt" ) {
                             needsUpgrade = true;
                             break;
                         }
@@ -332,7 +355,7 @@ export class QlogLoader {
                         console.error("QlogLoader:draft01 : timestamps were not in the correct order!", parsedEvt.absoluteTime, " < ", minimumTime, parsedEvt);
                         break;
                     }
-                 }
+                }
  
                 if ( misOrdered ){
                     connection.getEvents().sort( (a, b) => { return connection.parseEvent(a).absoluteTime - connection.parseEvent(b).absoluteTime });
@@ -340,7 +363,7 @@ export class QlogLoader {
                     connection.setEventParser( new EventFieldsParser() ); // because startTime etc. could have changes because of the re-ordering
  
                     alert("Loaded trace was not absolutely ordered on event timestamps. We performed a sort() in qvis, but this slows things down and isn't guaranteed to be stable if the timestamps aren't unique! The qlog spec requires absolutely ordered timestamps. See the console for more details.");
-                 }
+                }
             }
         }
 
@@ -443,11 +466,22 @@ export class QlogLoader {
                 parsedEvt.data.parameters = [];
             }
             
-            if ( parsedEvt.data.packet_type === "onertt" ) {
-                parsedEvt.data.packet_type = qlog01.PacketType.onertt;
+            // we already moved data.packet_type to data.header.packet_type before this to be draft-02 compatible
+            if ( parsedEvt.data.header && parsedEvt.data.header.packet_type === "onertt" ) {
+                parsedEvt.data.header.packet_type = qlog02.PacketType.onertt;
             }
-            else if ( parsedEvt.data.packet_type === "zerortt" ) {
-                parsedEvt.data.packet_type = qlog01.PacketType.zerortt;
+            else if ( parsedEvt.data.header && parsedEvt.data.header.packet_type === "zerortt" ) {
+                parsedEvt.data.header.packet_type = qlog02.PacketType.zerortt;
+            }
+
+            // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
+            if ( parsedEvt.data && parsedEvt.data.header && parsedEvt.data.header.packet_size ) {
+                if ( !parsedEvt.data.raw ) {
+                    parsedEvt.data.raw = {};
+                }
+
+                parsedEvt.data.raw.length = parsedEvt.data.header.packet_size;
+                delete parsedEvt.data.header.packet_size; // to enforce proper draft-02 structure
             }
         }
     }
@@ -556,7 +590,17 @@ export class QlogLoader {
                     if ( data.packet_type ){
                         data.packet_type = data.packet_type.toLowerCase();
                         data.packet_type = data.packet_type.replace("rtt","RTT");
-                        data.type = data.packet_type; // older version of draft-01 had .type instead of .packet_type // FIXME: remove!
+
+                        // force draft-02 compliance: packet_type was moved to header.packet_type
+                        if ( !data.header ) {
+                            data.header = {};
+                        }
+
+                        data.header.packet_type = data.packet_type;
+                        delete data.packet_type;
+                        if ( data.type ) {
+                            delete data.type; // early versions of qlog had data.type instead of data.packet_type
+                        }
                     }
 
                     // if ( data.header && data.header.packet_number !== undefined ){
