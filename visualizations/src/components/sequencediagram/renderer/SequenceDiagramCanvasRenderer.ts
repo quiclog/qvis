@@ -1,6 +1,6 @@
 import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 
 
 export default class SequenceDiagramCanvasRenderer {

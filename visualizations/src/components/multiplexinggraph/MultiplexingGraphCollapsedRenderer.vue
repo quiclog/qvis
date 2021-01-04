@@ -62,7 +62,7 @@
 <script lang="ts">
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import QlogConnection from "@/data/Connection";
-    import * as qlog from '@quictools/qlog-schema';
+    import * as qlog from '@/data/QlogSchema';
 
     import MultiplexingGraphConfig from "./data/MultiplexingGraphConfig";
     import MultiplexingGraphD3SimulationRenderer from "./renderer/MultiplexingGraphD3SimulationRenderer";

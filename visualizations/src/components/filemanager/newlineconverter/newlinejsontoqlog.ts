@@ -1,4 +1,4 @@
-import * as qlogschema from '@quictools/qlog-schema';
+import * as qlogschema from '@/data/QlogSchema';
 
 export default class NewlineJSONToQlog {
 
@@ -7,7 +7,7 @@ export default class NewlineJSONToQlog {
         console.log("NewlineJSONToQlog: converting newline delimited JSON file");
 
         // make proper qlogschema.IQLog again when we've updated the schema to match draft-02 proper
-        const qlogFile:any = { qlog_version: "draft-02-RC1", qlog_format: "NDJSON", traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
+        const qlogFile:any = { qlog_version: "draft-02", qlog_format: "NDJSON", traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
         
 
         const rawJSONentries = await NewlineJSONToQlog.parseNDJSON( inputStream );

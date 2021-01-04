@@ -1,4 +1,5 @@
-import * as qlogschema from '@quictools/qlog-schema';
+
+import * as qlogschema from '@/data/QlogSchema';
 import * as netlogschema from './netlog';
 
 /* Netlog example:

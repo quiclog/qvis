@@ -1,4 +1,4 @@
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 
 export enum PacketizationDirection {
     sending,

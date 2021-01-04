@@ -1,4 +1,5 @@
-import * as qlogschema from '@quictools/qlog-schema';
+
+import * as qlogschema from '@/data/QlogSchema';
 
 export enum PacketType {
     initial = "ENCRYPTION_INITIAL",

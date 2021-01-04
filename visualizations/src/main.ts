@@ -8,10 +8,6 @@ import store from "./store";
 import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue/dist/bootstrap-vue.css";
 
-import { getModule } from "vuex-module-decorators";
-import ConnectionStore from "@/store/ConnectionStore";
-// import { IQLog } from '@quictools/qlog-schema';
-
 // const standaloneFiles:Array<string> = [
 //     "draft-00/example_github.qlog.js",
 //     "draft-01/new_cid.qlog.js",

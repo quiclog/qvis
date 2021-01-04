@@ -1,6 +1,6 @@
 import QlogConnectionGroup from '@/data/ConnectionGroup';
 
-import * as qlog01 from '@quictools/qlog-schema';
+import * as qlog02 from '@/data/QlogSchema02';
 import QlogConnection from '@/data/Connection';
 import { IQlogEventParser, IQlogRawEvent, TimeTrackingMethod } from '@/data/QlogEventParser';
 import { EventFieldsParser } from './QlogLoader';
@@ -11,14 +11,14 @@ export class QlogLoaderV2 {
 
     public static fromJSON(json:any) : QlogConnectionGroup | undefined {
 
-        if ( json && json.qlog_version ){
+        if ( json && json.qlog_version ){ 
             const version = json.qlog_version;
 
-            if ( version === "draft-02-RC1" || version === "draft-02" ){
+            if ( qlog02.Defaults.versionAliases.indexOf(version) >= 0 ){
                 return QlogLoaderV2.fromDraft02(json);
             }
             else {
-                console.error("QlogLoaderV2: Unknown qlog version! Only draft-02 and draft-02-RC1 are supported!", version, json);
+                console.error("QlogLoaderV2: Unknown qlog version! Only " + qlog02.Defaults.versionAliases + " are supported!", version, json);
                 
                 return undefined;
             }
@@ -32,7 +32,7 @@ export class QlogLoaderV2 {
 
     protected static fromDraft02(json:any) : QlogConnectionGroup {
 
-        const fileContents:qlog01.IQLog = json as qlog01.IQLog;
+        const fileContents:qlog02.IQLog = json as qlog02.IQLog;
 
         console.log("QlogLoaderV2:fromDraft02 : ", fileContents, fileContents.traces);
 
@@ -46,8 +46,8 @@ export class QlogLoaderV2 {
 
             const qlogconnections:Array<QlogConnection> = new Array<QlogConnection>();
 
-            if ( (jsonconnection as qlog01.ITraceError).error_description !== undefined ) {
-                jsonconnection = jsonconnection as qlog01.ITraceError;
+            if ( (jsonconnection as qlog02.ITraceError).error_description !== undefined ) {
+                jsonconnection = jsonconnection as qlog02.ITraceError;
 
                 const conn = new QlogConnection(group);
                 conn.title = "ERROR";
@@ -55,7 +55,7 @@ export class QlogLoaderV2 {
                 continue;
             }
 
-            jsonconnection = jsonconnection as qlog01.ITrace;
+            jsonconnection = jsonconnection as qlog02.ITrace;
 
             // from draft-02 onward, we allow both event_fields (csv-alike setup) and "normal" JSON formats
             let usesEventFields:boolean = false;
@@ -134,11 +134,11 @@ export class QlogLoaderV2 {
                 connection.title += jsonconnection.title ? jsonconnection.title : "";
                 connection.description += jsonconnection.description ? jsonconnection.description : "";
                 
-                connection.vantagePoint = jsonconnection.vantage_point || {} as qlog01.IVantagePoint;
+                connection.vantagePoint = jsonconnection.vantage_point || {} as qlog02.IVantagePoint;
 
                 if ( !connection.vantagePoint.type ){
-                    connection.vantagePoint.type = qlog01.VantagePointType.unknown;
-                    connection.vantagePoint.flow = qlog01.VantagePointType.unknown;
+                    connection.vantagePoint.type = qlog02.VantagePointType.unknown;
+                    connection.vantagePoint.flow = qlog02.VantagePointType.unknown;
                     connection.vantagePoint.name = "No VantagePoint set";
                 }
 

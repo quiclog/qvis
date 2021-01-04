@@ -53,7 +53,7 @@
     import { Component, Vue, Prop } from "vue-property-decorator";
     import SequenceDiagramConfig from "./data/SequenceDiagramConfig";
     import ConnectionConfigurator from "@/components/shared/ConnectionConfigurator.vue";
-    import * as qlog from "@quictools/qlog-schema";
+    import * as qlog from '@/data/QlogSchema';
 
     import ConnectionStore from "@/store/ConnectionStore";
     import ConnectionGroup from "@/data/ConnectionGroup";

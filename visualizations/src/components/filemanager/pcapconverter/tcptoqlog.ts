@@ -1,4 +1,4 @@
-import * as qlogschema from '@quictools/qlog-schema';
+import * as qlogschema from '@/data/QlogSchema';
 import * as tcpschema from './qlog_tcp_tls_h2';
 
 interface TCPConnection {

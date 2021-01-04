@@ -1,5 +1,5 @@
 import QlogConnection from '@/data/Connection';
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 import * as d3 from 'd3';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';
 import PacketizationTCPPreProcessor from './PacketizationTCPPreProcessor';

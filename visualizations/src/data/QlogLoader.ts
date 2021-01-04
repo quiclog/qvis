@@ -1,9 +1,9 @@
 import QlogConnectionGroup from '@/data/ConnectionGroup';
 
 
-import * as qlog01 from '@quictools/qlog-schema';
+import * as qlog01 from './QlogSchema01';
+import * as qlog02 from './QlogSchema02';
 import * as qlogPreSpec from '@quictools/qlog-schema/draft-16/QLog';
-import { QUtil } from '@quictools/qlog-schema/util';
 import QlogConnection from '@/data/Connection';
 import { IQlogEventParser, IQlogRawEvent, TimeTrackingMethod } from '@/data/QlogEventParser';
 
@@ -25,9 +25,9 @@ export class QlogLoader {
                 return QlogLoader.fromDraft01(json);
             }
             else if ( version === "draft-02-wip" ){
-                return QlogLoader.fromDraft02(json);
+                return QlogLoader.fromDraft02(json); // draft-02-wip was still much like draft-01 and thus is handled in this file. The new structure (event.name etc.) was only from draft-02-RC1 onward.
             }
-            else if ( version === "draft-02-RC1" || version === "draft-02" ) {
+            else if ( qlog02.Defaults.versionAliases.indexOf(version) >= 0 ) {
                 return QlogLoaderV2.fromJSON( json );
             }
             else {

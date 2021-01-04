@@ -52,7 +52,7 @@
     import { getModule } from "vuex-module-decorators";
     import { Component, Vue, Prop } from "vue-property-decorator";
     import MultiplexingGraphConfig from "./data/MultiplexingGraphConfig";
-    import * as qlog from '@quictools/qlog-schema';
+    import * as qlog from '@/data/QlogSchema';
 
     import ConnectionConfigurator from "@/components/shared/ConnectionConfigurator.vue";
     import ConnectionStore from "@/store/ConnectionStore";

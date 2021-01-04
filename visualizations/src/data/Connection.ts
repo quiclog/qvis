@@ -1,6 +1,6 @@
 import QlogConnectionGroup from '@/data/ConnectionGroup';
 import { IQlogEventParser, IQlogRawEvent } from '@/data/QlogEventParser';
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 import Vue from 'vue';
 
 // a single trace

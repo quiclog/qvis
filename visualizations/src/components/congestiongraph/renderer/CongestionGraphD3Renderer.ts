@@ -1,11 +1,11 @@
 import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 import CongestionGraphConfig from '../data/CongestionGraphConfig';
 import { MainGraphState } from './MainGraphState';
 import { RecoveryGraphState } from './RecoveryGraphState';
 import { Selection } from 'd3';
-import { IEventTransportParametersSet } from '@quictools/qlog-schema/draft-01/QLog';
+import { IEventTransportParametersSet } from '@/data/QlogSchema01';
 
 export default class CongestionGraphD3Renderer {
 

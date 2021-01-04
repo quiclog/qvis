@@ -1,5 +1,5 @@
 import * as tcpqlog from "@/components/filemanager/pcapconverter/qlog_tcp_tls_h2";
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 import { PacketizationLane, PacketizationRange, LightweightRange, PacketizationPreprocessor, PacketizationDirection } from './PacketizationDiagramModels';
 import QlogConnection from '@/data/Connection';
 import PacketizationDiagramDataHelper from './PacketizationDiagramDataHelper';

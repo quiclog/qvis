@@ -62,7 +62,7 @@
 <script lang="ts">
     import { Component, Vue, Prop, Watch } from "vue-property-decorator";
     import StatisticsConfig from "./data/StatisticsConfig";
-    import * as qlog from '@quictools/qlog-schema';
+    import * as qlog from '@/data/QlogSchema';
 
     import StatisticsConnectionRenderer from "@/components/stats/StatisticsConnectionRenderer.vue";
 

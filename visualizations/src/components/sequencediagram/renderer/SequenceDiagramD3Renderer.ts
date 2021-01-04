@@ -1,8 +1,8 @@
 import QlogConnection from '@/data/Connection';
 import * as d3 from 'd3';
-import * as qlog from '@quictools/qlog-schema';
+import * as qlog from '@/data/QlogSchema';
 import SequenceDiagramConfig, { SequenceDiagramConnection } from '../data/SequenceDiagramConfig';
-import { VantagePointType, IEventConnectionStateUpdated, QUICFrameTypeName } from '@quictools/qlog-schema';
+import { VantagePointType, IEventConnectionStateUpdated, QUICFrameTypeName } from '@/data/QlogSchema';
 import { IQlogRawEvent, IQlogEventParser, TimeTrackingMethod } from '@/data/QlogEventParser';
 
 interface VerticalRange {
