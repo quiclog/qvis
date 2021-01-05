@@ -1,5 +1,6 @@
 
-import * as qlogschema from '@/data/QlogSchema';
+import * as qlogschema from '@/data/QlogSchema01';
+import * as qlogschema02 from '@/data/QlogSchema02';
 import * as netlogschema from './netlog';
 
 /* Netlog example:
@@ -136,7 +137,7 @@ class QUICConnection {
 
     public txQUICFrames: Array<qlogschema.QuicFrame>;
     public rxQUICFrames: Array<qlogschema.QuicFrame>;
-    public rxPacket: qlogschema.IEventPacket | undefined;
+    public rxPacket: qlogschema02.IEventPacket | undefined;
 
     constructor(
         session: netlogschema.QUIC_SESSION,
@@ -487,7 +488,7 @@ export default class NetlogToQlog {
                         raw: {
                             length: event_params.size,
                         },
-                    } as qlogschema.IEventPacket);
+                    } as any);
                     connection.qlogEvents.push(qlogEvent);
 
                     // Reset txQUICFrames
@@ -502,7 +503,7 @@ export default class NetlogToQlog {
 
                 case 'QUIC_SESSION_PACKET_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_PACKET_RECEIVED = params;
-                    const packet: qlogschema.IEventPacket = {
+                    const packet: qlogschema02.IEventPacket = {
                         header: {
                             packet_type: qlogschema.PacketType.unknown, // placeholder, filled in below
                             packet_number: '', // placeholder, filled in below
@@ -609,7 +610,7 @@ export default class NetlogToQlog {
                                 return qlogschema.PacketType.unknown;
                         }
                     })();
-                    const packet: qlogschema.IEventPacketLost = {
+                    const packet: qlogschema02.IEventPacketLost = {
                         header: {
                             packet_type,
                             packet_number: event_params.packet_number.toString(),
@@ -652,7 +653,7 @@ export default class NetlogToQlog {
                                 return qlogschema.PacketType.unknown;
                         }
                     })();
-                    const frame: qlogschema.IEventPacketDropped = {
+                    const frame: qlogschema02.IEventPacketDropped = {
                         header: {
                             packet_type,
                             packet_number: "", // not always known
@@ -660,7 +661,7 @@ export default class NetlogToQlog {
                     }
                     qlogEvent.push(qlogschema.EventCategory.transport);
                     qlogEvent.push(qlogschema.TransportEventType.packet_dropped);
-                    qlogEvent.push(frame);
+                    qlogEvent.push(frame as any);
                     connection.qlogEvents.push(qlogEvent);
                     break;
                 }
@@ -883,7 +884,7 @@ export default class NetlogToQlog {
         });
 
         const qlogFile: qlogschema.IQLog = {
-            qlog_version: "draft-02-wip",
+            qlog_version: "draft-01",
             traces: qlogs,
         };
 

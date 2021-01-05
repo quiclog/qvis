@@ -11,8 +11,15 @@ export class Defaults {
     public static versionAliases:Array<string> = ["draft-02", "draft-02-RC1"];
 }
 
+export enum LogFormat {
+    JSON = "JSON",
+    NDJSON = "NDJSON",
+}
+
 export interface IQLog {
     qlog_version: string,
+    qlog_format?: LogFormat,
+
     title?:string,
     description?: string,
     summary?:any,
@@ -35,9 +42,20 @@ export interface ITrace {
     configuration?: IConfiguration,
 
     common_fields?: ICommonFields,
-    event_fields: string[],
 
-    events: Array<Array<EventField>>
+    events: Array<IEvent>
+}
+
+export interface IEvent {
+    time: number,
+
+    name?: string,
+    category?: string,
+    type?: string,
+
+    data: EventData,
+
+    [additionalUserSpecifiedProperty: string]: any // e.g., group_id or time_format can be defined on a per-event basis
 }
 
 export interface IVantagePoint{
@@ -63,11 +81,19 @@ export interface IConfiguration{
     [additionalUserSpecifiedProperty: string]: any
 }
 
-export interface ICommonFields{
+export enum TimeFormat {
+    absolute = "absolute",
+    relative = "relative",
+    delta = "delta",
+}
+
+export interface ICommonFields {
     group_id?: string | Array<any>,
     protocol_type?: string,
 
     reference_time?:string,
+
+    time_format?:TimeFormat,
 
     // allow additional properties. This way, we can enforce proper types for the ones defined in the spec, see other properties
     [additionalUserSpecifiedProperty: string]: any

@@ -1,4 +1,4 @@
-import * as qlogschema from '@/data/QlogSchema';
+import * as qlogschema from '@/data/QlogSchema01';
 import * as tcpschema from './qlog_tcp_tls_h2';
 
 interface TCPConnection {
@@ -220,7 +220,7 @@ export default class TCPToQlog {
                 },
             }
     
-            qlogEvent.push( packetSent );
+            qlogEvent.push( packetSent as any );
     
             connection.qlog.events.push ( qlogEvent );
         }

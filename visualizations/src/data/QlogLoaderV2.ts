@@ -57,10 +57,11 @@ export class QlogLoaderV2 {
 
             jsonconnection = jsonconnection as qlog02.ITrace;
 
-            // from draft-02 onward, we allow both event_fields (csv-alike setup) and "normal" JSON formats
+            // from draft-02 onward, we allow both event_fields (csv-alike setup) and "normal" JSON formats in qvis, 
+            // even thoug hthe csv-alike setup has been removed from the draft
             let usesEventFields:boolean = false;
 
-            if ( jsonconnection.event_fields !== undefined && jsonconnection.event_fields.length > 0  ) {
+            if ( (jsonconnection as any).event_fields !== undefined && (jsonconnection as any).event_fields.length > 0  ) {
                 usesEventFields = true;
             }
 
@@ -70,7 +71,7 @@ export class QlogLoaderV2 {
             let groupIDKey:string|number = "group_id";
 
             if ( usesEventFields ){
-                groupIDKey = jsonconnection.event_fields.indexOf("group_id");
+                groupIDKey = (jsonconnection as any).event_fields.indexOf("group_id");
 
                 if ( groupIDKey >= 0 ) { 
                     needsSplit = true;
@@ -110,7 +111,7 @@ export class QlogLoaderV2 {
                         qlogconnections.push( conn );
                     }
 
-                    conn.getEvents().push( event );
+                    conn.getEvents().push( event as any ); // TODO: remove case once QlogConnection is properly updated!
                 }
             }
             // just one component trace, easy mode
@@ -143,7 +144,7 @@ export class QlogLoaderV2 {
                 }
 
                 if ( usesEventFields ) {
-                    connection.eventFieldNames = jsonconnection.event_fields;
+                    connection.eventFieldNames = (jsonconnection as any).event_fields;
                     connection.setEventParser( new EventFieldsParser() );
                 }
                 else {
@@ -374,10 +375,10 @@ export class DirectEventParser implements IQlogEventParser {
             }
 
             if ( trace.commonFields.time_format ) {
-                if ( trace.commonFields.time_format === "relative" ) {
+                if ( trace.commonFields.time_format === qlog02.TimeFormat.relative ) {
                     this.timeTrackingMethod = TimeTrackingMethod.RELATIVE_TIME;
                 }
-                else if ( trace.commonFields.time_format === "delta" ) {
+                else if ( trace.commonFields.time_format === qlog02.TimeFormat.delta ) {
                     this.timeTrackingMethod = TimeTrackingMethod.DELTA_TIME;
                 }
                 else {

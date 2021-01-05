@@ -41,7 +41,6 @@ export default class NewlineJSONToQlog {
             vantage_point: { 
                 type: qlogschema.VantagePointType.unknown,
             },
-            event_fields: [],
             events: [],
         };
 
