@@ -48,6 +48,11 @@ export default class ConnectionStore extends VuexModule {
         }
     }
 
+    @Action 
+    public removeGroup(group:QlogConnectionGroup) {
+        this.context.commit( "deleteGroup", group );
+    }
+
     @Action
     // TODO: move this away from here to its own location
     // We need to prepare ways to load QLOG files of various qlog versions and then map them to our internal structs

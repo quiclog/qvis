@@ -33,4 +33,29 @@ export default class QlogConnectionGroup {
 
     public addConnection( connection:QlogConnection ):void { this.connections.push( connection ); }
     public getConnections() { return this.connections; }
+
+    public getShorthand(){
+        let output = "";
+
+        if ( this.title ) {
+            output += this.title;
+        }
+        if (this.description) {
+            if ( this.description.length <= 50 ) {
+                output +=  " : " + this.description;
+            }
+            else {
+                output +=  " : " + this.description.substr(0,50) + "...";
+            }
+        }
+
+        if ( this.connections.length !== 1 ) {
+            output +=  " (" + this.connections.length + " connections)";
+        }
+        else {
+            output +=  " (1 connection)";
+        }
+
+        return output;
+    }
 }

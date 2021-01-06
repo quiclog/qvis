@@ -136,6 +136,37 @@
             </b-col>
         </b-row>
 
+        <b-row v-if="filesLoaded" class="fileOptionContainer" style="padding: 50px 0;">
+            <b-col>
+                <b-row >
+                    <b-col cols="1" md="auto"><h3>List of loaded files</h3></b-col>
+                </b-row>
+                <b-row>
+                    <b-container id="loadedGroupsContainer">
+                        <b-row v-for="(group, index) in allGroups" :key="'group_'+index" class="py-1">
+                            <b-col class="text-left">
+                                <span v-if="group.URL !== undefined && group.URL.length > 0">
+                                    <a :href="group.URL">{{group.URLshort}}</a>
+                                </span>
+                                <span v-else>
+                                    {{group.filename}}
+                                </span>
+                                <br />
+                                <span style="font-size: 0.8em">{{group.getShorthand()}}</span>
+                            </b-col>
+                            
+                            <b-col cols="2" class="text-center">
+                                <b-button @click="removeGroup(group)" variant="danger">Remove</b-button>
+                            </b-col>
+                            <b-col cols="2" class="text-center">
+                                <b-button @click="downloadGroup(group)" variant="info">Download</b-button>
+                            </b-col>
+                        </b-row>
+                    </b-container>
+                </b-row>
+            </b-col>
+        </b-row>
+
         </b-container>
 
     </div>
@@ -163,12 +194,16 @@
         background-color: rgba(0,0,0,.05);
     }
 
-    /* #FileManagerContainer :nth-child(even){
+    /* #loadedGroupsContainer :nth-child(even){
         background-color: #dcdcdc;
-    }
-    #FileManagerContainer :nth-child(odd){
-        background-color: #aaaaaa;
     } */
+    #loadedGroupsContainer .row:nth-of-type(odd) {
+        background-color: rgba(0,0,0,.05);
+    }
+
+    #loadedGroupsContainer .btn {
+        margin-top: 5px;
+    }
 
 </style>
 
@@ -182,6 +217,8 @@
     import FileLoader, { FileResult } from "./data/FileLoader";
 
     import StreamingJSONParser from "./utils/StreamingJSONParser";
+    import QlogConnectionGroup from '../../data/ConnectionGroup';
+    import { QlogSchemaConverter } from '../../data/QlogSchemaConverter';
 
     @Component({})
     export default class FileManagerContainer extends Vue {
@@ -490,12 +527,53 @@
             this.store.loadQlogDirectlyFromURL( { url : "standalone_data/draft-00/mvfst_large.qlog", filename: "MASSIVE_DEMO_mvfst_large.qlog (31MB)"} );
         }
 
+        public removeGroup(group:QlogConnectionGroup) {
+            console.log("FileManagerContainer:removeGroup : removing group ", group);
+
+            this.store.removeGroup( group );
+        }
+
+        public downloadGroup(group:QlogConnectionGroup) {
+            console.log("FileManagerContainer:downloadGroup : downloading internal qlog representation of group ", group);
+
+            const internalQlog = QlogSchemaConverter.Convert01to02( group );
+
+            let filename = "" + group.filename;
+            if ( group.URL && group.URL.length > 0 ) {
+                filename = group.URL.substr( group.URL.lastIndexOf("/") );
+            }
+
+            if ( filename.length === 0 ) {
+                filename = "trace";
+            }
+
+            if ( !filename.endsWith(".qlog") ) {
+                filename += ".qlog";
+            }
+
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL( new Blob([JSON.stringify(internalQlog, null, 2)], {type : 'application/json'}) );
+            link.download = filename;
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         protected get urlIsPcap(){
             return this.urlToLoad.indexOf(".pcap") >= 0 && this.urlToLoad.indexOf(".pcapng") < 0;
         }
 
         protected get uploadIsPcap(){
             return false; // this.fileToUpload !== null && this.fileToUpload.name.indexOf(".pcap") >= 0;
+        }
+
+        protected get filesLoaded() {
+            return this.store.groups.length > 0;
+        }
+
+        protected get allGroups() {
+            return this.store.groups;
         }
     }
 </script>
