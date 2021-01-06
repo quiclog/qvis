@@ -198,7 +198,7 @@ export class QlogLoaderV2 {
                     if ( data && data.header ) {
                         if ( data.header.packet_size ) {
                             if ( !incorrectSize ) {
-                                O2errors.push( "events had data.header.packet_size set, use data.raw.length instead" );
+                                O2errors.push( "events had data.header.packet_size set, use data.raw.length instead (example: " + parsedEvt.category + ":" + parsedEvt.name + ")" );
                                 incorrectSize = true;
                             }
 
@@ -212,7 +212,7 @@ export class QlogLoaderV2 {
 
                         if ( data.header.payload_length ) {
                             if ( !incorrectpayloadlength ) {
-                                O2errors.push( "events had data.header.payload_length set, use data.raw.payload_length instead");
+                                O2errors.push( "events had data.header.payload_length set, use data.raw.payload_length instead (example: " + parsedEvt.category + ":" + parsedEvt.name + ")");
                                 incorrectpayloadlength = true;
                             }
 
@@ -227,7 +227,7 @@ export class QlogLoaderV2 {
 
                     if ( data && data.packet_type ) {
                         if ( !incorrectType ) {
-                            O2errors.push( "events had data.packet_type set: use data.header.packet_type instead");
+                            O2errors.push( "events had data.packet_type set: use data.header.packet_type instead (example: " + parsedEvt.category + ":" + parsedEvt.name + ")");
                             incorrectType = true;
                         }
 
@@ -254,7 +254,7 @@ export class QlogLoaderV2 {
                         console.error( err );
                     }
 
-                    alert( " ERROR: non-compliant qlog draft-02 trace! \n\n" + O2errors.join("\n\n") );
+                    alert( " ERROR: non-compliant qlog draft-02 trace! \n\n" + O2errors.join("\n\n") + "\n\nqvis has attempted to auto-fix these things, so thing should mostly still work." );
                 }
             }
         }

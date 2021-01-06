@@ -133,6 +133,13 @@ export class QlogLoader {
 
                 connection.setEventParser( new EventFieldsParser() );
 
+                for ( const evt of connection.getEvents() ) {
+                    const parsedEvt = connection.parseEvent(evt);
+
+                    // draft-02-wip didn't have a few of the non-backwards-compatible changes of the final version
+                    QlogLoader.fix02Compatibility(parsedEvt.data);
+                }
+
                 // TODO: remove! Slows down normal traces!
                 let misOrdered = false;
                 let minimumTime = -1;
@@ -267,39 +274,7 @@ export class QlogLoader {
                         data.packet_type = data.type.replace("rtt","RTT");
                     }
 
-                    // to be compatible with draft-02: packet_type was moved to header.packet_type
-                    if ( data && data.packet_type ) {
-                        if ( !data.header ) {
-                            data.header = {};
-                        }
-
-                        data.header.packet_type = data.packet_type;
-                        delete data.packet_type; // to enforce proper draft-02 structure
-                        if ( data.type ) {
-                            delete data.type; // to enforce proper draft-02 structure
-                        }
-                    }
-
-                    // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
-                    if ( data && data.header ) {
-                        if ( data.header.packet_size ) {
-                            if ( !data.raw ) {
-                                data.raw = {};
-                            }
-
-                            data.raw.length = data.header.packet_size;
-                            delete data.header.packet_size; // to enforce proper draft-02 structure
-                        }
-
-                        if ( data.header.payload_length ) {
-                            if ( !data.raw ) {
-                                data.raw = {};
-                            }
-
-                            data.raw.payload_length = data.header.payload_length;
-                            delete data.header.payload_length;
-                        }
-                    }
+                    QlogLoader.fix02Compatibility(data);
                 }
 
                 // we had a version in between draft-00 and draft-01 that was also using the "draft-01" version...
@@ -379,6 +354,44 @@ export class QlogLoader {
         }
 
         return group;
+    }
+
+    protected static fix02Compatibility( evtData:any ) {
+        const data = evtData;
+
+        // to be compatible with draft-02: packet_type was moved to header.packet_type
+        if ( data && data.packet_type ) {
+            if ( !data.header ) {
+                data.header = {};
+            }
+
+            data.header.packet_type = data.packet_type;
+            delete data.packet_type; // to enforce proper draft-02 structure
+            if ( data.type ) {
+                delete data.type; // to enforce proper draft-02 structure
+            }
+        }
+
+        // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
+        if ( data && data.header ) {
+            if ( data.header.packet_size ) {
+                if ( !data.raw ) {
+                    data.raw = {};
+                }
+
+                data.raw.length = data.header.packet_size;
+                delete data.header.packet_size; // to enforce proper draft-02 structure
+            }
+
+            if ( data.header.payload_length ) {
+                if ( !data.raw ) {
+                    data.raw = {};
+                }
+
+                data.raw.payload_length = data.header.payload_length;
+                delete data.header.payload_length;
+            }
+        }
     }
 
     protected static fixPreviousInto01( connection:QlogConnection ){

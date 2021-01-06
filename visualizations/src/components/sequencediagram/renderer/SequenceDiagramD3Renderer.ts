@@ -354,7 +354,7 @@ export class SequenceDiagramD3Renderer {
         // scroll events are fired very quickly sometimes, don't want to try and render for each of them
         // we only fire on each 5th event but also add a timeout (typical "debounce"-alike) to make sure the final event gets used
         let scrollEventCount:number = 0;
-        let scrollTimer:number | undefined = undefined;
+        let scrollTimer:any | undefined = undefined;
         this.scrollHandler = (e) => {
            
            const execute = () => {
