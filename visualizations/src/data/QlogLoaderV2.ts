@@ -38,7 +38,7 @@ export class QlogLoaderV2 {
 
         const group = new QlogConnectionGroup();
         group.version = fileContents.qlog_version;
-        group.format = (fileContents as any).qlog_format;
+        group.format = fileContents.qlog_format ? "" + fileContents.qlog_format : qlog02.LogFormat.JSON;
         group.title = fileContents.title || "";
         group.description = fileContents.description || "";
 
@@ -188,29 +188,46 @@ export class QlogLoaderV2 {
                 // TODO: remove eventually. Mainly sanity checks to make sure draft-02 is properly followed, since there were breaking changes between -01 and -02
                 const O2errors = [];
                 let incorrectSize = false;
+                let incorrectpayloadlength = false;
                 let incorrectType = false;
                 for ( const evt of connection.getEvents() ){
                     const parsedEvt = connection.parseEvent(evt);
                     
                     const data = parsedEvt.data;
 
-                    if ( data && data.header && data.header.packet_size ) {
-                        if ( !incorrectSize ) {
-                            O2errors.push( "events had data.header.packet_size set, use data.raw.length instead " + JSON.stringify(data) );
-                            incorrectSize = true;
+                    if ( data && data.header ) {
+                        if ( data.header.packet_size ) {
+                            if ( !incorrectSize ) {
+                                O2errors.push( "events had data.header.packet_size set, use data.raw.length instead" );
+                                incorrectSize = true;
+                            }
+
+                            if ( !data.raw ) {
+                                data.raw = {};
+                            }
+
+                            data.raw.length = data.header.packet_size;
+                            delete data.header.packet_size;
                         }
 
-                        if ( !data.raw ) {
-                            data.raw = {};
-                        }
+                        if ( data.header.payload_length ) {
+                            if ( !incorrectpayloadlength ) {
+                                O2errors.push( "events had data.header.payload_length set, use data.raw.payload_length instead");
+                                incorrectpayloadlength = true;
+                            }
 
-                        data.raw.length = data.header.packet_size;
-                        delete data.header.packet_size;
+                            if ( !data.raw ) {
+                                data.raw = {};
+                            }
+
+                            data.raw.payload_length = data.header.payload_length;
+                            delete data.header.payload_length;
+                        }
                     }
 
                     if ( data && data.packet_type ) {
                         if ( !incorrectType ) {
-                            O2errors.push( "events had data.packet_type set: use data.header.packet_type instead "  + JSON.stringify(data));
+                            O2errors.push( "events had data.packet_type set: use data.header.packet_type instead");
                             incorrectType = true;
                         }
 
@@ -221,6 +238,14 @@ export class QlogLoaderV2 {
                         data.header.packet_type = data.packet_type;
                         delete data.packet_type;
                     }
+                }
+
+                if ( usesEventFields ) {
+                    O2errors.push( "Trace still uses event_fields. This method is deprecated in draft-02, though qvis still supports it. Better to use the more traditional -02 JSON or NDJSON formats instead.");
+                }
+
+                if ( fileContents.qlog_format === undefined || fileContents.qlog_format.length === 0 ) {
+                    O2errors.push( "Trace does not specify a qlog_format entry, which is required in draft-02. JSON was assumed.");
                 }
 
                 if ( O2errors.length !== 0 ) {

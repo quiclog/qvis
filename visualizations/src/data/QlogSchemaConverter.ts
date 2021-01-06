@@ -144,8 +144,17 @@ export class QlogSchemaConverter {
                 rawOutput.raw = {};
             }
 
-            rawOutput.raw.length = rawOutput.header.packet_size;
-            delete rawOutput.header.packet_size; // to enforce proper draft-02 structure
+            rawOutput.raw.length = rawInput.header.packet_size;
+            delete rawInput.header.packet_size; // to enforce proper draft-02 structure
+        }
+
+        if ( rawInput.header && rawInput.header.payload_length ) {
+            if ( !rawOutput.raw ) {
+                rawOutput.raw = {};
+            }
+
+            rawOutput.raw.payload_length = rawInput.header.payload_length;
+            delete rawInput.header.payload_length;
         }
 
         // TODO: add other 01 to 02 changes for individual events 

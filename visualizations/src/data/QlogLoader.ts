@@ -281,13 +281,24 @@ export class QlogLoader {
                     }
 
                     // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
-                    if ( data && data.header && data.header.packet_size ) {
-                        if ( !data.raw ) {
-                            data.raw = {};
+                    if ( data && data.header ) {
+                        if ( data.header.packet_size ) {
+                            if ( !data.raw ) {
+                                data.raw = {};
+                            }
+
+                            data.raw.length = data.header.packet_size;
+                            delete data.header.packet_size; // to enforce proper draft-02 structure
                         }
 
-                        data.raw.length = data.header.packet_size;
-                        delete data.header.packet_size; // to enforce proper draft-02 structure
+                        if ( data.header.payload_length ) {
+                            if ( !data.raw ) {
+                                data.raw = {};
+                            }
+
+                            data.raw.payload_length = data.header.payload_length;
+                            delete data.header.payload_length;
+                        }
                     }
                 }
 
@@ -474,14 +485,26 @@ export class QlogLoader {
                 parsedEvt.data.header.packet_type = qlog02.PacketType.zerortt;
             }
 
-            // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length
-            if ( parsedEvt.data && parsedEvt.data.header && parsedEvt.data.header.packet_size ) {
-                if ( !parsedEvt.data.raw ) {
-                    parsedEvt.data.raw = {};
+            // to be compatible with draft-02: data.header.packet_size was moved to data.raw.length, data.header.payload_length to data.raw.payload_length
+            if ( parsedEvt.data && parsedEvt.data.header ) {
+                if ( parsedEvt.data.header.packet_size ) {
+                    if ( !parsedEvt.data.raw ) {
+                        parsedEvt.data.raw = {};
+                    }
+
+                    parsedEvt.data.raw.length = parsedEvt.data.header.packet_size;
+                    delete parsedEvt.data.header.packet_size; // to enforce proper draft-02 structure
                 }
 
-                parsedEvt.data.raw.length = parsedEvt.data.header.packet_size;
-                delete parsedEvt.data.header.packet_size; // to enforce proper draft-02 structure
+
+                if ( parsedEvt.data.header.payload_length ) {
+                    if ( !parsedEvt.data.raw ) {
+                        parsedEvt.data.raw = {};
+                    }
+
+                    parsedEvt.data.raw.payload_length = parsedEvt.data.header.payload_length;
+                    delete parsedEvt.data.header.payload_length;
+                }
             }
         }
     }
