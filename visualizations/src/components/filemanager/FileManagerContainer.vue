@@ -24,7 +24,7 @@
                 </div>
                 <div>
                     <p style="margin-top: 5px;">
-                        You can load .qlog, .pcap (alongside separate .keys) and .pcapng (with embedded keys) files.<br/>
+                        You can load .qlog, .netlog, .pcap (alongside separate .keys) and .pcapng (with embedded keys) files.<br/>
                         You can also load a .json file that lists several other files to be fetched (for the format, see <a href="https://github.com/quiclog/pcap2qlog#options">the pcap2qlog documentation</a>. Or try <a href="https://quic-tracker.info.ucl.ac.be/traces/20190820/list/quant.eggert.org:4433?.json">an example</a>).<br/><br/>
                         If you're looking for inspiration, <a href="https://quant.eggert.org/" target="_blank">quant</a> has public qlogs, as does <a href="https://quic.aiortc.org/logs" target="_blank">aioquic</a>.<br/>
                         <a href="https://quic-tracker.info.ucl.ac.be">QUIC Tracker</a> provides .pcap files for all its tests and has a convenient integration with qvis from its UI. <br/>

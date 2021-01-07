@@ -8,6 +8,8 @@ import { IQlogRawEvent } from '@/data/QlogEventParser';
 import Vue from 'vue';
 import TCPToQlog from '@/components/filemanager/pcapconverter/tcptoqlog';
 import StreamingJSONParser from '@/components/filemanager/utils/StreamingJSONParser';
+import FileLoader from '@/components/filemanager/data/FileLoader';
+import NetlogToQlog from '@/components/filemanager/netlogconverter/netlogtoqlog';
 
 @Module({name: 'connections'})
 export default class ConnectionStore extends VuexModule {
@@ -172,12 +174,20 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit("adjustOutstandingRequestCount", 1 );
 
             // 1. try direct download first
-            if ( urlToLoad.indexOf(".qlog") >= 0 ) {
+            if ( urlToLoad.indexOf(".qlog") >= 0 || urlToLoad.indexOf(".netlog") >= 0 ) {
                 apireturns = await fetch( urlToLoad );
                 if ( apireturns.ok ) { // 200-299 status
                     const txt = await apireturns.text();
+
                     console.log("ConnectionStore:loadFilesFromServer: successfully loaded file directly: ", urlToLoad, apireturns, txt);
-                    fileContents = StreamingJSONParser.parseQlogText(txt);
+
+                    const fileResult = await FileLoader.Load( txt, urlToLoad );
+                    if ( fileResult.error !== undefined ) {
+                        throw fileResult.error;
+                    }
+                    else {
+                        fileContents = fileResult.qlogJSON;
+                    }
                 }
                 else {
                     console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, apireturns);
@@ -227,11 +237,27 @@ export default class ConnectionStore extends VuexModule {
                             qlogRoot = apireturns.data.qlog; // pcap2qlog output has 1 more level of indirection 
                         }
 
-                        if ( typeof qlogRoot === "object" ) {
-                            fileContents = qlogRoot; // returned json has multiple fields, the actual qlog is inside the .qlog field
+                        if ( qlogRoot.constants && qlogRoot.events && urlToLoad.indexOf(".netlog") >= 0 ) {
+                            // 100% sure trace is a netlog trace, already parsed for use, pass it to netlog interpreter directly
+                            // needed becaue here qlogRoot is also typeof "object" which messes with other qlog-specific returns from the server
+                            console.log("ConnectionStore:loadFilesFromServer: identified file as .netlog, transforming to .qlog", urlToLoad, qlogRoot);
+
+                            fileContents = NetlogToQlog.convert( qlogRoot );
                         }
                         else {
-                            fileContents = StreamingJSONParser.parseQlogText(qlogRoot);
+                            if ( typeof qlogRoot === "object" ) {
+                                fileContents = qlogRoot; // returned json has multiple fields, the actual qlog is inside the .qlog field
+                            }
+                            else {                 
+                                const fileResult = await FileLoader.Load( qlogRoot, urlToLoad );
+
+                                if ( fileResult.error !== undefined ) {
+                                    throw fileResult.error;
+                                }
+                                else {
+                                    fileContents = fileResult.qlogJSON;
+                                }
+                            }
                         }
 
                         if ( fileContents.traces && fileContents.traces.length > 0 && fileContents.traces[0].error_description ) {

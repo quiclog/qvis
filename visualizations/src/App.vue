@@ -51,7 +51,9 @@
         }
 
         protected mounted(){
-            this.store.loadFilesFromServer( this.$route.query );
+            if ( Object.keys(this.$route.query).length > 0 ){
+                this.store.loadFilesFromServer( this.$route.query );
+            }
         }
     }
 </script>
