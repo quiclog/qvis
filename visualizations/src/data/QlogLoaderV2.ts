@@ -143,6 +143,9 @@ export class QlogLoaderV2 {
                     connection.vantagePoint.name = "No VantagePoint set";
                 }
 
+                connection.commonFields = jsonconnection.common_fields!;
+                connection.configuration = jsonconnection.configuration || {};
+
                 if ( usesEventFields ) {
                     connection.eventFieldNames = (jsonconnection as any).event_fields;
                     connection.setEventParser( new EventFieldsParser() );
@@ -150,9 +153,6 @@ export class QlogLoaderV2 {
                 else {
                     connection.setEventParser( new DirectEventParser() );
                 }
-
-                connection.commonFields = jsonconnection.common_fields!;
-                connection.configuration = jsonconnection.configuration || {};
 
                 // TODO: remove! Slows down normal traces!
                 let misOrdered = false;
