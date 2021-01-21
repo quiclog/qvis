@@ -1506,8 +1506,8 @@ export class SequenceDiagramD3Renderer {
                             let framesToRender:undefined | Array<any> = undefined;
 
                             // in some cases, we have MANY frames in a single packet (e.g., some tests have 50+, if there are many ACK gaps it can also be dozens)
-                            // so, if there are more than 10 (and more than 5 of a particular type) we aggregate them into a single visual entity
-                            if ( evt.data.frames.length > 10 ) {
+                            // so, if there are more than 8 (and more than 5 of a particular type) we aggregate them into a single visual entity
+                            if ( evt.data.frames.length >= 8 ) {
 
                                 const typeCounter:Map<QUICFrameTypeName, Array<any>> = new Map<QUICFrameTypeName, Array<any>>();
 
@@ -1553,7 +1553,7 @@ export class SequenceDiagramD3Renderer {
                                     }
                                 }
                             }
-                            else { // < 10 overall, just render each frame individually
+                            else { // < 8 overall, just render each frame individually
                                 framesToRender = evt.data.frames;
                             }
                             
