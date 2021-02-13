@@ -1982,13 +1982,13 @@ export class SequenceDiagramD3Renderer {
                 break;
 
             case qlog.RecoveryEventType.packet_lost:
-                if ( evt.data !== undefined && evt.data.packet_number !== undefined ) {
+                if ( evt.data !== undefined && evt.data.header !== undefined && evt.data.header.packet_number !== undefined ) {
                     let packetType = "";
-                    if ( evt.data.header !== undefined && evt.data.header.packet_type !== undefined ) {
+                    if ( evt.data.header.packet_type !== undefined ) {
                         packetType = this.packetTypeToString( evt.data.header.packet_type ) + " ";
                     }
 
-                    return packetType + "packet lost #" + evt.data.packet_number;
+                    return packetType + "packet lost #" + evt.data.header.packet_number;
                 }
                 else {
                     return evt.name;

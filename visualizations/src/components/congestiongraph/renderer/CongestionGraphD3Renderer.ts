@@ -1298,12 +1298,12 @@ export default class CongestionGraphD3Renderer {
             const data = parsedPacket.data;
             this.createPrivateNamespace(packet);
 
-            if ( data.packet_number === undefined ) {
+            if ( data.header === undefined || data.header.packet_number === undefined ) {
                 console.error("Packet was LOST that didn't contain a packet_number field...", packet);
                 continue;
             }
 
-            const lostPacketNumber = parseInt( data.packet_number, 10 );
+            const lostPacketNumber = parseInt( data.header.packet_number, 10 );
             const sentPacket = packetSentList[ lostPacketNumber ];
             if (!sentPacket) {
                 console.error("Packet was LOST that we didn't send... ignoring", lostPacketNumber, packet);
