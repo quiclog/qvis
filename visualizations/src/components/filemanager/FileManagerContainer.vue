@@ -48,7 +48,7 @@
                                     :state="Boolean(filesToUpload.length > 0)"
                                     placeholder="Choose files or drop them here..."
                                     drop-placeholder="Drop files here..."
-                                    accept=".qlog,.json,.netlog"
+                                    accept=".qlog,.qlognd,.json,.netlog"
                                     class="text-nowrap text-truncate"
                                     ></b-form-file>
 
@@ -274,22 +274,24 @@
                 return;
             }
 
+            let filteredFilesToUpload: Array<File> = [];
             for ( const file of this.filesToUpload ){
 
                 if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog") && !file.name.endsWith(".qlognd")) {
                     Vue.notify({
                         group: "default",
-                        title: "Provide .qlog file",
+                        title: "Provide .qlog, .qlognd, .json, or .netlog file",
                         type: "error",
                         duration: 6000,
-                        text: "We currently only support uploading .qlog files. " + file.name,
+                        text: "Cannot accept " + file.name + "; we currently only support uploading .qlog, .qlognd, .json, or .netlog files. ",
                     });
-                
-                    return;
+                }
+                else {
+                    filteredFilesToUpload.push(file);
                 }
             }
 
-            for ( const file of this.filesToUpload ){
+            for ( const file of filteredFilesToUpload ){
 
                 const uploadFileName = file.name;
                 Vue.notify({
