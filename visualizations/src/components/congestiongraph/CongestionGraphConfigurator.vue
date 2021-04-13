@@ -14,6 +14,7 @@
                 <b-button @click="useBrush2d()" v-b-tooltip.hover title="Click this button, then drag and drop a rectangular area to zoom in on.">Zoom area</b-button>
                 <b-button @click="useRuler()" v-b-tooltip.hover title="Click this button or press R, then drag and drop a line to see the time and byte ranges it spans">Ruler (press R)</b-button>
                 <b-button @click="toggleCongestionGraph()">Toggle congestion info</b-button>
+                <b-button @click="toggleRTTZoom()">Toggle RTT zooming</b-button>
                 <!--<b-button @click="togglePerspective()" v-if="isClientSideTrace"  v-b-tooltip.hover title="You have selected a trace from a client-side perspective, while this tool works best for server-side. Press this button to simulate a server-side view (by swapping packet_sent and packet_received)" variant="danger">Toggle perspective</b-button>-->
             </b-row>
 
@@ -94,6 +95,10 @@
         public toggleCongestionGraph(){
             // TODO hook up properly
             this.config.renderer.toggleCongestionGraph();
+        }
+
+        public toggleRTTZoom() {
+            this.config.renderer.toggleZoomingRTTGraph();
         }
 
         public togglePerspective(){

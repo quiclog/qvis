@@ -28,6 +28,8 @@ export class RecoveryGraphState {
     public originalRangeY: [number, number] = [0, 0]; // [minY, maxY]
     public rangeY: [number, number] = [0, 0]; // Current minY and maxY
 
+    public zooming0RTTenabled:boolean = false;
+
 
     /* Methods */
     public constructor() {

@@ -292,6 +292,16 @@ export default class CongestionGraphD3Renderer {
         this.setPerspective(this.mainGraphState.useSentPerspective ? false : true, true);
     }
 
+    public toggleZoomingRTTGraph() {
+        this.recoveryGraphState.zooming0RTTenabled = !this.recoveryGraphState.zooming0RTTenabled;
+
+        this.redrawCanvas(
+            this.mainGraphState.currentPerspective().rangeX[0], 
+            this.mainGraphState.currentPerspective().rangeX[1], 
+            this.mainGraphState.currentPerspective().rangeY[0], 
+            this.mainGraphState.currentPerspective().rangeY[1]);
+    }
+
     public resetZoom(){
         this.mainGraphState.currentPerspective().rangeX = this.mainGraphState.currentPerspective().originalRangeX;
         this.mainGraphState.currentPerspective().rangeY = this.mainGraphState.currentPerspective().originalRangeY;
@@ -784,7 +794,8 @@ export default class CongestionGraphD3Renderer {
     }
 
     // Y corresponds to coordinates for data sent/received in bytes
-    // Y scale for congestion info and recovery info is static and can not be changed
+    // Y scale for congestion info is static and can not be changed
+    // Y scale for RTT info is dynamically calculated based on zoom of sent/received area
     private redrawCanvas(minX: number, maxX: number, minY: number, maxY: number) {
         // currentPerspective gives easy access to the variables of the current perspective
         // This way we can cover both perspectives without having to use a lot conditions
@@ -810,6 +821,32 @@ export default class CongestionGraphD3Renderer {
         this.mainGraphState.canvasContext!.clearRect(0, 0, this.mainGraphState.innerWidth, this.mainGraphState.innerHeight);
 
         if (this.mainGraphState.useSentPerspective) {
+
+            // zooming the RTT graph y-axis along can cause some weird visual artefacts sometimes, so reserve this as an extra option
+            if ( this.recoveryGraphState.zooming0RTTenabled ) {
+                let [minCongestionY, maxCongestionY, minRTT, maxRTT] = this.findMetricUpdateExtrema( [minX, maxX] );
+
+                if ( minRTT === 0 && maxRTT === 0 ) {
+                    // no measurements in this zone: default to full measurements for lack of something better
+                    minRTT = 0;
+                    maxRTT = currentPerspective.originalRangeY[1];
+                }
+
+                this.recoveryGraphState.yScale = d3.scaleLinear()
+                    .domain( [Math.max(minRTT - 10, 0), maxRTT + 10] ) // fuzz by 10 to make sure extremes are drawn
+                    .range([this.recoveryGraphState.innerHeight, 0]);
+
+                this.recoveryGraphState.gyAxis!.call(currentPerspective.yAxis!.scale(this.recoveryGraphState.yScale));
+            }
+            else {
+                // need to reset if was toggled on, now off again
+                this.recoveryGraphState.yScale = d3.scaleLinear()
+                    .domain( [0, this.recoveryGraphState.originalRangeY[1]] )
+                    .range([this.recoveryGraphState.innerHeight, 0]);
+
+                this.recoveryGraphState.gyAxis!.call(currentPerspective.yAxis!.scale(this.recoveryGraphState.yScale));
+            }
+
             // In case we're using the 'sent-perspective' we want to update the recoverygraph's graphical axis as well
             this.recoveryGraphState.gxAxis!.call(currentPerspective.xAxis!.scale(currentPerspective.xScale));
             // And clear its canvas
@@ -892,15 +929,15 @@ export default class CongestionGraphD3Renderer {
             // RTT
             this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.minRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
-            }), "#C96480", undefined);
+            }), "#C96480", this.drawSmallTick);
 
             this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.smoothedRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
-            }), "#8a554a", undefined);
+            }), "#8a554a", this.drawSmallTick);
 
             this.drawLines(this.recoveryGraphState.canvasContext!, this.mainGraphState.metricUpdateLines.lastRTT.map((point) => {
                 return [ this.mainGraphState.sent.xScale!(point[0]), this.recoveryGraphState.yScale!(point[1]) ];
-            }), "#ff9900", undefined);
+            }), "#ff9900", this.drawSmallTick);
         }
 
         // Update the ranges to their new values
@@ -975,6 +1012,15 @@ export default class CongestionGraphD3Renderer {
 
         canvasContext.beginPath();
         canvasContext.arc(centerX, centerY, radius, 0, 360);
+        canvasContext.fill();
+    }
+
+    private drawSmallTick(canvasContext: CanvasRenderingContext2D, centerX: number, centerY: number, color: string){
+        const radius = 2;
+        canvasContext.fillStyle = color;
+
+        canvasContext.beginPath();
+        canvasContext.arc(centerX, centerY - 1, radius, 0, 360);
         canvasContext.fill();
     }
 
@@ -1723,13 +1769,18 @@ export default class CongestionGraphD3Renderer {
         return [min, max];
     }
 
+    private findYExtremaRecovery(minX: number, maxX: number): [number, number] {
+
+        return [0,0];
+    }
+
     // Returns [minCongestionY, maxCongestionY, minRTT, maxRTT];
     // Optionally, a range of [minX, maxX] can be passed within which the y extrema must be located
     private findMetricUpdateExtrema(range?: [number, number]): [number, number, number, number] {
         let minCongestionY = 0;
         let maxCongestionY = 0;
-        let minRTT = 0;
-        let maxRTT = 0;
+        let minRTT = Number.MAX_VALUE;
+        let maxRTT = Number.MIN_VALUE;
 
         const minX = range !== undefined ? range[0] : this.mainGraphState.currentPerspective().originalRangeX[0];
         const maxX = range !== undefined ? range[1] : this.mainGraphState.currentPerspective().originalRangeX[1];
@@ -1772,6 +1823,14 @@ export default class CongestionGraphD3Renderer {
                 minRTT = minRTT > y ? y : minRTT;
                 maxRTT = maxRTT < y ? y : maxRTT;
             }
+        }
+
+        if ( minRTT === Number.MAX_VALUE ) {
+            minRTT = 0;
+        }
+        
+        if ( maxRTT === Number.MIN_VALUE ) {
+            maxRTT = 0;
         }
 
         return [minCongestionY, maxCongestionY, minRTT, maxRTT];
