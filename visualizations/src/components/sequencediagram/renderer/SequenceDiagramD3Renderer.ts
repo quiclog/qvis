@@ -2036,6 +2036,8 @@ export class SequenceDiagramD3Renderer {
                 if ( evt.data && evt.data.frame && evt.data.frame.headers ) {
                     let method = undefined;
                     let path = undefined;
+                    let authority = undefined;
+                    let status = undefined;
                     for ( const header of evt.data.frame.headers ) {
                         if ( header.name === ":method" || header.name === "method" ) {
                             method = header.value;
@@ -2043,10 +2045,47 @@ export class SequenceDiagramD3Renderer {
                         else if ( header.name === ":path" || header.name === "path" ) {
                             path = header.value;
                         }
+                        else if ( header.name === ":authority" || header.name === "authority" ) {
+                            authority = header.value;
+                        }
+                        else if ( header.name === ":status" || header.name === "status" ) {
+                            status = header.value;
+                        }
                     }
 
-                    if ( method && path ) {
-                        return method + " " + path + streamID;
+                    // Ideally, we have
+                    // status method path (stream id) authority
+
+                    // example:
+                    // 200 GET /index.html (stream 4) example.org
+                    // (though note that not all these headers will be present for both requests and responses)
+
+                    let shorthand = "";
+                    if ( status ) {
+                        shorthand += status + " ";
+                    }
+
+                    if ( method ) {
+                        shorthand += method + " ";
+                    }
+
+                    if ( path ) {
+                        shorthand += path + " ";
+                    }
+
+                    if ( shorthand !== "" ) { // if none of the headers are set, we want to log generic stuff below
+                        shorthand += streamID + " ";
+                    }
+
+                    if ( authority ) {
+                        if ( shorthand === "" ) { // if only authority is set, we still want to show stream ID here
+                            shorthand += streamID + " ";
+                        }
+                        shorthand += authority;
+                    }
+
+                    if ( shorthand !== "" ) {
+                        return shorthand;
                     }
                 }
 
