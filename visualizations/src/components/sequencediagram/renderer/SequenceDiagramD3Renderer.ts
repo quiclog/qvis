@@ -1234,10 +1234,26 @@ export class SequenceDiagramD3Renderer {
         const yMin = Math.max(0, window.pageYOffset - offsetFromDocumentTop);
         const yMax = yMin + (window.innerHeight - Math.max(0, svgRect.top));
 
+
+        // 1.b we want to have a hacky override that forces the tool to draw the full SVG at once (e.g., for storage, search)
+        // for this, we just never remove extents
+        let forceFullRender = false;
+        // TODO: FIXME: this is very hacky and should be propagated down from the parent component properly!!!
+        if ( window.location.hash && window.location.hash.indexOf("forceFull") >= 0 ){
+            forceFullRender = true;
+        }
+
         // see if we need to render ranges at this time
         const currentRangeIndex = Math.floor(yMin / this.rangeHeight);
-        const fromRange         = Math.max(0,                              currentRangeIndex - 1);
-        const toRange           = Math.min(this.renderedRanges.length - 1, currentRangeIndex + 1);
+        let fromRange         = Math.max(0,                              currentRangeIndex - 1);
+        let toRange           = Math.min(this.renderedRanges.length - 1, currentRangeIndex + 1);
+
+        if ( forceFullRender ) {
+            fromRange = 0;
+            toRange = this.renderedRanges.length - 1;
+
+            console.warn("SequenceDiagramD3Renderer:renderPartialExtents: forcing a full render of the entire diagram, this can cause slowdowns!", this.renderedRanges);
+        }
 
         // we need to go from ranges to actual [yMin, yMax] "extents" that we can render
         const extentsToRender:Array< ExtentInfo > = new Array< ExtentInfo >();
@@ -1251,25 +1267,30 @@ export class SequenceDiagramD3Renderer {
 
         // see if we need to un-render ranges at this time
         const rangeIndicesToRemove:Array< number > = new Array< number >();
-        // first determine the lower indices
-        let removeFrom:number = Math.max(0, fromRange - 500);
-        let removeTo:number   = Math.max(0, fromRange - 2); // leave 1 extra buffer of rendered range
-        if ( !(removeFrom === 0 && removeTo === 0) ){ // don't want to remove range 0 if it's the only one
-            for ( let r = removeFrom; r <= removeTo; ++r ){
-                if ( this.renderedRanges[r].rendered ){
-                    rangeIndicesToRemove.push( r );
+
+        if ( !forceFullRender ) {
+
+            // first determine the lower indices
+            let removeFrom:number = Math.max(0, fromRange - 500);
+            let removeTo:number   = Math.max(0, fromRange - 2); // leave 1 extra buffer of rendered range
+            if ( !(removeFrom === 0 && removeTo === 0) ){ // don't want to remove range 0 if it's the only one
+                for ( let r = removeFrom; r <= removeTo; ++r ){
+                    if ( this.renderedRanges[r].rendered ){
+                        rangeIndicesToRemove.push( r );
+                    }
                 }
             }
-        }
-        // then the higher indices (when scrolling back up)
-        removeFrom  = Math.min(this.renderedRanges.length - 1, toRange + 2); // leave 1 extra buffer of rendered range
-        removeTo    = Math.min(this.renderedRanges.length - 1, toRange + 500);
-        if ( !(removeFrom === this.renderedRanges.length - 1 && removeTo === this.renderedRanges.length - 1) ){ // don't want to remove the last range if it's the only one
-            for ( let r = removeFrom; r <= removeTo; ++r ){
-                if ( this.renderedRanges[r].rendered ){
-                    rangeIndicesToRemove.push( r );
+            // then the higher indices (when scrolling back up)
+            removeFrom  = Math.min(this.renderedRanges.length - 1, toRange + 2); // leave 1 extra buffer of rendered range
+            removeTo    = Math.min(this.renderedRanges.length - 1, toRange + 500);
+            if ( !(removeFrom === this.renderedRanges.length - 1 && removeTo === this.renderedRanges.length - 1) ){ // don't want to remove the last range if it's the only one
+                for ( let r = removeFrom; r <= removeTo; ++r ){
+                    if ( this.renderedRanges[r].rendered ){
+                        rangeIndicesToRemove.push( r );
+                    }
                 }
             }
+
         }
 
         // 2. 
