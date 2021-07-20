@@ -60,6 +60,15 @@
             if ( queryParameters.focusOnConnection && queryParameters.focusOnEvent ) {
                 this.focusOnNext = { connectionIndex: parseInt(queryParameters.focusOnConnection as string, 10), eventIndex: parseInt(queryParameters.focusOnEvent as string, 10) };
             }
+            else if ( queryParameters.focusOnPN ) {
+                
+                let connectionIndex = 0;
+                if ( queryParameters.focusOnConnection ) {
+                    connectionIndex = parseInt(queryParameters.focusOnConnection as string, 10);
+                }
+
+                this.focusOnNext = { connectionIndex: connectionIndex, packetNumber: parseInt(queryParameters.focusOnPN as string, 10) };
+            }
         }
 
         public mounted(){
@@ -118,7 +127,7 @@
                     }
 
                     if ( trace.connection && trace.connection.parent && trace.connection.parent.URL ) {
-                        this.eventLink = "https://qvis.edm.uhasselt.be/?#/sequence?" + fileLinks + "&focusOnConnection=" + focusInfo.connectionIndex + "&focusOnEvent=" + focusInfo.eventIndex;
+                        this.eventLink = "https://qvis.quictools.info?#/sequence?" + fileLinks + "&focusOnConnection=" + focusInfo.connectionIndex + "&focusOnEvent=" + focusInfo.eventIndex;
                     }
                     else {
                         this.eventLink = null;

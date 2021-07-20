@@ -31,7 +31,8 @@ interface Interval {
 
 export interface EventPointer {
     connectionIndex: number,
-    eventIndex: number
+    eventIndex?: number,
+    packetNumber?: number
 };
 
 enum arrowTargetProperty {
@@ -1155,25 +1156,56 @@ export class SequenceDiagramD3Renderer {
         if ( focusOn ) {
             if ( this.traces.length > focusOn.connectionIndex ) {
 
-                // a. figure out the y offset for the event (stored in the metadata from calculateCoordinates)
                 const trace = this.traces[ focusOn.connectionIndex ];
                 const events = trace.connection.getEvents();
-                if ( events.length > focusOn.eventIndex ) {
-                    const evt = events[ focusOn.eventIndex ] as any;
-                    if ( evt.qvis && evt.qvis.sequencediagram && evt.qvis.sequencediagram.y ) {
-                        const targetY = evt.qvis.sequencediagram.y - 50; // - 50 to scroll back up a little bit so we are sure the event is "in view"
-                        console.log("SequenceDiagramD3Renderer:renderPartialExtents: focusing on event ", focusOn, targetY);
 
-                        window.scrollTo( 0, targetY ); // this will trigger the scrollHandler, which will again enter this function, so we exit it instead
+                if ( focusOn.packetNumber ) {
+                    // we "abuse" .eventIndex by looking up the event belonging to the packet number and using that event's index
+                    let idx = 0;
+                    for ( const rawEvt of events ) {
+                        const evt = trace.connection.parseEvent(rawEvt);
 
-                        return;
+                        // we only check in the packet_sent event for the given trace
+                        // if you want the other trace, need to specify another connectionIndex
+                        if ( evt.name === qlog.TransportEventType.packet_sent &&
+                             evt.data && evt.data.header && evt.data.header.packet_number ) {
+                            if ( "" + evt.data.header.packet_number === "" + focusOn.packetNumber ) {
+                                focusOn.eventIndex = idx;
+                                console.log("SequenceDiagramD3Renderer:renderPartialExtents: packet number found in event", rawEvt, focusOn);
+                                break;
+                            }
+                        }
+
+                        ++idx;
+                    }
+
+                    if ( !focusOn.eventIndex ) {
+                        console.error("SequenceDiagramD3Renderer:renderPartialExtents: packet number couldn't be found in the trace...", focusOn, this.traces);
+                    }
+                }
+
+                if ( focusOn.eventIndex ) {
+                    // a. figure out the y offset for the event (stored in the metadata from calculateCoordinates)
+                    if ( events.length > focusOn.eventIndex ) {
+                        const evt = events[ focusOn.eventIndex ] as any;
+                        if ( evt.qvis && evt.qvis.sequencediagram && evt.qvis.sequencediagram.y ) {
+                            const targetY = evt.qvis.sequencediagram.y - 50; // - 50 to scroll back up a little bit so we are sure the event is "in view"
+                            console.log("SequenceDiagramD3Renderer:renderPartialExtents: focusing on event ", focusOn, targetY);
+
+                            window.scrollTo( 0, targetY ); // this will trigger the scrollHandler, which will again enter this function, so we exit it instead
+
+                            return;
+                        }
+                        else {
+                            console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, y unknown", focusOn, this.traces);
+                        }
                     }
                     else {
-                        console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, y unknown", focusOn, this.traces);
+                        console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, eventIndex unknown", focusOn, this.traces);
                     }
                 }
                 else {
-                    console.error("SequenceDiagramD3Renderer:renderPartialExtents: couldn't focus on event, eventIndex unknown", focusOn, this.traces);
+                    console.error("SequenceDiagramD3Renderer:renderPartialExtents: neither eventIndex nor pnIndex was set, one is required to focus!", focusOn, this.traces);
                 }
             }
             else {
