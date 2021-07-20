@@ -1824,11 +1824,25 @@ export class SequenceDiagramD3Renderer {
 
             case qlog.QUICFrameTypeName.connection_close:
                 output = frame.frame_type + " ";
-                if (frame.error_code === qlog.TransportError.no_error || frame.error_code === qlog.ApplicationError.http_no_error || frame.error_code === 0) {
+                if (frame.error_code === qlog.TransportError.no_error || frame.error_code === qlog.ApplicationError.http_no_error || ( "" + frame.error_code) === "0" ) {
                     output += ": clean";
                 }
-                else{
-                    output += frame.error_code + " : " + frame.reason;
+                // some implementations don't output .error_code, only raw_error_code... weird
+                else if ( frame.raw_error_code && ("" + frame.raw_error_code) === "0" ) {
+                    output += ": clean";
+                }
+                else {
+                    if ( frame.error_code ) {
+                        output += frame.error_code;
+                    }
+                    // some implementations don't output .error_code, only raw_error_code... weird
+                    else if ( frame.raw_error_code ) {
+                        output += frame.raw_error_code;
+                    }
+
+                    if ( frame.reason ) {
+                        output  += " : " + frame.reason;
+                    }
                 }
                 
                 return output;
@@ -1887,6 +1901,34 @@ export class SequenceDiagramD3Renderer {
                 }
                 else {
                     return "" + qlog.QUICFrameTypeName.data_blocked;
+                }
+                break;
+            
+            case qlog.QUICFrameTypeName.reset_stream:
+                if ( frame.stream_id ) {
+                    if ( frame.error_code !== undefined ) {
+                        return "reset stream " + frame.stream_id + " (" + frame.error_code + ")";
+                    }
+                    else {
+                        return "reset stream " + frame.stream_id;
+                    }
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.reset_stream;
+                }
+                break;
+            
+            case qlog.QUICFrameTypeName.stop_sending:
+                if ( frame.stream_id ) {
+                    if ( frame.error_code !== undefined ) {
+                        return "stop sending " + frame.stream_id + " (" + frame.error_code + ")";
+                    }
+                    else {
+                        return "stop sending " + frame.stream_id;
+                    }
+                }
+                else {
+                    return "" + qlog.QUICFrameTypeName.stop_sending;
                 }
                 break;
 
