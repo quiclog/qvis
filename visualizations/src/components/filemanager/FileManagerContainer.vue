@@ -126,11 +126,11 @@
                         You can pass files you want to load via URL parameters to the qvis page.<br/>
                         This method supports the same formats as Option 1.<br/><br/>
 
-                        Format 1: <a href="https://qvis.edm.uhasselt.be/#?list=x.json">?list=x.json</a><br/>
-                        Format 2: <a href="https://qvis.edm.uhasselt.be/#?file=x.qlog">?file=x.qlog</a><br/>
-                        Format 3: <a href="https://qvis.edm.uhasselt.be/#?file=x.pcap&amp;secrets=x.keys">?file=x.pcap&amp;secrets=x.keys</a><br/>
-                        Format 4: <a href="https://qvis.edm.uhasselt.be/#?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog">?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog</a><br/>
-                        Format 5: <a href="https://qvis.edm.uhasselt.be/#?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys">?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys</a><br/>
+                        Format 1: <a href="https://qvis.quictools.info/#?list=x.json">?list=x.json</a><br/>
+                        Format 2: <a href="https://qvis.quictools.info/#?file=x.qlog">?file=x.qlog</a><br/>
+                        Format 3: <a href="https://qvis.quictools.info/#?file=x.pcap&amp;secrets=x.keys">?file=x.pcap&amp;secrets=x.keys</a><br/>
+                        Format 4: <a href="https://qvis.quictools.info/#?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog">?file1=x.qlog&amp;file2=y.qlog&amp;file3=z.qlog</a><br/>
+                        Format 5: <a href="https://qvis.quictools.info/#?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys">?file1=x.qlog&amp;secrets1=x.keys&amp;file2=y.qlog&amp;secrets2=y.keys</a><br/>
                     </p>
                 </div>
             </b-col>
@@ -212,6 +212,7 @@
     import { Component, Vue } from "vue-property-decorator";
     import ConnectionStore from "@/store/ConnectionStore";
 
+    import * as qlog02 from "@/data/QlogSchema02";
     import TCPToQLOG from "./pcapconverter/tcptoqlog";
     import NetlogToQLOG from "./netlogconverter/netlogtoqlog";
     import FileLoader, { FileResult } from "./data/FileLoader";
@@ -537,6 +538,22 @@
             console.log("FileManagerContainer:downloadGroup : downloading internal qlog representation of group ", group);
 
             const internalQlog = QlogSchemaConverter.Convert01to02( group );
+
+            const DEBUGfilter = true;
+            if ( DEBUGfilter ) {
+                for ( const connection of internalQlog.traces ) {
+                    const newEvents = (connection as qlog02.ITrace).events.filter( (evt) => (
+                        evt.name === qlog02.EventCategory.transport + ":" + qlog02.TransportEventType.packet_sent ||
+                        evt.name === qlog02.EventCategory.transport + ":" + qlog02.TransportEventType.packet_received ||
+                        evt.name === qlog02.EventCategory.transport + ":" + qlog02.TransportEventType.parameters_set ||
+                        evt.name === qlog02.EventCategory.http + ":" + qlog02.HTTP3EventType.frame_created ||
+                        evt.name === qlog02.EventCategory.http + qlog02.HTTP3EventType.frame_parsed ||
+                        evt.name!.indexOf("session_ticket_used") >= 0
+                    ));
+
+                    (connection as qlog02.ITrace).events = newEvents;
+                }
+            }
 
             let filename = "" + group.filename;
             if ( group.URL && group.URL.length > 0 ) {

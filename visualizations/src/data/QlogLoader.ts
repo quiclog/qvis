@@ -31,7 +31,7 @@ export class QlogLoader {
                 return QlogLoaderV2.fromJSON( json );
             }
             else {
-                console.error("QlogLoader: Unknown qlog version! Only draft-00, draft-01 and draft-02-wip are supported!", version, json);
+                console.error("QlogLoader: Unknown qlog version! Only draft-00, draft-01, draft-02-wip, draft-02 and qlog-03-WIP are supported!", version, json);
                 
                 return undefined;
             }

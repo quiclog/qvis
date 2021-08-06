@@ -174,7 +174,7 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit("adjustOutstandingRequestCount", 1 );
 
             // 1. try direct download first
-            if ( urlToLoad.indexOf(".qlog") >= 0 || urlToLoad.indexOf(".netlog") >= 0 ) {
+            if ( urlToLoad.indexOf(".qlog") >= 0 || urlToLoad.indexOf(".netlog") >= 0 || urlToLoad.indexOf(".json") >= 0 ) {
                 apireturns = await fetch( urlToLoad );
                 if ( apireturns.ok ) { // 200-299 status
                     const txt = await apireturns.text();
@@ -211,7 +211,7 @@ export default class ConnectionStore extends VuexModule {
                 }
                 else if (window.location.toString().indexOf(":8080") >= 0 ){
                     // local testing, but with online service
-                    url = "https://qvis.edm.uhasselt.be/loadfiles";
+                    url = "https://qvis.quictools.info/loadfiles";
                 }
 
                 // url = "https://192.168.220.132:8089/loadfiles"; 

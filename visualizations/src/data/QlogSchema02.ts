@@ -8,7 +8,8 @@
 
 export class Defaults {
     public static versionName:string = "draft-02";
-    public static versionAliases:Array<string> = ["draft-02", "draft-02-RC1"];
+    // TODO: FIXME: make qlog-03 its own proper version. For now, it's identical to draft-02, so treating it as alias
+    public static versionAliases:Array<string> = ["draft-02", "draft-02-RC1", "qlog-03-WIP"];
 }
 
 export enum LogFormat {
