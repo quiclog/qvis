@@ -136,6 +136,10 @@ export default class ConnectionStore extends VuexModule {
             urlToLoad = queryParameters.list;
         }
         else if ( queryParameters.file1 ){
+            // note: adding "etc." to the URL will cause the direct download below to fail.
+            // this is intentional: we currently don't yet have support for loading multiple files directly in the browser
+            // and have to fallback to the backend for this.
+            // TODO: this is probably not the cleanest way of enforcing this... maybe set a bool or something instead? 
             urlToLoad = queryParameters.file1 + " etc.";
         }
 
@@ -190,7 +194,14 @@ export default class ConnectionStore extends VuexModule {
                     }
                 }
                 else {
+                    // we get here for example if it was a 404 instead of CORS error 
+                    
+                    // TODO: handle this better. Now we have duplicated code here and when handling thrown exceptions
+                    // maybe just throw an exception here as well and fallback to the catch()? 
+                    this.context.commit('adjustOutstandingRequestCount', -1);
+
                     console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, apireturns);
+                    apireturns = null;
                 }
             }
         }
