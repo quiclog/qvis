@@ -3,6 +3,7 @@ import StreamingJSONParser from '../utils/StreamingJSONParser';
 import TCPToQLOG from "../pcapconverter/tcptoqlog";
 import NetlogToQLOG from "../netlogconverter/netlogtoqlog";
 import NewlineJSONToQlog from '../newlineconverter/newlinejsontoqlog';
+import TextSequenceJSONToQlog from '../newlineconverter/textsequencejsontoqlog';
 
 export interface FileResult {
     qlogJSON: any | undefined,
@@ -11,7 +12,9 @@ export interface FileResult {
 
 export enum FileType {
     qlog_normal, // a normal JSON-formatted qlog file
-    qlog_newline, // a newline-delimited JSON file (streaming qlog)
+    qlog_newline, // a newline-delimited JSON file (streaming qlog) : NDJSON format
+
+    qlog_textsequence, // a record separator+newline-delimited JSON file : json-seq format (RFC 7464)
 
     netlog, // internal JSON-based Chromium logging format
     pcap_json,   // JSON obtained from processing a .pcap with tshark
@@ -90,7 +93,7 @@ export default class FileLoader {
 
         if ( rawContents instanceof File ) {
             
-            if ( type === FileType.qlog_newline ) {
+            if ( type === FileType.qlog_newline || type === FileType.qlog_textsequence ) {
                 // for newline delimited qlogs, we have a special streaming parser that can read from a File directly, so prefer that
                 contents = new Response(rawContents).body!;
             }
@@ -100,7 +103,7 @@ export default class FileLoader {
         }
         // it's a string already
         else {
-            if ( type === FileType.qlog_newline ) {
+            if ( type === FileType.qlog_newline || type === FileType.qlog_textsequence ) {
                 // we only have a streaming parser for this, so even if we have a string, we need to transform it to a stream
                 const blob = new Blob([rawContents]);
                 contents = new Response(blob).body!;
@@ -134,6 +137,15 @@ export default class FileLoader {
 
             contentsJSON = await NewlineJSONToQlog.convert( contents );
         }
+        else if ( type === FileType.qlog_textsequence ) {
+            if ( !(contents instanceof ReadableStream) ) {
+                console.error("FileLoader:Load : problem loading textsequence JSON file: contents wasn't a ReadableStream!", contents);
+
+                throw Error("Could not load json-seq file from stream : " + name );
+            }
+
+            contentsJSON = await TextSequenceJSONToQlog.convert( contents );
+        }
 
         output.qlogJSON = contentsJSON;
 
@@ -151,6 +163,7 @@ export default class FileLoader {
         const typeMap:Map<string, FileType> = new Map<string, FileType>([
             // we don't really want to promote the use of these two extensions, so also don't support their compressed versions directly at this time
             [".qlognd",         FileType.qlog_newline],
+            [".qlogseq",        FileType.qlog_textsequence],
             [".pcap.json",      FileType.pcap_json], // make sure this is before .json to enforce largest-suffix-first logic
 
             [".netlog",         FileType.netlog],
@@ -198,6 +211,9 @@ export default class FileLoader {
             if ( firstFewCharacters.indexOf("qlog_format") >= 0 ) {
                 if ( firstFewCharacters.indexOf("NDJSON") >= 0 ) {
                     return FileType.qlog_newline;
+                }
+                else if( firstFewCharacters.indexOf("JSON-SEQ") >= 0 ) {
+                    return FileType.qlog_textsequence;
                 }
                 else if ( firstFewCharacters.indexOf("JSON") >= 0 ) {
                     return FileType.qlog_normal;

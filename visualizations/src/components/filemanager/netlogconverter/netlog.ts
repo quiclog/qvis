@@ -1,6 +1,8 @@
 
 import * as qlogschema from '@/data/QlogSchema';
 
+/* tslint:disable */
+
 export enum PacketType {
     initial = "ENCRYPTION_INITIAL",
     handshake = "ENCRYPTION_HANDSHAKE",

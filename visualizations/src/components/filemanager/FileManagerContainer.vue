@@ -539,7 +539,7 @@
 
             const internalQlog = QlogSchemaConverter.Convert01to02( group );
 
-            const DEBUGfilter = true;
+            const DEBUGfilter = false;
             if ( DEBUGfilter ) {
                 for ( const connection of internalQlog.traces ) {
                     const newEvents = (connection as qlog02.ITrace).events.filter( (evt) => (

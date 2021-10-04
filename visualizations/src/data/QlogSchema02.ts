@@ -1,3 +1,4 @@
+/* tslint:disable */
 
 // TODO: FIXME: export from the proper qlog package once that's updated
 // export * from "@quictools/qlog-schema/draft-02/QLog";
@@ -15,6 +16,7 @@ export class Defaults {
 export enum LogFormat {
     JSON = "JSON",
     NDJSON = "NDJSON",
+    JSONSEQ = "JSON-SEQ",
 }
 
 export interface IQLog {

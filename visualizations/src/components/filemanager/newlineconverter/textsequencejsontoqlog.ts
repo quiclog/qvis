@@ -1,30 +1,30 @@
 import * as qlogschema from '@/data/QlogSchema';
 
-export default class NewlineJSONToQlog {
+export default class TextSequenceJSONToQlog {
 
     public static async convert( inputStream:ReadableStream ) : Promise<qlogschema.IQLog> {
 
-        console.log("NewlineJSONToQlog: converting newline delimited JSON file");
+        console.log("TextSequenceJSONToQlog: converting textsequence JSON file");
 
         // make proper qlogschema.IQLog again when we've updated the schema to match draft-02 proper
-        const qlogFile:any = { qlog_version: "draft-02", qlog_format: qlogschema.LogFormat.NDJSON, traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
+        const qlogFile:any = { qlog_version: "draft-02", qlog_format: qlogschema.LogFormat.JSONSEQ, traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
         
 
-        const rawJSONentries = await NewlineJSONToQlog.parseNDJSON( inputStream );
+        const rawJSONentries = await TextSequenceJSONToQlog.parseTextSequences( inputStream );
 
         if ( rawJSONentries.length === 0 ) {
-            console.error("NewlineJSONToQlog: no entries found in the loaded file...");
+            console.error("TextSequenceJSONToQlog: no entries found in the loaded file...");
 
             return qlogFile;
         }
 
-        // in NDJSON format, we should first have the file "header", a separate object containing the qlog metadata
+        // in json-seq format, we should first have the file "header", a separate object containing the qlog metadata
         // and then we should have a single entry per event after that. 
 
         const header = rawJSONentries.shift();
 
-        if ( header.qlog_version === undefined || header.qlog_format !== qlogschema.LogFormat.NDJSON || header.trace === undefined ) { 
-            console.error("NewlineJSONToQlog: File did not start with the proper qlog header! Aborting...", header);
+        if ( header.qlog_version === undefined || header.qlog_format !== qlogschema.LogFormat.JSONSEQ || header.trace === undefined ) { 
+            console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header! Aborting...", header);
 
             return qlogFile;
         }
@@ -36,7 +36,7 @@ export default class NewlineJSONToQlog {
             }
         }
 
-        // NDJSON files have just a single trace by definition
+        // json-seq files have just a single trace by definition
         const trace:qlogschema.ITrace = {
             vantage_point: { 
                 type: qlogschema.VantagePointType.unknown,
@@ -57,7 +57,7 @@ export default class NewlineJSONToQlog {
         return qlogFile as qlogschema.IQLog;
     } 
 
-    protected static async parseNDJSON( inputStream:ReadableStream ) : Promise<Array<any>> {
+    protected static async parseTextSequences( inputStream:ReadableStream ) : Promise<Array<any>> {
 
         let resolver:any = undefined;
         let rejecter:any = undefined;
@@ -69,8 +69,7 @@ export default class NewlineJSONToQlog {
 
         const entries:Array<any> = [];
 
-        // const jsonStream = ndjsonStream( inputStream );
-        const jsonStream = NewlineJSONToQlog.createNewlineTransformer( inputStream );
+        const jsonStream = TextSequenceJSONToQlog.createRecordTransformer( inputStream );
 
         const streamReader = jsonStream.getReader(); 
         let read:any = undefined;
@@ -128,7 +127,7 @@ export default class NewlineJSONToQlog {
         OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
         SOFTWARE.
     */
-    protected static createNewlineTransformer( inputStream:ReadableStream ):ReadableStream {
+    protected static createRecordTransformer( inputStream:ReadableStream ):ReadableStream {
 
         let is_reader:ReadableStreamReader|undefined = undefined;
         let cancellationRequest:boolean = false;
@@ -144,8 +143,6 @@ export default class NewlineJSONToQlog {
                 let data_buf = "";
 
                 reader.read().then(function processResult(result:any):any {
-
-                    // console.log("parseNDJSON:parse ", result);
 
                     // at the end of the stream, this function is called one last time 
                     // with result.done set and an empty result.value
@@ -165,7 +162,7 @@ export default class NewlineJSONToQlog {
                                 controller.enqueue( [data_l] ); // need to wrap in array, since that's what calling code expects
                             } 
                             catch (e) {
-                                console.error("NewlineJSONToQlog: line #" + readLineCount + " was invalid JSON. Skipping and continuing.", data_buf);
+                                console.error("TextSequenceJSONToQlog:ondone line #" + readLineCount + " was invalid JSON. Skipping and continuing.", data_buf);
                                 // // TODO: what does this do practically? We probably want to (silently?) ignore errors?
                                 // controller.error(e);
                                 // return;
@@ -180,13 +177,21 @@ export default class NewlineJSONToQlog {
                     const data = decoder.decode(result.value, {stream: true});
                     data_buf += data;
 
-                    const lines = data_buf.split("\n");
+                    const lines = data_buf.split("\u001E"); // \u001E is the Record Separator character
 
                     const output = []; // batch results together to reduce message passing overhead
+
+                    console.log("Amount of lines", lines.length);
 
                     for ( let i = 0; i < lines.length - 1; ++i) {
 
                         const l = lines[i].trim();
+
+                        // FIXME: REMOVE: JUST FOR TESTING!
+                        // if ( readLineCount > 1000 ) {
+                        //     controller.close();
+                        //     reader.cancel();
+                        // }
                         
                         if (l.length > 0) {
                             ++readLineCount;
@@ -197,7 +202,8 @@ export default class NewlineJSONToQlog {
                                 output.push( data_line );
                             } 
                             catch (e) {
-                                console.error("NewlineJSONToQlog: line #" + readLineCount + " was invalid JSON. Skipping and continuing.", l);
+                                console.error("TextSequenceJSONToQlog: line #" + readLineCount + " was invalid JSON. Skipping and continuing.", l, lines.length);
+                                return;
 
                                 // // TODO: what does this do practically? We probably want to (silently?) ignore errors?
                                 // controller.error(e);
@@ -218,7 +224,7 @@ export default class NewlineJSONToQlog {
             },
 
             cancel: (reason) => {
-                console.warn("NewlineJSONToQlog:parseNDJSON : Cancel registered due to ", reason);
+                console.warn("TextSequenceJSONToQlog:parseTextSequences : Cancel registered due to ", reason);
 
                 cancellationRequest = true;
 

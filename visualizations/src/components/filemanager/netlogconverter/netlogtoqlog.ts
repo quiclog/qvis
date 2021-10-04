@@ -1,3 +1,4 @@
+/* tslint:disable */
 
 import * as qlogschema from '@/data/QlogSchema01';
 import * as qlogschema02 from '@/data/QlogSchema02';

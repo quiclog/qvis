@@ -1,3 +1,5 @@
+/* tslint:disable */
+
 import * as qlogschema from '@/data/QlogSchema01';
 import * as tcpschema from './qlog_tcp_tls_h2';
 
