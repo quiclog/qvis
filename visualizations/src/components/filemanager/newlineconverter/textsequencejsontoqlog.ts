@@ -100,6 +100,7 @@ export default class TextSequenceJSONToQlog {
     // that project however surfaces each object individually, which incurs quite a large message passing overhead from the transforming stream
     // to the reading stream.
     // Our custom version here instead batches all read objects from a single chunk and propagates those up in 1 time, which is much faster for our use case.
+    // it also replaces splitting on \n by splitting on the RecordSeparator character for json-seq. Everything else is the same as NDJSON handling.
 
     // copyright notice for this function:
     /*
@@ -132,7 +133,7 @@ export default class TextSequenceJSONToQlog {
         let is_reader:ReadableStreamReader|undefined = undefined;
         let cancellationRequest:boolean = false;
 
-        let readLineCount = 0;
+        let readRecordCount = 0;
 
         return new ReadableStream({
             start: (controller) => {
@@ -155,14 +156,14 @@ export default class TextSequenceJSONToQlog {
                         // try to process the last part of the file if possible
                         data_buf = data_buf.trim();
                         if (data_buf.length !== 0) {
-                            ++readLineCount;
+                            ++readRecordCount;
 
                             try {
                                 const data_l = JSON.parse(data_buf);
                                 controller.enqueue( [data_l] ); // need to wrap in array, since that's what calling code expects
                             } 
                             catch (e) {
-                                console.error("TextSequenceJSONToQlog:ondone line #" + readLineCount + " was invalid JSON. Skipping and continuing.", data_buf);
+                                console.error("TextSequenceJSONToQlog:ondone record #" + readRecordCount + " was invalid JSON. Skipping and continuing.", data_buf);
                                 // // TODO: what does this do practically? We probably want to (silently?) ignore errors?
                                 // controller.error(e);
                                 // return;
@@ -177,32 +178,26 @@ export default class TextSequenceJSONToQlog {
                     const data = decoder.decode(result.value, {stream: true});
                     data_buf += data;
 
-                    const lines = data_buf.split("\u001E"); // \u001E is the Record Separator character
+                    const records = data_buf.split("\u001E"); // \u001E is the Record Separator character
 
                     const output = []; // batch results together to reduce message passing overhead
 
-                    console.log("Amount of lines", lines.length);
+                    console.log("TextsequenceJSONToQlog:createRecordTransformer Amount of records", records.length);
 
-                    for ( let i = 0; i < lines.length - 1; ++i) {
+                    for ( let i = 0; i < records.length - 1; ++i) {
 
-                        const l = lines[i].trim();
-
-                        // FIXME: REMOVE: JUST FOR TESTING!
-                        // if ( readLineCount > 1000 ) {
-                        //     controller.close();
-                        //     reader.cancel();
-                        // }
+                        const r = records[i].trim();
                         
-                        if (l.length > 0) {
-                            ++readLineCount;
+                        if (r.length > 0) {
+                            ++readRecordCount;
 
                             try {
-                                const data_line = JSON.parse(l);
-                                // controller.enqueue(data_line) would immediately pass the single read object on, but we batch it instead on the next line
-                                output.push( data_line );
+                                const data_record = JSON.parse(r);
+                                // controller.enqueue(data_record) would immediately pass the single read object on, but we batch it instead on the next line
+                                output.push( data_record );
                             } 
                             catch (e) {
-                                console.error("TextSequenceJSONToQlog: line #" + readLineCount + " was invalid JSON. Skipping and continuing.", l, lines.length);
+                                console.error("TextSequenceJSONToQlog: line #" + readRecordCount + " was invalid JSON. Skipping and continuing.", r, records.length);
                                 return;
 
                                 // // TODO: what does this do practically? We probably want to (silently?) ignore errors?
@@ -214,7 +209,7 @@ export default class TextSequenceJSONToQlog {
                             }
                         }
                     }
-                    data_buf = lines[lines.length - 1];
+                    data_buf = records[records.length - 1];
 
                     controller.enqueue( output );
 
