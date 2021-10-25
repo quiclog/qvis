@@ -24,7 +24,7 @@
                 </div>
                 <div>
                     <p style="margin-top: 5px;">
-                        You can load .qlog, .netlog, .pcap (alongside separate .keys) and .pcapng (with embedded keys) files.<br/>
+                        You can load .qlog, .sqlog, .netlog, .pcap (alongside separate .keys) and .pcapng (with embedded keys) files.<br/>
                         You can also load a .json file that lists several other files to be fetched (for the format, see <a href="https://github.com/quiclog/pcap2qlog#options">the pcap2qlog documentation</a>. Or try <a href="https://quic-tracker.info.ucl.ac.be/traces/20190820/list/quant.eggert.org:4433?.json">an example</a>).<br/><br/>
                         If you're looking for inspiration, <a href="https://quant.eggert.org/" target="_blank">quant</a> has public qlogs, as does <a href="https://quic.aiortc.org/logs" target="_blank">aioquic</a>.<br/>
                         <a href="https://quic-tracker.info.ucl.ac.be">QUIC Tracker</a> provides .pcap files for all its tests and has a convenient integration with qvis from its UI. <br/>
@@ -48,7 +48,7 @@
                                     :state="Boolean(filesToUpload.length > 0)"
                                     placeholder="Choose files or drop them here..."
                                     drop-placeholder="Drop files here..."
-                                    accept=".qlog,.json,.netlog"
+                                    accept=".qlog,.sqlog,.json,.netlog"
                                     class="text-nowrap text-truncate"
                                     ></b-form-file>
 
@@ -73,7 +73,7 @@
                 <div>
                     <p>
                         <!--Upload supports the same formats as Option 1. You can only upload a single file at a time.<br/>-->
-                        Upload currently supports .qlog, .json, and <a href="https://www.chromium.org/for-testers/providing-network-details">.netlog</a> files. No data is transfered to the server.<br/>
+                        Upload currently supports .qlog, .sqlog, .json, and <a href="https://www.chromium.org/for-testers/providing-network-details">.netlog</a> files. No data is transfered to the server.<br/>
                         Eventually we will also support .pcap, .pcapng and .qtr files.<br/>
                         <span style="font-size: 12px;">
                             Note: Chrome netlog must be explicitly given the .netlog extension before uploading to qvis.
@@ -277,13 +277,13 @@
 
             for ( const file of this.filesToUpload ){
 
-                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog") && !file.name.endsWith(".qlognd")) {
+                if ( file === null || (!file.name.endsWith(".qlog") && !file.name.endsWith(".sqlog") && !file.name.endsWith(".json")) && !file.name.endsWith(".netlog") && !file.name.endsWith(".qlognd")) {
                     Vue.notify({
                         group: "default",
-                        title: "Provide .qlog file",
+                        title: "Provide .qlog/.sqlog file",
                         type: "error",
                         duration: 6000,
-                        text: "We currently only support uploading .qlog files. " + file.name,
+                        text: "We currently only support uploading .qlog/.sqlog files. " + file.name,
                     });
                 
                     return;

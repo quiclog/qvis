@@ -145,6 +145,12 @@ export default class FileLoader {
             }
 
             contentsJSON = await TextSequenceJSONToQlog.convert( contents );
+            
+            if ( contentsJSON === undefined ) {
+                console.error("FileLoader:Load : problem loading textsequence JSON file: contents was undefined!", contentsJSON, contents);
+
+                throw Error("Could not load json-seq file from stream : " + name );
+            }
         }
 
         output.qlogJSON = contentsJSON;
@@ -164,6 +170,7 @@ export default class FileLoader {
             // we don't really want to promote the use of these two extensions, so also don't support their compressed versions directly at this time
             [".qlognd",         FileType.qlog_newline],
             [".qlogseq",        FileType.qlog_textsequence],
+            [".sqlog",          FileType.qlog_textsequence],
             [".pcap.json",      FileType.pcap_json], // make sure this is before .json to enforce largest-suffix-first logic
 
             [".netlog",         FileType.netlog],

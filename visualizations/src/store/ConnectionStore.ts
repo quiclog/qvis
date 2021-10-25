@@ -178,7 +178,7 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit("adjustOutstandingRequestCount", 1 );
 
             // 1. try direct download first
-            if ( urlToLoad.indexOf(".qlog") >= 0 || urlToLoad.indexOf(".netlog") >= 0 || urlToLoad.indexOf(".json") >= 0 ) {
+            if ( urlToLoad.indexOf(".qlog") >= 0 || urlToLoad.indexOf(".sqlog") >= 0 || urlToLoad.indexOf(".netlog") >= 0 || urlToLoad.indexOf(".json") >= 0 ) {
                 apireturns = await fetch( urlToLoad );
                 if ( apireturns.ok ) { // 200-299 status
                     const txt = await apireturns.text();
@@ -200,7 +200,7 @@ export default class ConnectionStore extends VuexModule {
                     // maybe just throw an exception here as well and fallback to the catch()? 
                     this.context.commit('adjustOutstandingRequestCount', -1);
 
-                    console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, apireturns);
+                    console.warn("ConnectionStore:loadFilesFromServer : tried to load qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, apireturns);
                     apireturns = null;
                 }
             }
@@ -209,7 +209,7 @@ export default class ConnectionStore extends VuexModule {
             this.context.commit('adjustOutstandingRequestCount', -1);
             apireturns = null;
 
-            console.warn("ConnectionStore:loadFilesFromServer : tried to load .qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, e);
+            console.warn("ConnectionStore:loadFilesFromServer : tried to load qlog from remote server directly but got probable CORS error. Trying again via backend server.", queryParameters, e);
         }
 
         try{

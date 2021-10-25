@@ -2,7 +2,7 @@ import * as qlogschema from '@/data/QlogSchema';
 
 export default class TextSequenceJSONToQlog {
 
-    public static async convert( inputStream:ReadableStream ) : Promise<qlogschema.IQLog> {
+    public static async convert( inputStream:ReadableStream ) : Promise<qlogschema.IQLog | undefined> {
 
         console.log("TextSequenceJSONToQlog: converting textsequence JSON file");
 
@@ -24,9 +24,9 @@ export default class TextSequenceJSONToQlog {
         const header = rawJSONentries.shift();
 
         if ( header.qlog_version === undefined || header.qlog_format !== qlogschema.LogFormat.JSONSEQ || header.trace === undefined ) { 
-            console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header! Aborting...", header);
+            console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header (needs version, format and trace)! Aborting...", header);
 
-            return qlogFile;
+            return undefined;
         }
 
         // copy over everything, but we'll handle trace separately below
