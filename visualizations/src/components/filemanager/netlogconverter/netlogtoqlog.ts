@@ -435,6 +435,30 @@ export default class NetlogToQlog {
                     break;
                 }
 
+                case 'QUIC_SESSION_MAX_STREAMS_FRAME_SENT':
+                case 'QUIC_SESSION_MAX_STREAMS_FRAME_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_MAX_STREAMS_FRAME = params;
+                    const frame: qlogschema.IMaxStreamsFrame = {
+                        frame_type: qlogschema.QUICFrameTypeName.max_streams,
+                        stream_type: event_params.is_unidirectional ? "unidirectional" : "bidirectional",
+                        maximum: event_params.stream_count.toString(),
+                    };
+                    connection.pushFrame(event_type, frame);
+                    break;
+                }
+
+                case 'QUIC_SESSION_STREAMS_BLOCKED_FRAME_SENT':
+                case 'QUIC_SESSION_STREAMS_BLOCKED_FRAME_RECEIVED': {
+                    const event_params: netlogschema.QUIC_SESSION_STREAMS_BLOCKED_FRAME = params;
+                    const frame: qlogschema.IStreamsBlockedFrame = {
+                        frame_type: qlogschema.QUICFrameTypeName.streams_blocked,
+                        stream_type: event_params.is_unidirectional ? "unidirectional" : "bidirectional",
+                        limit: event_params.stream_count.toString(),
+                    };
+                    connection.pushFrame(event_type, frame);
+                    break;
+                }
+
                 case 'QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE_SENT':
                 case 'QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE_RECEIVED': {
                     const event_params: netlogschema.QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE = params;
