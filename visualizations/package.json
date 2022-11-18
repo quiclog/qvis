@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@vue/cli-plugin-typescript": "^3.12.1",
-    "@vue/cli-service": "^3.12.1",
+    "@vue/cli-service": "^5.0.8",
     "typescript": "^3.6.4",
     "vue-template-compiler": "^2.6.10"
   },
