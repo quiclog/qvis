@@ -856,11 +856,15 @@ export default class CongestionGraphD3Renderer {
         // The drawscales differ between x and y and are used for scaling when zooming in/out
         // The X drawscale increases asymptotically to a maximum value using a modified sigmoid function
         //     This cap ensures that events do not become overly large when zoomed in
-        // The Y scaling function scales values down to, going up to 1 asymptotically
-        //     This is necessary as we want Y values to be precise when zoomed in while we still want them to be visible when zoomed out
         currentPerspective.drawScaleX = this.xScalingFunction((currentPerspective.originalRangeX[1] - currentPerspective.originalRangeX[0]) / (maxX - minX));
-        currentPerspective.drawScaleY = this.yScalingFunction((currentPerspective.originalRangeY[1] - currentPerspective.originalRangeY[0]) / (maxY - minY));
-
+        // The Y scaling function originally used a scaling function that asymptotically went up to 1
+        //     The goal was to make sure events didn't get overly small when zoomed out, nor superlarge when zoomed in
+        //     This generally worked well for large traces with thousands of packets. But for very short traces with dozens of packets, the scalingfunction could overshoot
+        //     This meant packet byte ranges were rendered too large on the y-axis, leading to overlapping ranges and thus inaccurate visualization
+        //     After extensive testing, it seems like just keeping the scale at 1 is the best middle solution until this part can be properly refactored (someday)
+        // currentPerspective.drawScaleY = this.yScalingFunction((currentPerspective.originalRangeY[1] - currentPerspective.originalRangeY[0]) / (maxY - minY));
+        currentPerspective.drawScaleY = 1;
+    
         // We then iterate over either the list of packets sent or received, based on the current perspective
         const packetList = this.mainGraphState.useSentPerspective ? this.packetsSent : this.packetsReceived;
 
@@ -1561,7 +1565,7 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedPacketTime);
-                    this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedPacketData.header.packet_number);
+                    this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedPacketData.header ? parsedPacketData.header.packet_number : "?"));
                     
                     let packetText = "PacketSize: " + parsedPacketData.raw.length;
 
@@ -1651,8 +1655,8 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + this.transformTime(parsedLostPacket.relativeTime));
-                        this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + parsedLostPacket.data.header.packet_number);
-                        this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + parsedLostPacket.data.raw.length);
+                        this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedLostPacket.data.header ? parsedLostPacket.data.header.packet_number : "unknown") );
+                        this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + (parsedLostPacket.data.raw ? parsedLostPacket.data.raw.length : "unknown"));
 
                         return;
                 }
@@ -1761,7 +1765,7 @@ export default class CongestionGraphD3Renderer {
             const timestamp = this.transformTime( parsedPacket.relativeTime );
 
             if (minX <= timestamp && timestamp <= maxX) {
-                min = min > extraData.to ? extraData.to : min;
+                min = min > extraData.from ? extraData.from : min;
                 max = max < extraData.to ? extraData.to : max;
             }
         }
