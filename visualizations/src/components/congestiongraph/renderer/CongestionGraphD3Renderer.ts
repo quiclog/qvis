@@ -1123,7 +1123,7 @@ export default class CongestionGraphD3Renderer {
             }
 
             const packetOffsetStart = totalSentByteCount + 1;
-            totalSentByteCount += data.raw.length;
+            totalSentByteCount += parseInt( "" + data.raw.length, 10 );
 
             extraData.from = packetOffsetStart;
             extraData.to = totalSentByteCount;
@@ -1164,7 +1164,7 @@ export default class CongestionGraphD3Renderer {
 
             if ( data.raw !== undefined && data.raw.length !== undefined && data.raw.length !== 0 ) {
                 const packetOffsetStart = totalReceivedByteCount + 1;
-                totalReceivedByteCount += data.raw.length;
+                totalReceivedByteCount += parseInt( "" + data.raw.length, 10 );
 
                 extraData.from = packetOffsetStart;
                 extraData.to = totalReceivedByteCount;
