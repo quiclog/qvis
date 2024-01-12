@@ -875,11 +875,13 @@ export default class CongestionGraphD3Renderer {
 
             const height = currentPerspective.yScale(extraData.to) - currentPerspective.yScale(extraData.from);
             const x = currentPerspective.xScale( this.transformTime(parsedPacket.relativeTime) );
-            const y = currentPerspective.yScale(extraData.to);
+            // drawing happens top down, so height will be negative, and y for to will be less than y for from (so the inverse of a cartesian system)
+            const yTop    = currentPerspective.yScale(extraData.to);
+            const yBottom = currentPerspective.yScale(extraData.from);
 
             // Only draw within bounds
-            if (x + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && y + height >= 0 && y <= this.mainGraphState.innerHeight) {
-                this.drawRect(this.mainGraphState.canvasContext!, x, y, rectWidth, height, "#0000FF");
+            if (x + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && yBottom + Math.abs(height) >= 0 && yTop <= this.mainGraphState.innerHeight) {
+                this.drawRect(this.mainGraphState.canvasContext!, x, yTop, rectWidth, height, "#0000FF");
             }
 
             // Draw the packet's ACK, if it has one
@@ -889,8 +891,8 @@ export default class CongestionGraphD3Renderer {
                 const ackX = currentPerspective.xScale( this.transformTime(parsedAck.relativeTime) );
 
                 // Only draw within bounds
-                if (ackX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && y + height >= 0 && y <= this.mainGraphState.innerHeight) {
-                    this.drawRect(this.mainGraphState.canvasContext!, ackX, y, rectWidth, height, "#6B8E23");
+                if (ackX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && yBottom + Math.abs(height) >= 0 && yTop <= this.mainGraphState.innerHeight) {
+                    this.drawRect(this.mainGraphState.canvasContext!, ackX, yTop, rectWidth, height, "#6B8E23");
                 }
             }
 
@@ -901,8 +903,8 @@ export default class CongestionGraphD3Renderer {
                 const lossX = currentPerspective.xScale( this.transformTime(parsedLoss.relativeTime) );
 
                 // Only draw within bounds
-                if (lossX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && y + height >= 0 && y <= this.mainGraphState.innerHeight) {
-                    this.drawRect(this.mainGraphState.canvasContext!, lossX, y, rectWidth, height, "#FF0000");
+                if (lossX + rectWidth >= 0 && x <= this.mainGraphState.innerWidth && yBottom + Math.abs(height) >= 0 && yTop <= this.mainGraphState.innerHeight) {
+                    this.drawRect(this.mainGraphState.canvasContext!, lossX, yTop, rectWidth, height, "#FF0000");
                 }
             }
         }
@@ -1419,6 +1421,8 @@ export default class CongestionGraphD3Renderer {
         this.metricUpdates = metricUpdates;
 
         // Set the max ranges for each axis
+        sent.xMax += 10; // add 10ms extra to make sure the final packets in the trace also get drawn
+        sent.yMax += 10; // add 10 bytes extra to give some headroom
         this.mainGraphState.sent.originalRangeX = [0, sent.xMax];
         this.mainGraphState.sent.originalRangeY = [0, sent.yMax];
         this.mainGraphState.sent.originalCongestionRangeY = [0, sent.maxCongestionY];
