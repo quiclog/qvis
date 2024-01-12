@@ -1084,8 +1084,10 @@ export default class CongestionGraphD3Renderer {
         const metricUpdates = this.config.connection!.lookup(qlog.EventCategory.recovery, qlog.RecoveryEventType.metrics_updated);
         const transportParams = this.config.connection!.lookup(qlog.EventCategory.transport, qlog.TransportEventType.parameters_set);
 
-        const packetSentList = [];
-        const packetReceivedList = [];
+        // these are Map<string, Map<string,Packet>>, 
+        // where the top-level key is the packet type (initial, handshake, 1RTT, 0RTT) and the other key is the stringified packet number
+        const packetSentList:Map<string, Map<string,any>>       = new Map<string, Map<string,any>>();
+        const packetReceivedList:Map<string, Map<string,any>>   = new Map<string, Map<string,any>>();
 
         let totalSentByteCount = 0;
         let totalReceivedByteCount = 0;
@@ -1127,7 +1129,12 @@ export default class CongestionGraphD3Renderer {
             extraData.to = totalSentByteCount;
 
             // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
-            packetSentList[ parseInt( "" + data.header.packet_number, 10 ) ] = packet;
+            const packetType = data.header.packet_type;
+            if ( !packetSentList.has(packetType) )
+                packetSentList.set( packetType, new Map<string, any>() );
+            const packetList = packetSentList.get(packetType)!;
+
+            packetList.set( "" + data.header.packet_number, packet );
 
             // Update extrema
             sent.xMin = sent.xMin > timestamp ? timestamp : sent.xMin;
@@ -1146,7 +1153,7 @@ export default class CongestionGraphD3Renderer {
         const streamFCMap:Map<string, number> = new Map<string, number>();
         DEBUG_packetsWithInvalidSize = 0;
         for (const packet of packetsReceived) {
-            const parsedPacket = this.config.connection!.parseEvent(packet)
+            const parsedPacket = this.config.connection!.parseEvent(packet);
             const data = parsedPacket.data as qlog.IEventPacket;
             const timestamp = this.transformTime( parsedPacket.relativeTime );
 
@@ -1162,7 +1169,13 @@ export default class CongestionGraphD3Renderer {
                 extraData.from = packetOffsetStart;
                 extraData.to = totalReceivedByteCount;
 
-                packetReceivedList[ parseInt( "" + data.header.packet_number, 10 ) ] = packet; // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
+                // Store temporarily so we can link the ACK to this packet later in packet.qviscongestion.correspondingAck
+                const packetType = data.header.packet_type;
+                if ( !packetReceivedList.has(packetType) )
+                    packetReceivedList.set( packetType, new Map<string, any>() );
+                const packetList = packetReceivedList.get(packetType)!;
+
+                packetList.set( "" + data.header.packet_number, packet );
 
                 // Update extrema
                 received.xMin = received.xMin > timestamp ? timestamp : received.xMin;
@@ -1244,7 +1257,12 @@ export default class CongestionGraphD3Renderer {
                     // ackedNr will be the ACKed packet number of one of our SENT packets here
                     for (let ackedNr = from; ackedNr <= to; ++ackedNr) {
                         // find the originally sent packet
-                        const sentPacket = packetSentList[ ackedNr ];
+                        let sentPacket = undefined;
+
+                        const packetType = data.header.packet_type;
+                        if ( packetSentList.has(packetType) )
+                            sentPacket = packetSentList.get(packetType)!.get( "" + ackedNr );
+
                         if (!sentPacket){
                             // console.error("Packet was ACKed that we didn't send... ignoring", ackedNr, frame, packet);
                             ++DEBUG_packetsNotSent;
@@ -1323,7 +1341,12 @@ export default class CongestionGraphD3Renderer {
                     // ackedNr will be the ACKed packet number of one of our RECEIVED packets here
                     for (let ackedNr = from; ackedNr <= to; ++ackedNr) {
                         // find the originally received packet
-                        const receivedPacket = packetReceivedList[ ackedNr ];
+                        let receivedPacket = null;
+                        
+                        const packetType = data.header.packet_type;
+                        if ( packetReceivedList.has(packetType) )
+                            receivedPacket = packetReceivedList.get(packetType)!.get( "" + ackedNr );
+
                         if (!receivedPacket) {
                             console.error("Packet was ACKed that we didn't receive... ignoring", ackedNr, frame, packet);
                             continue;
@@ -1355,10 +1378,14 @@ export default class CongestionGraphD3Renderer {
                 continue;
             }
 
-            const lostPacketNumber = parseInt( data.header.packet_number, 10 );
-            const sentPacket = packetSentList[ lostPacketNumber ];
+            let sentPacket = undefined;
+
+            const packetType = data.header.packet_type;
+            if ( packetSentList.has(packetType) )
+                sentPacket = packetSentList.get(packetType)!.get( "" + data.header.packet_number );
+
             if (!sentPacket) {
-                console.error("Packet was LOST that we didn't send... ignoring", lostPacketNumber, packet);
+                console.error("Packet was LOST that we didn't send... ignoring", data.header.packet_number, packet);
                 continue;
             }
 
@@ -1569,7 +1596,7 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + parsedPacketTime);
-                    this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedPacketData.header ? parsedPacketData.header.packet_number : "?"));
+                    this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedPacketData.header ? parsedPacketData.header.packet_type : "" ) + " " +  (parsedPacketData.header ? parsedPacketData.header.packet_number : "?"));
                     
                     let packetText = "PacketSize: " + parsedPacketData.raw.length;
 
@@ -1626,6 +1653,7 @@ export default class CongestionGraphD3Renderer {
                     this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                     this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + this.transformTime( parsedAckPacket.relativeTime ));
+                    this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedAckPacket.data.header ? parsedAckPacket.data.header.packet_type : "" ) + " " +  (parsedAckPacket.data.header ? parsedAckPacket.data.header.packet_number : "?"));
                     this.mainGraphState.packetInformationDiv!.select("#ackedFrom").text("Acked from: " + extraDetails.from);
                     this.mainGraphState.packetInformationDiv!.select("#ackedTo").text("Acked to: " + extraDetails.to);
 
@@ -1659,7 +1687,7 @@ export default class CongestionGraphD3Renderer {
                         this.mainGraphState.packetInformationDiv!.style("margin-left", (svgHoverCoords[0] + this.mainGraphState.margins.left + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.style("margin-top", (svgHoverCoords[1] + this.mainGraphState.margins.top + 10) + "px");
                         this.mainGraphState.packetInformationDiv!.select("#timestamp").text("Timestamp: " + this.transformTime(parsedLostPacket.relativeTime));
-                        this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedLostPacket.data.header ? parsedLostPacket.data.header.packet_number : "unknown") );
+                        this.mainGraphState.packetInformationDiv!.select("#packetNr").text("PacketNr: " + (parsedLostPacket.data.header ? parsedLostPacket.data.header.packet_type : "" ) + " " + (parsedLostPacket.data.header ? parsedLostPacket.data.header.packet_number : "unknown") );
                         this.mainGraphState.packetInformationDiv!.select("#packetSize").text("PacketSize: " + (parsedLostPacket.data.raw ? parsedLostPacket.data.raw.length : "unknown"));
 
                         return;
