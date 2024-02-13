@@ -104,11 +104,13 @@ export default class MultiplexingGraphD3WaterfallRenderer {
 
         let requestEventType = qlog.TransportEventType.packet_sent; // client sends requests, receives data
         let dataEventType    = qlog.TransportEventType.packet_received;
+        let h3EventType      = qlog.HTTP3EventType.frame_created; // client sends requests with HEADERS and PRIORITY_UPDATE frames
         let directionText    = "received";
 
         if ( this.connection.vantagePoint && this.connection.vantagePoint.type === qlog.VantagePointType.server ){
             requestEventType = qlog.TransportEventType.packet_received;
             dataEventType    = qlog.TransportEventType.packet_sent;
+            h3EventType      = qlog.HTTP3EventType.frame_parsed; // server receives requests with HEADERS and PRIORITY_UPDATE frames
             directionText    = "sent";
         }
 
@@ -126,15 +128,117 @@ export default class MultiplexingGraphD3WaterfallRenderer {
             requestTime:number,
             frameCount:number,
             totalData:number,
+
+            h3Info: H3StreamInfo | null,
+        }
+
+        interface H3StreamInfo {
+            headersIndex:number,
+            priorityUpdateIndex:number,
+
+            headersTime:number,
+            priorityUpdateTime:number,
+
+            priorityString:string,
         }
 
         let dataFrameCount:number = 0;
 
+        // key here is the StreamID 
         const streams:Map<number, StreamExtents> = new Map<number, StreamExtents>();
+        const h3Infos:Map<number, H3StreamInfo> = new Map<number, H3StreamInfo>(); 
+
+        // we want to look for both QUIC level STREAM events and also HTTP/3 level frame events
+        // this gets complicated, because we also want stuff to work if there are NO HTTP/3 level things present.
+        // Additionally, we can't be sure in which order stuff gets logged 
+        // (e.g., first HTTP/3 frame_created with headers before the actual packet_sent with STREAM or vice versa)
+        // As such, we track the HTTP/3 stuff separately and have two locations to try and reconsolidate based on the StreamID
 
         for ( const eventRaw of this.connection.getEvents() ) {
             const evt = this.connection.parseEvent( eventRaw );
             const data = evt.data;
+
+            // just for the HTTP/3 events, looking for HEADERS or PRIORITY_UPDATE
+            if ( evt.name === h3EventType ) {
+                if ( !data.frame )
+                    continue;
+
+                let h3Info = null;
+                let stream_id = -1;
+                
+                if ( data.frame.frame_type === qlog.HTTP3FrameTypeName.headers ) {
+
+                    console.log("MultiplexingGraphD3WaterfallRenderer: HEADERS FOUND: ", evt.name, evt.data, evt.data.frame );
+                    // we might have gotten h3Info from a PRIORITY_UPDATE frame before HEADERS
+                    stream_id = parseInt("" + data.stream_id);
+                    h3Info = h3Infos.get( stream_id );
+                    if ( !h3Info ) {
+                        h3Info = {
+                            headersIndex: -1,
+                            priorityUpdateIndex: -1,
+                            headersTime: -1,
+                            priorityUpdateTime: -1,
+                            priorityString: ""
+                        }
+                    }
+
+                    h3Info.headersIndex = dataFrameCount;
+                    h3Info.headersTime = evt.relativeTime;
+
+                    for ( let header of data.frame.headers ) {
+                        if ( header.name === "priority" ) {
+                            if ( h3Info.priorityString.length === 0 ) {
+                                h3Info.priorityString = "HEADER: " + header.value;
+                            }
+                            else {
+                                h3Info.priorityString += " -> HEADER: " + header.value; // headers updates value from PRIORITY_UPDATE frame
+                            }
+                        }
+                    }
+                }
+                else if ( data.frame.frame_type === qlog.HTTP3FrameTypeName.priority_update )
+                {
+                    console.log("MultiplexingGraphD3WaterfallRenderer: PRIORITY_UPDATE FOUND: ", evt.name, evt.data, evt.data.frame );
+
+                    // {"data": {"frame": {"frame_type": "priority_update", "element_id": 8, "value": "u=1,i"}, "length": 11, "stream_id": 2}
+                    // here, the data.stream_id is always the stream ID of the control stream, as that's where the PRIORITY_UPDATE frames are sent
+                    // the "real" stream_id we need here is the frame.element_id instead
+                    // TODO: element_id can also be the push_id, but we don't handle that yet
+                    stream_id = parseInt("" + data.frame.element_id);
+                    h3Info = h3Infos.get( stream_id );
+                    if ( !h3Info ) {
+                        h3Info = {
+                            headersIndex: -1,
+                            priorityUpdateIndex: -1,
+                            headersTime: -1,
+                            priorityUpdateTime: -1,
+                            priorityString: ""
+                        }
+                    }
+
+                    h3Info.priorityUpdateIndex = dataFrameCount;
+                    h3Info.priorityUpdateTime = evt.relativeTime;
+
+                    if ( h3Info.priorityString.length === 0 ) {
+                        h3Info.priorityString = "FRAME: " + data.frame.value;
+                    }
+                    else {
+                        h3Info.priorityString += " -> FRAME: " + data.frame.value; // frame updates value from HEADERS
+                    }
+                }
+
+                // see if we need to hook up the h3Info to an existing StreamExtents (e.g., packet_received was logged before frame_parsed, which is typical)
+                if ( stream_id >= 0 && h3Info !== null ) {
+                    let stream = streams.get( stream_id );
+                    if ( stream ) {
+                        stream.h3Info = h3Info;
+                    }
+                    // else: this gets dealt with below 
+
+                    // always add to the global struct for easy tracking and debuggability (and memory leaks)
+                    h3Infos.set( stream_id, h3Info );
+                }
+            }
 
             if ( evt.name !== requestEventType && evt.name !== dataEventType ) {
                 continue;
@@ -175,7 +279,36 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                         break;
                     }
 
-                    stream = { stream_id: streamID, order: streams.size, requestIndex: dataFrameCount, startIndex: -1, stopIndex: -1, requestTime: evt.relativeTime, startTime: -1, endTime: -1, frameCount: 0, totalData: 0 };
+                    stream = { 
+                        stream_id: streamID, 
+                        order: streams.size, 
+                        requestIndex: dataFrameCount, 
+                        startIndex: -1, 
+                        stopIndex: -1, 
+                        requestTime: evt.relativeTime, 
+                        startTime: -1, 
+                        endTime: -1, 
+                        frameCount: 0, 
+                        totalData: 0,
+                        h3Info: null
+                    };
+
+                    let h3Info = h3Infos.get( streamID );
+                    if ( h3Info ) {
+                        // parsed before this, just need to link
+                        stream!.h3Info = h3Info;
+                    }
+                    else {
+                        // no H3info known yet: prepare in case it's discovered later 
+                        stream.h3Info = {
+                            headersIndex: -1,
+                            priorityUpdateIndex: -1,
+                            headersTime: -1,
+                            priorityUpdateTime: -1,
+                            priorityString: ""
+                        }
+                    }
+
                     streams.set( streamID, stream );
                 }
                 else {
@@ -198,6 +331,8 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 }
             }
         }
+
+        console.log("MultiplexingGraphD3WaterfallRenderer: streams to be rendered: ", streams, h3Infos);
 
         let minBarHeight = 4; // 4px is minimum height. Above that, we start scrolling (at 120 normal height, 4px gives us 30 streams without scrollbar)
         if ( minBarHeight * streams.size < this.barHeight ) {
@@ -297,7 +432,9 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 });
 
         const circleWidth = Math.min(15 ,Math.max(minBarHeight / 1.2, 0.01));
+        const rectWidth = circleWidth;
 
+        // request indicator: circle
         rects2
             .append("circle")
                 .attr("cx", (d:any) => { return xDomain(d.requestIndex) + circleWidth / 2; } )
@@ -307,8 +444,42 @@ export default class MultiplexingGraphD3WaterfallRenderer {
                 .attr("stroke-width", (d:any) => { return circleWidth / 5; } )
                 .attr("r", circleWidth / 2 );
 
+            
+        // HEADERS indicator: square
+        rects2
+            .filter( (d:any) => { return d && d.h3Info && d.h3Info.headersIndex >= 0 } )
+            .append("rect")
+                .attr("x", (d:any) => { return xDomain(d.h3Info.headersIndex); } )
+                .attr("y", (d:any) => { return ((d.order) * minBarHeight) + (rectWidth / 10); } )
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
+                .attr("stroke", "black" )
+                .attr("stroke-width", (d:any) => { return rectWidth / 5; } )
+                .attr("width", rectWidth )
+                .attr("height", rectWidth );
+
+        // PRIORITY UPDATE frame indicator: triangle
+        // we want equilateral triangles with the base on the bottom
+        // using relative SVG coordinates to draw a path with the line command (l)
+        // each coordinate is relative to the previous one!
+        let trianglePath = "m 0," + rectWidth; // move to bottom left of the triangle
+        trianglePath += " l " + rectWidth + ",0"; // move to bottom right. y is already correct, only move x
+        trianglePath += " l -" + (rectWidth/2) + ",-" + rectWidth; // move to the middle on top, relative to bottom right 
+        trianglePath += " z"; // close path
+
+        rects2
+            .filter( (d:any) => { return d && d.h3Info && d.h3Info.priorityUpdateIndex >= 0 } )
+            .append("path")
+                .attr("d", trianglePath)
+                // normal x and y doesn't work on path for some reason... thanks SVG
+                .attr("transform", function(d:any) { return "translate(" + xDomain(d.h3Info.priorityUpdateIndex) + "," + (((d.order) * minBarHeight) + (rectWidth / 10)) + ")"; })
+                .attr("fill", (d:any) => { return StreamGraphDataHelper.StreamIDToColor("" + d.stream_id)[0]; } )
+                .attr("stroke", "black" )
+                .attr("stroke-width", (d:any) => { return rectWidth / 5; } )
+
         // const legendY = ((-2) * (this.barHeight / streams.size)) + (circleWidth / 1.6); // 1.6 should be 2, but 1.6 somehow looks better...
 
+
+        // legend top left
         const legendY = -this.dimensions.margin.top / 2;
         const legendIconWidth = 13;
 

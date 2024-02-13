@@ -986,6 +986,7 @@ export enum HTTP3FrameTypeName {
     goaway = "goaway",
     max_push_id = "max_push_id",
     duplicate_push = "duplicate_push",
+    priority_update = "priority_update",
     reserved = "reserved",
     unknown = "unknown",
 }

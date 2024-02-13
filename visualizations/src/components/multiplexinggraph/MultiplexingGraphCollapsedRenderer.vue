@@ -10,7 +10,13 @@
                 Selected stream's details
             </b-col>
             <b-col cols="11">
-                <div><span :style="streamDetail.style">&nbsp;</span> Stream <span class="font-weight-bold">{{ streamDetail.stream_id }}</span> : Requested at {{ streamDetail.data.requestTime.toFixed(2) }}ms. Transmitted from {{ streamDetail.data.startTime.toFixed(2) }}ms to {{streamDetail.data.endTime.toFixed(2)}}ms ({{ (streamDetail.data.endTime.toFixed(2) - streamDetail.data.startTime.toFixed(2)).toFixed(2) }}ms). {{streamDetail.data.totalData}} bytes spread over {{streamDetail.data.frameCount}} frames (including retransmits). </div>
+                <div>
+                    <span :style="streamDetail.style">&nbsp;</span> Stream <span class="font-weight-bold">{{ streamDetail.stream_id }}</span> : Requested at {{ streamDetail.data.requestTime.toFixed(2) }}ms. Transmitted from {{ streamDetail.data.startTime.toFixed(2) }}ms to {{streamDetail.data.endTime.toFixed(2)}}ms ({{ (streamDetail.data.endTime.toFixed(2) - streamDetail.data.startTime.toFixed(2)).toFixed(2) }}ms). {{streamDetail.data.totalData}} bytes spread over {{streamDetail.data.frameCount}} frames (including retransmits).
+                    <br/>
+                    <div v-if="streamDetail.data.h3Info !== null">
+                        HTTP/3 HEADERS seen at {{ streamDetail.data.h3Info.headersTime.toFixed(2) }}ms. HTTP/3 PRIORITY Update seen at {{ streamDetail.data.h3Info.priorityUpdateTime.toFixed(2) }}ms. Priority info (if any): {{ streamDetail.data.h3Info.priorityString }}
+                    </div>
+                </div>
             </b-col>
         </b-row>
         <b-row v-if="showwaterfall" style="height: 165px; width: 100%;" align-v="center">
