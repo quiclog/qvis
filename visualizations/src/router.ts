@@ -107,8 +107,13 @@ router.beforeEach((to, from, next) => {
         }
         next({ name: to.name, query: query });
     }
+    else if( !hasQueryParams(to) && hasQueryParams(from) ){
+        // generally allow passing query parameters between navigations (otherwise they get lost)
+        // e.g., see https://stackoverflow.com/questions/45091380/vue-router-keep-query-parameter-and-use-same-view-for-children
+        next({name: to.name, query: from.query});
+    } 
     else {
-        next();
+        next()
     }
 });
 

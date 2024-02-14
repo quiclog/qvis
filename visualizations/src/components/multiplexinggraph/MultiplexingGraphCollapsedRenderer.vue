@@ -162,9 +162,11 @@
             // There is 15px padding on each side for each column, plus for the top level container, so 90px in total
             // up-front col is 1/12th of the width. Then we want 99% (not to cause a horizontal scrollbar as well) of the remaining 11/12th = 0.9075
             const fixedWidth = Math.ceil(((document.getElementById("multiplexingToplevelContainer")!.clientWidth - 90) * 0.9075)) + "px";
-            document.getElementById( "" + this.id_waterfall )!.style.width  = fixedWidth;
             document.getElementById( "" + this.id_data )!.style.width       = fixedWidth;
-            document.getElementById( "" + this.id_byterange )!.style.width  = fixedWidth;
+            if ( this.showwaterfall )
+                document.getElementById( "" + this.id_waterfall )!.style.width  = fixedWidth;
+            if ( this.showbyteranges )
+                document.getElementById( "" + this.id_byterange )!.style.width  = fixedWidth;
 
             // Using v-if to toggle some renderers. This is not frame-perfect.
             // The renderers use things like .clientWidth to size themselves, for which the toggle really has to be completed

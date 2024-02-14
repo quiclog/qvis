@@ -78,7 +78,10 @@
         }
 
         public get allowSelectAll() : boolean {
-            return (window.location.toString().indexOf(":8080") >= 0 ); // only for local testing for now! // TODO: CLEAN UP
+            // e.g., add ?multimultiplexing=true to the URL 
+            return  (window.location.toString().indexOf(":8080") >= 0) || 
+                    (window.location.toString().indexOf("localhost") >= 0) || 
+                    (window.location.toString().indexOf("multimultiplexing") >= 0); // only for local testing for now! // TODO: CLEAN UP
         }
 
         public selectAllConnections() {
@@ -88,12 +91,13 @@
 
             const conns = [];
             for ( const group of this.store.groups ){
-                if ( group.filename.indexOf("DEMO") < 0 ){
+                //if ( group.filename.indexOf("DEMO") < 0 ){
                     conns.push( ...group.getConnections() );
-                }
+                //}
             }
 
-            this.config.showwaterfall = false;
+            this.config.showwaterfall = true;
+            this.config.showbyteranges = false;
             this.config.connections = conns;
         }
 
