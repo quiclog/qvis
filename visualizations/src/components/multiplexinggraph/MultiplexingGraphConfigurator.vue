@@ -89,12 +89,17 @@
             // TODO: just for paper results, remove!
             (window as any).holblockinfo = new Array<any>();
 
-            const conns = [];
+            let conns = [];
             for ( const group of this.store.groups ){
                 //if ( group.filename.indexOf("DEMO") < 0 ){
                     conns.push( ...group.getConnections() );
                 //}
             }
+
+            // sort on filename. 
+            // Otherwise, they're sorted in whatever order they were actually loaded from the filesystem, 
+            // which seems wholly indeterministic.
+            conns = conns.sort( (c1, c2) => (c1.parent.filename < c2.parent.filename) ? -1 : 1 );
 
             this.config.showwaterfall = true;
             this.config.showbyteranges = false;
