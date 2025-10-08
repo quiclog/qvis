@@ -539,7 +539,11 @@ export class DirectEventParser implements IQlogEventParser {
                     return Date.parse( refTimeIn ) * 1000; // only other option is us, so need to do ms * 1000 to get that (small loss of accuracy here)
                 }
         }
-
-        return parseFloat( refTimeIn );
+        else {
+            // Newer draft versions define reference_time as a struct.
+            // This code makes no attempt to parse the struct, but simply prevents us from stumbling over it.
+            const out = parseFloat( refTimeIn );
+            return isNaN(out) ? 0 : out;
+        }
     }
 }
