@@ -1,5 +1,6 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+	import { Toaster } from 'svelte-sonner';
 
 	// this imports bootstrap, 
 	// but somehow imports the WHOLE file as an inlined JS string instead of normal transpiled CSS. 
@@ -16,5 +17,14 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<!-- notification popups -->
+<Toaster position="bottom-center" visibleToasts={10} richColors expand={true}
+	class="main-toaster"
+
+	toastOptions={{
+		duration: 3000
+	}}
+/>
 
 {@render children?.()}

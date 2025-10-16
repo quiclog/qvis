@@ -25,6 +25,7 @@
 	"dependencies": {
 		"@popperjs/core": "^2.11.8",
 		"bootstrap": "^5.3.8",
-		"oboe": "^2.1.5"
+		"oboe": "^2.1.5",
+		"svelte-sonner": "^1.0.5"
 	}
 }

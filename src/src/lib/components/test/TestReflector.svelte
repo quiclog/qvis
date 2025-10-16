@@ -2,7 +2,7 @@
 
 <script lang="ts">
 
-    import { store } from "@lib/components/test/TestStore.svelte";
+    import { store } from "@src/lib/store/ConnectionStore.svelte";
 
 </script>
 

@@ -9,3 +9,14 @@ html, body {
     text-align: left;
     color: #2c3e50;
 }
+
+.main-toaster {
+    display: flex;
+    justify-content: center;
+    --width: 65% !important;
+}
+
+/* each toast */
+.main-toaster li {
+    min-width: 500px !important;
+}

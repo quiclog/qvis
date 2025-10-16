@@ -1,7 +1,7 @@
 
 <script lang="ts">
 
-    import { store } from "@lib/components/test/TestStore.svelte";
+    import { store } from "@src/lib/store/ConnectionStore.svelte";
     
     function updateStore() {
         console.log("Updating store - loading random file");
