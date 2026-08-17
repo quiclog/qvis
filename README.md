@@ -12,6 +12,9 @@ Instructions and docker files for setting up your own copy can be found at https
 
 ## Running locally with Docker
 
+Note: this is a barebones dockerfile that mainly provides the qvis UI for locally loaded .qlog and .json files.
+If you need support for uploading .pcap files or loading files via external URL, you will need the [qvis-server](https://github.com/quiclog/qvis-server) project or use the hosted version.
+
 Build the Docker image:
 
 ```bash
