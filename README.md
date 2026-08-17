@@ -10,6 +10,26 @@ A full-featured, hosted version with example qlog files can be found at https://
 Instructions and docker files for setting up your own copy can be found at https://github.com/quiclog/qvis-server.
 
 
+## Running locally with Docker
+
+Note: this is a barebones dockerfile that mainly provides the qvis UI for locally loaded .qlog and .json files.
+If you need support for uploading .pcap files or loading files via external URL, you will need the [qvis-server](https://github.com/quiclog/qvis-server) project or use the hosted version.
+
+Build the Docker image:
+
+```bash
+docker build -t qvis .
+```
+
+Run the container:
+
+```bash
+docker run -p 8080:8080 qvis
+```
+
+Then open http://localhost:8080 in your browser.
+
+
 ## older versions
 
 This is the new version of the qvis visualization suite.
