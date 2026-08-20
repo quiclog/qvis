@@ -111,6 +111,16 @@ export interface QUIC_SESSION_WINDOW_UPDATE_FRAME {
     stream_id: number
 }
 
+export interface QUIC_SESSION_MAX_STREAMS_FRAME {
+    is_unidirectional: boolean,
+    stream_count: number,
+}
+
+export interface QUIC_SESSION_STREAMS_BLOCKED_FRAME {
+    is_unidirectional: boolean,
+    stream_count: number,
+}
+
 export interface QUIC_SESSION_CRYPTO_HANDSHAKE_MESSAGE {
     quic_crypto_handshake_message: string,
 }
