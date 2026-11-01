@@ -160,6 +160,20 @@ export class QlogLoaderV3 {
 
                 connection.setEventParser( new DirectEventParserV3() );
 
+                // quic-events-13/h3-events-13 renamed parameters_set's `owner` field to
+                // `initiator` (same "local"/"remote" values). Several renderers
+                // (CongestionGraphD3Renderer, StatisticsConnectionRenderer,
+                // PacketizationQUICPreProcessor) still read `data.owner` directly, so we
+                // mirror `initiator` onto `owner` here rather than touching every renderer.
+                for ( const evt of connection.getEvents() ){
+                    const parsedEvt = connection.parseEvent(evt);
+
+                    if ( parsedEvt.name === "parameters_set" && parsedEvt.data &&
+                         parsedEvt.data.owner === undefined && parsedEvt.data.initiator !== undefined ) {
+                        parsedEvt.data.owner = parsedEvt.data.initiator;
+                    }
+                }
+
                 // same sanity check as QlogLoaderV2: qlog requires absolutely ordered timestamps
                 let misOrdered = false;
                 let minimumTime = -1;
