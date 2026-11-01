@@ -1,29 +1,83 @@
 import * as qlogschema from '@/data/QlogSchema';
+import * as qlog03 from '@/data/QlogSchema03';
 
 export default class TextSequenceJSONToQlog {
 
-    public static async convert( inputStream:ReadableStream ) : Promise<qlogschema.IQLog | undefined> {
+    public static async convert( inputStream:ReadableStream ) : Promise<qlogschema.IQLog | qlog03.IQlogFile | undefined> {
 
         console.log("TextSequenceJSONToQlog: converting textsequence JSON file");
-
-        // make proper qlogschema.IQLog again when we've updated the schema to match draft-02 proper
-        const qlogFile:any = { qlog_version: "draft-02", qlog_format: qlogschema.LogFormat.JSONSEQ, traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
-        
 
         const rawJSONentries = await TextSequenceJSONToQlog.parseTextSequences( inputStream );
 
         if ( rawJSONentries.length === 0 ) {
             console.error("TextSequenceJSONToQlog: no entries found in the loaded file...");
 
-            return qlogFile;
+            // make proper qlogschema.IQLog again when we've updated the schema to match draft-02 proper
+            return { qlog_version: "draft-02", qlog_format: qlogschema.LogFormat.JSONSEQ, traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
         }
 
         // in json-seq format, we should first have the file "header", a separate object containing the qlog metadata
-        // and then we should have a single entry per event after that. 
+        // and then we should have a single entry per event after that.
 
         const header = rawJSONentries.shift();
 
-        if ( header.qlog_version === undefined || header.qlog_format !== qlogschema.LogFormat.JSONSEQ || header.trace === undefined ) { 
+        // main-schema-14 and onward (QlogFileSeq, file_schema "urn:ietf:params:qlog:file:sequential")
+        // dropped qlog_version/qlog_format entirely in favor of file_schema/serialization_format, and
+        // the header's "trace" has no "events" of its own (those are exactly the records that follow it).
+        //
+        // Some in-the-wild implementations (e.g. quic-go, as of this writing) emit a header carrying
+        // BOTH qlog_version/qlog_format AND file_schema, while the event payloads themselves are still
+        // in the older category:type convention. QlogLoader.fromJSON's own top-level dispatch checks
+        // qlog_version before file_schema, so to build an object that ends up on the loader path that
+        // actually matches the event shape, we mirror that same precedence here: qlog_version wins
+        // when both are present.
+        //
+        // Known residual gap: quic-go's traces of this shape have been observed mixing in the odd
+        // event under the NEW flattened namespace (e.g. "quic:recovery_parameters_set") alongside
+        // otherwise old-style names, inside a file that (correctly, per the above) still routes to
+        // QlogLoaderV2. That one event's old-style name-splitting won't recognize the new-style
+        // name, so renderers that look it up by name (e.g. SequenceDiagramD3Renderer's handling of
+        // RecoveryEventType.parameters_set) won't find it for quic-go traces specifically. Treated
+        // as a quic-go migration artifact rather than something to special-case here.
+        if ( header.file_schema !== undefined && header.qlog_version === undefined ) {
+            if ( header.trace === undefined ) {
+                console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header (needs file_schema and trace)! Aborting...", header);
+
+                return undefined;
+            }
+
+            const qlogFileV3:any = {};
+
+            // copy over everything, but we'll handle trace separately below
+            for ( const key of Object.keys(header) ) {
+                if ( key !== "trace" ) {
+                    qlogFileV3[key] = header[key];
+                }
+            }
+
+            // QlogFileSeq has just a single trace by definition
+            const traceV3:qlog03.ITrace = {
+                vantage_point: {
+                    type: qlog03.VantagePointType.unknown,
+                },
+                events: [],
+            };
+
+            for ( const key of Object.keys(header.trace) ) {
+                (traceV3 as any)[ key ] = header.trace[key];
+            }
+
+            traceV3.events = rawJSONentries; // the header was removed by calling shift() above, so these should be the raw events
+
+            qlogFileV3.trace = traceV3;
+
+            return qlogFileV3 as qlog03.IQlogFile;
+        }
+
+        // make proper qlogschema.IQLog again when we've updated the schema to match draft-02 proper
+        const qlogFile:any = { qlog_version: "draft-02", qlog_format: qlogschema.LogFormat.JSONSEQ, traces: new Array<qlogschema.ITrace>() } as qlogschema.IQLog;
+
+        if ( header.qlog_version === undefined || header.qlog_format !== qlogschema.LogFormat.JSONSEQ || header.trace === undefined ) {
             console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header (needs version, format and trace)! Aborting...", header);
 
             return undefined;
@@ -38,7 +92,7 @@ export default class TextSequenceJSONToQlog {
 
         // json-seq files have just a single trace by definition
         const trace:qlogschema.ITrace = {
-            vantage_point: { 
+            vantage_point: {
                 type: qlogschema.VantagePointType.unknown,
             },
             events: [],
@@ -51,11 +105,11 @@ export default class TextSequenceJSONToQlog {
 
         trace.events = rawJSONentries; // the header was removed by calling shift() above, so these should be the raw events
 
-        
+
         qlogFile.traces = [ trace ];
 
         return qlogFile as qlogschema.IQLog;
-    } 
+    }
 
     protected static async parseTextSequences( inputStream:ReadableStream ) : Promise<Array<any>> {
 

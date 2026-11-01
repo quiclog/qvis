@@ -278,8 +278,10 @@ export default class ConnectionStore extends VuexModule {
                 }
             }
 
-            // 3. we actually got some content, can add it to the store! 
-            if ( fileContents !==  null && fileContents.qlog_version !== undefined ) {
+            // 3. we actually got some content, can add it to the store!
+            // current IETF drafts (main-schema-14 and onward) dropped qlog_version
+            // entirely, so a valid file can now also be identified by file_schema
+            if ( fileContents !== null && ( fileContents.qlog_version !== undefined || fileContents.file_schema !== undefined ) ) {
                         
                 let urlToLoadShort = urlToLoad;
                 if ( urlToLoadShort.length > 50 ){

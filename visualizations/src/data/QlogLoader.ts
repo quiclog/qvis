@@ -8,6 +8,8 @@ import QlogConnection from '@/data/Connection';
 import { IQlogEventParser, IQlogRawEvent, TimeTrackingMethod } from '@/data/QlogEventParser';
 
 import { QlogLoaderV2 } from "./QlogLoaderV2";
+import { QlogLoaderV3 } from "./QlogLoaderV3";
+import * as qlog03 from './QlogSchema03';
 
 export class QlogLoader {
 
@@ -32,12 +34,17 @@ export class QlogLoader {
             }
             else {
                 console.error("QlogLoader: Unknown qlog version! Only draft-00, draft-01, draft-02-wip, draft-02 and 0.3 are supported!", version, json);
-                
+
                 return undefined;
             }
         }
+        // the current IETF drafts (main-schema-14 and onward) dropped qlog_version
+        // entirely: files are identified by file_schema instead (see QlogLoaderV3)
+        else if ( json && json.file_schema ) {
+            return QlogLoaderV3.fromJSON( json );
+        }
         else {
-            console.error("QlogLoader: qlog files MUST have a qlog_version field in their top-level object!", json);
+            console.error("QlogLoader: qlog files MUST have either a qlog_version field (draft-02 and earlier) or a file_schema field (" + qlog03.Defaults.versionName + " and later) in their top-level object!", json);
 
             return undefined;
         }
