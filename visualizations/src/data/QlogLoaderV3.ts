@@ -52,12 +52,13 @@ export class QlogLoaderV3 {
         }
 
         if ( fileContents.file_schema === qlog03.FileSchema.sequential ) {
-            // TODO: proper .sqlog support needs to happen at the file-reading layer
-            // (StreamingJSONParser/FileLoader), since JSON Text Sequences (RFC 7464)
-            // are RS-delimited records, not a single parseable JSON document.
-            // This only works here if something upstream already reassembled the
-            // records into one { file_schema, trace: { events: [...] } } object.
-            console.warn("QlogLoaderV3: file_schema is 'sequential' (.sqlog / JSON Text Sequences). qvis does not yet have a dedicated reader for that framing; this will only work if the records were pre-assembled into a single JSON object.");
+            // .sqlog (JSON Text Sequences, RFC 7464) are RS-delimited records, not a
+            // single parseable JSON document, so this loader can only work with an
+            // already-reassembled { file_schema, trace: { events: [...] } } object.
+            // TextSequenceJSONToQlog does exactly that reassembly at the file-reading
+            // layer before handing off to QlogLoader.fromJSON; this branch otherwise
+            // only serves whatever else constructs that shape directly.
+            console.log("QlogLoaderV3: file_schema is 'sequential' (.sqlog / JSON Text Sequences); reading the pre-assembled trace.");
         }
 
         if ( !traces ) {
@@ -171,6 +172,62 @@ export class QlogLoaderV3 {
                     if ( parsedEvt.name === "parameters_set" && parsedEvt.data &&
                          parsedEvt.data.owner === undefined && parsedEvt.data.initiator !== undefined ) {
                         parsedEvt.data.owner = parsedEvt.data.initiator;
+                    }
+
+                    // quic-events-13 renamed the symbolic error field on ConnectionClose/
+                    // ResetStream/StopSending frames from `error_code` to `error` (the new
+                    // `error_code` is only used for the raw numeric value when `error` is
+                    // "unknown"). It also merged draft-02's two CLOSE frame_types
+                    // ("connection_close" and "application_close") into a single
+                    // "connection_close", distinguished by `error_space` instead.
+                    // SequenceDiagramD3Renderer reads `frame.error_code` on all three frame
+                    // types expecting the symbolic value, so mirror `error` onto
+                    // `error_code` when the latter isn't already set.
+                    const frames:Array<any> | undefined = parsedEvt.data && parsedEvt.data.frames;
+                    if ( frames ) {
+                        for ( const frame of frames ) {
+                            if ( frame &&
+                                 ( frame.frame_type === "connection_close" || frame.frame_type === "reset_stream" || frame.frame_type === "stop_sending" ) &&
+                                 frame.error_code === undefined && frame.error !== undefined ) {
+                                frame.error_code = frame.error;
+                            }
+
+                            // StreamFrame dropped its top-level `length` field entirely in
+                            // quic-events-13 (it's only in `raw.length` now; `offset` stayed).
+                            // MultiplexingGraphD3ByterangesRenderer and
+                            // MultiplexingGraphD3CollapsedRenderer both read `frame.length`
+                            // directly to place stream data in the multiplexing graph, so
+                            // backfill it from raw.length when missing.
+                            if ( frame && frame.frame_type === "stream" &&
+                                 frame.length === undefined && frame.raw && frame.raw.length !== undefined ) {
+                                frame.length = frame.raw.length;
+                            }
+                        }
+                    }
+
+                    // h3-events-13's HTTP3PriorityUpdateFrame dropped the old experimental
+                    // `element_id`/`value` fields in favor of proper `stream_id`/`push_id`
+                    // + `priority_field_value`. MultiplexingGraphD3WaterfallRenderer reads
+                    // `data.frame.element_id`/`.value` (frame_created/frame_parsed carry a
+                    // single `data.frame`, not an array), so mirror the new fields onto the
+                    // old ones it expects.
+                    const h3Frame:any = parsedEvt.data && parsedEvt.data.frame;
+                    if ( h3Frame && h3Frame.frame_type === "priority_update" ) {
+                        if ( h3Frame.element_id === undefined ) {
+                            h3Frame.element_id = h3Frame.stream_id !== undefined ? h3Frame.stream_id : h3Frame.push_id;
+                        }
+                        if ( h3Frame.value === undefined && h3Frame.priority_field_value !== undefined ) {
+                            h3Frame.value = h3Frame.priority_field_value;
+                        }
+                    }
+
+                    // h3-events-13 renamed the HTTP3UnknownFrame field that holds the raw
+                    // numeric frame type from `raw_frame_type` to `frame_type_bytes`.
+                    // PacketizationDiagramModels reads `frame.raw_frame_type` to size
+                    // unknown/extension frames.
+                    if ( h3Frame && h3Frame.frame_type === "unknown" &&
+                         h3Frame.raw_frame_type === undefined && h3Frame.frame_type_bytes !== undefined ) {
+                        h3Frame.raw_frame_type = h3Frame.frame_type_bytes;
                     }
                 }
 
