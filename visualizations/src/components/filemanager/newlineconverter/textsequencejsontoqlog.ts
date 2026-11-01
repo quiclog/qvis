@@ -23,8 +23,23 @@ export default class TextSequenceJSONToQlog {
 
         // main-schema-14 and onward (QlogFileSeq, file_schema "urn:ietf:params:qlog:file:sequential")
         // dropped qlog_version/qlog_format entirely in favor of file_schema/serialization_format, and
-        // the header's "trace" has no "events" of its own (those are exactly the records that follow it)
-        if ( header.file_schema !== undefined ) {
+        // the header's "trace" has no "events" of its own (those are exactly the records that follow it).
+        //
+        // Some in-the-wild implementations (e.g. quic-go, as of this writing) emit a header carrying
+        // BOTH qlog_version/qlog_format AND file_schema, while the event payloads themselves are still
+        // in the older category:type convention. QlogLoader.fromJSON's own top-level dispatch checks
+        // qlog_version before file_schema, so to build an object that ends up on the loader path that
+        // actually matches the event shape, we mirror that same precedence here: qlog_version wins
+        // when both are present.
+        //
+        // Known residual gap: quic-go's traces of this shape have been observed mixing in the odd
+        // event under the NEW flattened namespace (e.g. "quic:recovery_parameters_set") alongside
+        // otherwise old-style names, inside a file that (correctly, per the above) still routes to
+        // QlogLoaderV2. That one event's old-style name-splitting won't recognize the new-style
+        // name, so renderers that look it up by name (e.g. SequenceDiagramD3Renderer's handling of
+        // RecoveryEventType.parameters_set) won't find it for quic-go traces specifically. Treated
+        // as a quic-go migration artifact rather than something to special-case here.
+        if ( header.file_schema !== undefined && header.qlog_version === undefined ) {
             if ( header.trace === undefined ) {
                 console.error("TextSequenceJSONToQlog: File did not start with the proper qlog header (needs file_schema and trace)! Aborting...", header);
 
